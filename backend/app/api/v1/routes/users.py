@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import get_current_user
+from app.auth.permissions import require_permission
 from app.db.session import get_db
 from app.models.identity import User
 from app.schemas.user_admin import UserAdminResponse, UserCreate, UserUpdate
@@ -13,7 +13,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 @router.get("", response_model=list[UserAdminResponse])
 def read_users(
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    _current_user: User = Depends(require_permission("system.admin")),
 ) -> list[UserAdminResponse]:
     return list_users(db)
 
@@ -22,7 +22,7 @@ def read_users(
 def write_user(
     payload: UserCreate,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    _current_user: User = Depends(require_permission("system.admin")),
 ) -> UserAdminResponse:
     try:
         return create_user(db, payload)
@@ -35,7 +35,7 @@ def patch_user(
     email: str,
     payload: UserUpdate,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    _current_user: User = Depends(require_permission("system.admin")),
 ) -> UserAdminResponse:
     user = update_user(db, email, payload)
     if user is None:
