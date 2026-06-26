@@ -19,6 +19,35 @@ export type AvailableWorkflow = {
   route: string;
 };
 
+export type AdminUser = {
+  id: number;
+  email: string;
+  display_name: string;
+  home_store_number: string | null;
+  region_code: string | null;
+  is_active: boolean;
+  roles: string[];
+  permissions: string[];
+};
+
+export type AdminUserCreate = {
+  email: string;
+  display_name: string;
+  password: string;
+  home_store_number?: string | null;
+  region_code?: string | null;
+  is_active: boolean;
+  role_codes: string[];
+};
+
+export type AdminUserUpdate = {
+  display_name?: string;
+  home_store_number?: string | null;
+  region_code?: string | null;
+  is_active?: boolean;
+  role_codes?: string[];
+};
+
 export function getStoredToken(): string | null {
   if (typeof window === 'undefined') {
     return null;
@@ -65,4 +94,22 @@ export async function getCurrentUser(): Promise<CurrentUser> {
 
 export async function getAvailableWorkflows(): Promise<AvailableWorkflow[]> {
   return apiFetch<AvailableWorkflow[]>('/workflows/available');
+}
+
+export async function listAdminUsers(): Promise<AdminUser[]> {
+  return apiFetch<AdminUser[]>('/users');
+}
+
+export async function createAdminUser(payload: AdminUserCreate): Promise<AdminUser> {
+  return apiFetch<AdminUser>('/users', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function updateAdminUser(email: string, payload: AdminUserUpdate): Promise<AdminUser> {
+  return apiFetch<AdminUser>(`/users/${encodeURIComponent(email)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
 }
