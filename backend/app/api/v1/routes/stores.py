@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import get_current_user
+from app.auth.permissions import require_permission
 from app.db.session import get_db
 from app.models.identity import User
 from app.schemas.store import RegionScopeCheck, RegionScopeResult, StoreResponse, StoreUpsert
@@ -16,7 +16,7 @@ router = APIRouter(prefix="/stores", tags=["stores"])
 def read_stores(
     region_code: str | None = None,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    _current_user: User = Depends(require_permission("stores.manage")),
 ) -> list[StoreResponse]:
     return list_active_stores(db, region_code=region_code)
 
@@ -25,7 +25,7 @@ def read_stores(
 def read_store(
     store_number: str,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    _current_user: User = Depends(require_permission("stores.manage")),
 ) -> StoreResponse:
     store = get_store_by_number(db, store_number)
     if store is None:
@@ -37,7 +37,7 @@ def read_store(
 def write_store(
     payload: StoreUpsert,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    _current_user: User = Depends(require_permission("stores.manage")),
 ) -> StoreResponse:
     return upsert_store(db, payload)
 
@@ -46,7 +46,7 @@ def write_store(
 def write_store_batch(
     payload: StoreBatchRequest,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    _current_user: User = Depends(require_permission("stores.manage")),
 ) -> StoreBatchResult:
     return process_store_batch(db, payload)
 
@@ -55,7 +55,7 @@ def write_store_batch(
 def read_region_scope(
     payload: RegionScopeCheck,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    _current_user: User = Depends(require_permission("stores.manage")),
 ) -> RegionScopeResult:
     blocked = check_region_scope(db, payload.user_region_code, payload.target_store_numbers)
     return RegionScopeResult(allowed=not blocked, blocked_store_numbers=blocked)
