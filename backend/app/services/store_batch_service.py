@@ -2,8 +2,10 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
+from app.schemas.event_snapshot import EventSnapshotCreate
 from app.schemas.store import StoreUpsert
 from app.schemas.store_batch import StoreBatchError, StoreBatchRequest, StoreBatchResult
+from app.services.snapshot_service import append_snapshot
 from app.services.store_service import upsert_store
 
 
@@ -37,7 +39,7 @@ def process_store_batch(db: Session, payload: StoreBatchRequest) -> StoreBatchRe
         upsert_store(db, row)
         upserted_rows += 1
 
-    return StoreBatchResult(
+    result = StoreBatchResult(
         source_system=payload.source_system,
         submitted_by=payload.submitted_by,
         processed_at=datetime.now(UTC),
@@ -46,3 +48,15 @@ def process_store_batch(db: Session, payload: StoreBatchRequest) -> StoreBatchRe
         failed_rows=len(errors),
         errors=errors,
     )
+
+    append_snapshot(
+        db,
+        EventSnapshotCreate(
+            event_type="store.batch.processed",
+            entity_type="store_batch",
+            entity_id=f"{payload.source_system}:{result.processed_at.isoformat()}",
+            actor=payload.submitted_by,
+            payload=result.model_dump(mode="json"),
+        ),
+    )
+    return result
