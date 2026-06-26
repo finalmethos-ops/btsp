@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,6 +19,15 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins_raw.split(",") if origin.strip()]
+
+    @model_validator(mode="after")
+    def validate_production_safety(self) -> "Settings":
+        if self.environment.lower() == "production":
+            if self.secret_key == "change-me-before-production":
+                raise ValueError("SECRET_KEY must be changed before production deployment")
+            if "localhost" in self.cors_origins_raw:
+                raise ValueError("CORS_ORIGINS must not use localhost in production")
+        return self
 
 
 @lru_cache
