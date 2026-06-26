@@ -1,8 +1,8 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    email: str
     password: str
 
 
@@ -12,7 +12,7 @@ class TokenResponse(BaseModel):
 
 
 class CurrentUserResponse(BaseModel):
-    email: EmailStr
+    email: str
     display_name: str
     roles: list[str]
     permissions: list[str]
