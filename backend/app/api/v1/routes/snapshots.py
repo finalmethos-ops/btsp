@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import get_current_user
+from app.auth.permissions import require_permission
 from app.db.session import get_db
 from app.models.identity import User
 from app.schemas.event_snapshot import EventSnapshotCreate, EventSnapshotResponse
@@ -17,7 +17,7 @@ def list_snapshots(
     event_type: str | None = None,
     limit: int = 100,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    _current_user: User = Depends(require_permission("snapshots.read")),
 ) -> list[EventSnapshotResponse]:
     return read_snapshots(
         db=db,
@@ -32,6 +32,6 @@ def list_snapshots(
 def create_snapshot(
     payload: EventSnapshotCreate,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    _current_user: User = Depends(require_permission("system.admin")),
 ) -> EventSnapshotResponse:
     return append_snapshot(db, payload)
