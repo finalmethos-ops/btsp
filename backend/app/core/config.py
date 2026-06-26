@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     app_name: str = Field(default="BTSP", alias="APP_NAME")
     app_version: str = Field(default="0.1.0", alias="APP_VERSION")
     secret_key: str = Field(default="change-me-before-production", alias="SECRET_KEY")
+    bootstrap_admin_token: str = Field(default="change-me-before-bootstrap", alias="BOOTSTRAP_ADMIN_TOKEN")
     access_token_expire_minutes: int = Field(default=60, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
     database_url: str = Field(alias="DATABASE_URL")
     redis_url: str = Field(default="redis://redis:6379/0", alias="REDIS_URL")
@@ -25,6 +26,8 @@ class Settings(BaseSettings):
         if self.environment.lower() == "production":
             if self.secret_key == "change-me-before-production":
                 raise ValueError("SECRET_KEY must be changed before production deployment")
+            if self.bootstrap_admin_token == "change-me-before-bootstrap":
+                raise ValueError("BOOTSTRAP_ADMIN_TOKEN must be changed before production deployment")
             if "localhost" in self.cors_origins_raw:
                 raise ValueError("CORS_ORIGINS must not use localhost in production")
         return self
