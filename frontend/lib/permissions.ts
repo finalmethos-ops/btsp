@@ -16,9 +16,8 @@ export type AdminNavigationItem = {
 
 export const adminNavigationItems: AdminNavigationItem[] = [
   { label: 'Users', href: '/admin/users', permission: 'system.admin' },
-  { label: 'Stores', href: '/admin/stores', permission: 'stores.manage' },
   { label: 'Configuration', href: '/admin/configuration', permission: 'configuration.manage' },
-  { label: 'Snapshots', href: '/admin/snapshots', permission: 'snapshots.read' },
+  { label: 'Audit', href: '/admin/audit', permission: 'snapshots.read' },
 ];
 
 export function visibleAdminNavigation(user: CurrentUser | null): AdminNavigationItem[] {
