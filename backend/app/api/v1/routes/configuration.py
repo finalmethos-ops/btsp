@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import get_current_user
+from app.auth.permissions import require_permission
 from app.db.session import get_db
 from app.models.identity import User
 from app.schemas.configuration_entry import ConfigEntryLookup, ConfigEntryResponse, ConfigEntryWrite
@@ -16,7 +16,7 @@ def read_config_entries(
     scope_type: str | None = None,
     scope_key: str | None = None,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    _current_user: User = Depends(require_permission("configuration.manage")),
 ) -> list[ConfigEntryResponse]:
     return list_config_entries(db, scope_type=scope_type, scope_key=scope_key)
 
@@ -25,7 +25,7 @@ def read_config_entries(
 def read_config_entry(
     payload: ConfigEntryLookup,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    _current_user: User = Depends(require_permission("configuration.manage")),
 ) -> ConfigEntryResponse:
     entry = get_config_entry(db, payload.scope_type, payload.scope_key, payload.key)
     if entry is None:
@@ -36,7 +36,7 @@ def read_config_entry(
 @router.post("/seed-defaults")
 def seed_config_defaults(
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    _current_user: User = Depends(require_permission("configuration.manage")),
 ) -> dict[str, int]:
     return {"seeded_count": seed_default_configuration(db)}
 
@@ -45,6 +45,6 @@ def seed_config_defaults(
 def write_config_entry(
     payload: ConfigEntryWrite,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(get_current_user),
+    _current_user: User = Depends(require_permission("configuration.manage")),
 ) -> ConfigEntryResponse:
     return upsert_config_entry(db, payload)
