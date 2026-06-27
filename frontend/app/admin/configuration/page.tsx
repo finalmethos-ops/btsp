@@ -1,34 +1,38 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { AdminShell } from '@/components/AdminShell';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
-import { ConfigEntry, listConfigEntries, saveConfigEntry, seedConfigDefaults } from '@/lib/configuration-api';
+import { listConfigEntries, saveConfigEntry, seedConfigDefaults } from '@/lib/configuration-api';
+import type { ConfigEntry } from '@/lib/configuration-api';
 import { useAuth } from '@/lib/auth';
 
 export default function AdminConfigurationPage() {
   const { user } = useAuth();
   const [entries, setEntries] = useState<ConfigEntry[]>([]);
   const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [scopeType, setScopeType] = useState('');
   const [scopeKey, setScopeKey] = useState('');
   const [settingKey, setSettingKey] = useState('');
   const [settingValue, setSettingValue] = useState('{\n  "enabled": true\n}');
 
-  async function loadEntries() {
+  const loadEntries = useCallback(async () => {
     setEntries(await listConfigEntries(scopeType || undefined, scopeKey || undefined));
-  }
+  }, [scopeKey, scopeType]);
 
   useEffect(() => {
     void loadEntries();
-  }, []);
+  }, [loadEntries]);
 
   async function handleFilter(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setError(null);
     await loadEntries();
   }
 
   async function handleSeed() {
+    setError(null);
     const result = await seedConfigDefaults();
     setMessage(`Seeded ${result.seeded_count} defaults.`);
     await loadEntries();
@@ -36,7 +40,16 @@ export default function AdminConfigurationPage() {
 
   async function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const value = JSON.parse(settingValue) as Record<string, unknown>;
+    setError(null);
+
+    let value: Record<string, unknown>;
+    try {
+      value = JSON.parse(settingValue) as Record<string, unknown>;
+    } catch {
+      setError('The setting value must be valid JSON.');
+      return;
+    }
+
     await saveConfigEntry({
       scope_type: scopeType || 'global',
       scope_key: scopeKey || 'default',
@@ -73,6 +86,7 @@ export default function AdminConfigurationPage() {
           <button className="mt-3 rounded bg-slate-900 px-4 py-2 font-semibold text-white" type="submit">Save</button>
         </form>
         {message ? <p className="mt-4 text-sm text-green-700">{message}</p> : null}
+        {error ? <p className="mt-4 text-sm text-red-700">{error}</p> : null}
         <div className="mt-6 space-y-3">
           {entries.map((entry) => (
             <article className="rounded border border-slate-200 p-4" key={`${entry.scope_type}:${entry.scope_key}:${entry.key}`}>
