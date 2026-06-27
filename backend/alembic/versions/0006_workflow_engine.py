@@ -24,8 +24,18 @@ def upgrade() -> None:
         sa.Column("terminal_states", sa.JSON(), nullable=False),
         sa.Column("transitions", sa.JSON(), nullable=False),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.true()),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.UniqueConstraint("code", "version", name="uq_workflow_definition_code_version"),
     )
     op.create_index("ix_workflow_definitions_code", "workflow_definitions", ["code"])
@@ -42,8 +52,18 @@ def upgrade() -> None:
         sa.Column("context", sa.JSON(), nullable=False),
         sa.Column("started_by", sa.String(length=255), nullable=False),
         sa.Column("updated_by", sa.String(length=255), nullable=False),
-        sa.Column("started_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "started_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
     )
     op.create_index("ix_workflow_instances_workflow_code", "workflow_instances", ["workflow_code"])
     op.create_index("ix_workflow_instances_entity_type", "workflow_instances", ["entity_type"])
