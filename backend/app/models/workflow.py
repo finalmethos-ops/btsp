@@ -9,7 +9,9 @@ from app.db.session import Base
 
 class WorkflowDefinition(Base):
     __tablename__ = "workflow_definitions"
-    __table_args__ = (UniqueConstraint("code", "version", name="uq_workflow_definition_code_version"),)
+    __table_args__ = (
+        UniqueConstraint("code", "version", name="uq_workflow_definition_code_version"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     code: Mapped[str] = mapped_column(String(128), index=True)
@@ -19,7 +21,10 @@ class WorkflowDefinition(Base):
     terminal_states: Mapped[list[str]] = mapped_column(JSON, default=list)
     transitions: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -40,7 +45,10 @@ class WorkflowInstance(Base):
     context: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     started_by: Mapped[str] = mapped_column(String(255))
     updated_by: Mapped[str] = mapped_column(String(255))
-    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
