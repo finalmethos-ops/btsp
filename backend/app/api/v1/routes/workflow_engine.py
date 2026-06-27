@@ -51,11 +51,12 @@ def run_action(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> FlowInstanceResponse:
+    trusted_payload = payload.model_copy(update={"actor": current_user.email})
     try:
         return advance_workflow(
             db=db,
             instance_id=instance_id,
-            payload=payload,
+            payload=trusted_payload,
             permission_codes=get_permission_codes(current_user),
         )
     except PermissionError as exc:
