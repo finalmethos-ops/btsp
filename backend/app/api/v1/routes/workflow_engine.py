@@ -5,8 +5,19 @@ from app.auth.dependencies import get_current_user
 from app.auth.permissions import get_permission_codes, require_permission
 from app.db.session import get_db
 from app.models.identity import User
-from app.schemas.flow import FlowActionRequest, FlowDefinitionResponse, FlowDefinitionWrite, FlowInstanceResponse, FlowStartRequest
-from app.services.workflow_engine import WorkflowError, advance_workflow, start_workflow, upsert_workflow_definition
+from app.schemas.flow import (
+    FlowActionRequest,
+    FlowDefinitionResponse,
+    FlowDefinitionWrite,
+    FlowInstanceResponse,
+    FlowStartRequest,
+)
+from app.services.workflow_engine import (
+    WorkflowError,
+    advance_workflow,
+    start_workflow,
+    upsert_workflow_definition,
+)
 
 router = APIRouter(prefix="/workflow-engine", tags=["workflow-engine"])
 
@@ -60,6 +71,9 @@ def run_action(
             permission_codes=get_permission_codes(current_user),
         )
     except PermissionError as exc:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Missing required permission: {exc}") from exc
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Missing required permission: {exc}",
+        ) from exc
     except WorkflowError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
