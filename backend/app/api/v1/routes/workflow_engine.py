@@ -5,19 +5,8 @@ from app.auth.dependencies import get_current_user
 from app.auth.permissions import get_permission_codes, require_permission
 from app.db.session import get_db
 from app.models.identity import User
-from app.schemas.flow import (
-    FlowActionRequest,
-    FlowDefinitionResponse,
-    FlowDefinitionWrite,
-    FlowInstanceResponse,
-    FlowStartRequest,
-)
-from app.services.workflow_engine import (
-    WorkflowError,
-    advance_workflow,
-    start_workflow,
-    upsert_workflow_definition,
-)
+from app.schemas.flow import FlowActionRequest, FlowDefinitionResponse, FlowDefinitionWrite, FlowInstanceResponse, FlowStartRequest
+from app.services.workflow_engine import WorkflowError, advance_workflow, start_workflow, upsert_workflow_definition
 
 router = APIRouter(prefix="/workflow-engine", tags=["workflow-engine"])
 
@@ -28,7 +17,19 @@ def write_definition(
     db: Session = Depends(get_db),
     _current_user: User = Depends(require_permission("configuration.manage")),
 ) -> FlowDefinitionResponse:
-    return upsert_workflow_definition(db, payload)
+    definition = upsert_workflow_definition(db, payload)
+    return FlowDefinitionResponse(
+        id=definition.id,
+        code=definition.code,
+        name=definition.name,
+        version=definition.version,
+        initial_state=definition.initial_state,
+        terminal_states=definition.terminal_states,
+        rules=payload.rules,
+        is_active=definition.is_active,
+        created_at=definition.created_at,
+        updated_at=definition.updated_at,
+    )
 
 
 @router.post("/instances", response_model=FlowInstanceResponse)
