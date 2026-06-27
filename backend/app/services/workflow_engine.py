@@ -1,3 +1,5 @@
+from typing import Any
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -79,7 +81,11 @@ def start_workflow(db: Session, payload: FlowStartRequest, actor: str) -> Workfl
     return instance
 
 
-def find_rule(definition: WorkflowDefinition, current_state: str, action: str) -> dict[str, str] | None:
+def find_rule(
+    definition: WorkflowDefinition,
+    current_state: str,
+    action: str,
+) -> dict[str, Any] | None:
     for rule in definition.transitions:
         if rule.get("source") == current_state and rule.get("action") == action:
             return rule
@@ -108,7 +114,11 @@ def advance_workflow(
         raise PermissionError(required_permission)
 
     previous_state = instance.current_state
-    instance.current_state = rule["target"]
+    target_state = rule.get("target")
+    if not isinstance(target_state, str):
+        raise WorkflowError("Workflow rule target is invalid")
+
+    instance.current_state = target_state
     instance.context = {**instance.context, **payload.context_patch}
     instance.updated_by = payload.actor
     if instance.current_state in definition.terminal_states:
