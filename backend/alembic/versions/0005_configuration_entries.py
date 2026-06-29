@@ -4,8 +4,10 @@ Revision ID: 0005_configuration_entries
 Revises: 0004_store_audit_fields
 Create Date: 2026-06-26
 """
-from alembic import op
+
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = "0005_configuration_entries"
 down_revision = "0004_store_audit_fields"
@@ -24,8 +26,12 @@ def upgrade() -> None:
         sa.Column("description", sa.String(length=500), nullable=True),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.true()),
         sa.Column("updated_by", sa.String(length=255), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
+        sa.Column(
+            "updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
         sa.UniqueConstraint("scope_type", "scope_key", "key", name="uq_configuration_scope_key"),
     )
     op.create_index("ix_configuration_entries_scope_type", "configuration_entries", ["scope_type"])

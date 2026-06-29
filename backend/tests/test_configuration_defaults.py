@@ -3,8 +3,7 @@ from app.services.configuration_defaults import DEFAULT_CONFIGURATION_ENTRIES
 
 def test_default_configuration_includes_separate_workflows() -> None:
     workflow_keys = {
-        (entry.scope_type, entry.scope_key, entry.key)
-        for entry in DEFAULT_CONFIGURATION_ENTRIES
+        (entry.scope_type, entry.scope_key, entry.key) for entry in DEFAULT_CONFIGURATION_ENTRIES
     }
 
     assert ("workflow", "BPP", "ordering.enabled") in workflow_keys

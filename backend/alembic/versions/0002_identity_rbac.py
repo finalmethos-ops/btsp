@@ -4,8 +4,10 @@ Revision ID: 0002_identity_rbac
 Revises: 0001_initial_schema
 Create Date: 2026-06-26
 """
-from alembic import op
+
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = "0002_identity_rbac"
 down_revision = "0001_initial_schema"

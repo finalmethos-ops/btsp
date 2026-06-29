@@ -6,7 +6,11 @@ from app.db.session import get_db
 from app.models.identity import User
 from app.schemas.configuration_entry import ConfigEntryLookup, ConfigEntryResponse, ConfigEntryWrite
 from app.services.configuration_seed_service import seed_default_configuration
-from app.services.configuration_service import get_config_entry, list_config_entries, upsert_config_entry
+from app.services.configuration_service import (
+    get_config_entry,
+    list_config_entries,
+    upsert_config_entry,
+)
 
 router = APIRouter(prefix="/configuration", tags=["configuration"])
 

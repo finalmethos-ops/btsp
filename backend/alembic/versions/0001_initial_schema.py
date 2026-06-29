@@ -1,11 +1,13 @@
 """initial schema
 
 Revision ID: 0001_initial_schema
-Revises: 
+Revises:
 Create Date: 2026-06-26
 """
-from alembic import op
+
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = "0001_initial_schema"
 down_revision = None
@@ -35,7 +37,9 @@ def upgrade() -> None:
         sa.Column("entity_id", sa.String(length=128), nullable=False),
         sa.Column("payload", sa.JSON(), nullable=False),
         sa.Column("actor", sa.String(length=255), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
     )
     op.create_index("ix_event_snapshots_event_type", "event_snapshots", ["event_type"])
     op.create_index("ix_event_snapshots_entity_type", "event_snapshots", ["entity_type"])

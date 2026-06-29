@@ -37,7 +37,10 @@ def patch_user(
     db: Session = Depends(get_db),
     _current_user: User = Depends(require_permission("system.admin")),
 ) -> UserAdminResponse:
-    user = update_user(db, email, payload)
+    try:
+        user = update_user(db, email, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return user

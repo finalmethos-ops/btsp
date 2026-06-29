@@ -31,7 +31,9 @@ def ensure_core_roles(db: Session, permissions: dict[str, Permission]) -> dict[s
                 is_system_role=True,
             )
             db.add(role)
-        role.permissions = [permissions[permission_code] for permission_code in definition["permissions"]]
+        role.permissions = [
+            permissions[permission_code] for permission_code in definition["permissions"]
+        ]
         roles[code] = role
     db.flush()
     return roles
@@ -65,7 +67,9 @@ def bootstrap_admin_user(db: Session, payload: AdminBootstrapRequest) -> AdminBo
     db.refresh(user)
 
     role_codes = sorted({role.code for role in user.roles})
-    permission_codes = sorted({permission.code for role in user.roles for permission in role.permissions})
+    permission_codes = sorted(
+        {permission.code for role in user.roles for permission in role.permissions}
+    )
     return AdminBootstrapResponse(
         email=user.email,
         display_name=user.display_name,

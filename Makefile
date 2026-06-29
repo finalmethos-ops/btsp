@@ -29,11 +29,14 @@ test:
 	cd frontend && npm test -- --run
 
 lint:
-	cd backend && ruff check app tests
+	cd backend && ruff check app tests scripts alembic
+	cd backend && ruff format --check app tests scripts alembic
 	cd frontend && npm run lint
+	cd frontend && npm run format:check
+	cd frontend && npm run typecheck
 
 format:
-	cd backend && ruff format app tests
+	cd backend && ruff format app tests scripts alembic
 	cd frontend && npm run format
 
 migrate:

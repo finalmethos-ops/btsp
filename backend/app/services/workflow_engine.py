@@ -3,17 +3,27 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.workflows import WORKFLOW_REGISTRY, WorkflowRegistryError
 from app.models.workflow import WorkflowDefinition, WorkflowInstance
 from app.schemas.event_snapshot import EventSnapshotCreate
 from app.schemas.flow import FlowActionRequest, FlowDefinitionWrite, FlowStartRequest
 from app.services.snapshot_service import append_snapshot
+from app.services.workflow_projection_service import sync_workflow_entity_projection
 
 
 class WorkflowError(ValueError):
     pass
 
 
+def ensure_registered_workflow(workflow_code: str) -> None:
+    try:
+        WORKFLOW_REGISTRY.require_active(workflow_code)
+    except WorkflowRegistryError as exc:
+        raise WorkflowError(str(exc)) from exc
+
+
 def upsert_workflow_definition(db: Session, payload: FlowDefinitionWrite) -> WorkflowDefinition:
+    ensure_registered_workflow(payload.code)
     definition = db.scalar(
         select(WorkflowDefinition).where(
             WorkflowDefinition.code == payload.code,
@@ -37,6 +47,7 @@ def upsert_workflow_definition(db: Session, payload: FlowDefinitionWrite) -> Wor
 
 
 def get_active_definition(db: Session, workflow_code: str) -> WorkflowDefinition:
+    ensure_registered_workflow(workflow_code)
     definition = db.scalar(
         select(WorkflowDefinition)
         .where(WorkflowDefinition.code == workflow_code, WorkflowDefinition.is_active.is_(True))
@@ -44,6 +55,23 @@ def get_active_definition(db: Session, workflow_code: str) -> WorkflowDefinition
     )
     if definition is None:
         raise WorkflowError("Workflow definition not found")
+    return definition
+
+
+def get_definition(
+    db: Session,
+    workflow_code: str,
+    workflow_version: int,
+) -> WorkflowDefinition:
+    ensure_registered_workflow(workflow_code)
+    definition = db.scalar(
+        select(WorkflowDefinition).where(
+            WorkflowDefinition.code == workflow_code,
+            WorkflowDefinition.version == workflow_version,
+        )
+    )
+    if definition is None:
+        raise WorkflowError("Workflow definition version not found")
     return definition
 
 
@@ -101,10 +129,10 @@ def advance_workflow(
     instance = db.get(WorkflowInstance, instance_id)
     if instance is None:
         raise WorkflowError("Workflow instance not found")
-    if instance.status != "active":
+    if instance.status != "active" and payload.action != "administrative_reopen":
         raise WorkflowError("Workflow instance is not active")
 
-    definition = get_active_definition(db, instance.workflow_code)
+    definition = get_definition(db, instance.workflow_code, instance.workflow_version)
     rule = find_rule(definition, instance.current_state, payload.action)
     if rule is None:
         raise WorkflowError("Workflow action is not valid for current state")
@@ -123,7 +151,10 @@ def advance_workflow(
     instance.updated_by = payload.actor
     if instance.current_state in definition.terminal_states:
         instance.status = "complete"
+    elif payload.action == "administrative_reopen":
+        instance.status = "active"
 
+    sync_workflow_entity_projection(db, instance)
     db.commit()
     db.refresh(instance)
 

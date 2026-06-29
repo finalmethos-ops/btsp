@@ -7,7 +7,12 @@ from app.models.identity import User
 from app.schemas.store import RegionScopeCheck, RegionScopeResult, StoreResponse, StoreUpsert
 from app.schemas.store_batch import StoreBatchRequest, StoreBatchResult
 from app.services.store_batch_service import process_store_batch
-from app.services.store_service import check_region_scope, get_store_by_number, list_active_stores, upsert_store
+from app.services.store_service import (
+    check_region_scope,
+    get_store_by_number,
+    list_active_stores,
+    upsert_store,
+)
 
 router = APIRouter(prefix="/stores", tags=["stores"])
 

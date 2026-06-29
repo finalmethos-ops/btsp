@@ -8,7 +8,9 @@ from app.schemas.user_admin import UserAdminResponse, UserCreate, UserUpdate
 
 def user_to_admin_response(user: User) -> UserAdminResponse:
     role_codes = sorted({role.code for role in user.roles})
-    permission_codes = sorted({permission.code for role in user.roles for permission in role.permissions})
+    permission_codes = sorted(
+        {permission.code for role in user.roles for permission in role.permissions}
+    )
     return UserAdminResponse(
         id=user.id,
         email=user.email,
@@ -24,7 +26,11 @@ def user_to_admin_response(user: User) -> UserAdminResponse:
 def get_roles_by_code(db: Session, role_codes: list[str]) -> list[Role]:
     if not role_codes:
         return []
-    return list(db.scalars(select(Role).where(Role.code.in_(role_codes))).all())
+    roles = list(db.scalars(select(Role).where(Role.code.in_(role_codes))).all())
+    missing = sorted(set(role_codes) - {role.code for role in roles})
+    if missing:
+        raise ValueError(f"Unknown roles: {', '.join(missing)}")
+    return roles
 
 
 def list_users(db: Session) -> list[UserAdminResponse]:

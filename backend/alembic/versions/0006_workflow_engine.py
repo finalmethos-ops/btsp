@@ -4,8 +4,10 @@ Revision ID: 0006_workflow_engine
 Revises: 0005_configuration_entries
 Create Date: 2026-06-26
 """
-from alembic import op
+
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = "0006_workflow_engine"
 down_revision = "0005_configuration_entries"

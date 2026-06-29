@@ -2,6 +2,8 @@
 
 BTSP uses a reusable workflow engine for state-based business processes.
 
+Only workflow codes declared by the code-owned workflow registry can be used for definitions and instances. The registry identifies deployable workflow capabilities; this engine owns their versioned runtime state machines.
+
 ## Core Concepts
 
 - Workflow definitions describe the process code, version, initial state, terminal states, and allowed rules.
@@ -20,6 +22,7 @@ BTSP uses a reusable workflow engine for state-based business processes.
 
 - Definitions are versioned.
 - Instances retain the definition version they started with.
+- Instance advancement resolves the exact recorded definition version, even after newer versions are activated.
 - Completed instances cannot be advanced.
 - Invalid actions are rejected.
 - Required permissions are checked before state changes.

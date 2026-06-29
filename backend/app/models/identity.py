@@ -1,15 +1,7 @@
-from enum import StrEnum
-
-from sqlalchemy import Boolean, ForeignKey, String, Table, Column
+from sqlalchemy import Boolean, Column, ForeignKey, String, Table
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
-
-
-class WorkflowCode(StrEnum):
-    BPP = "BPP"
-    INDEPENDENT = "INDEPENDENT"
-
 
 user_roles = Table(
     "user_roles",
@@ -63,4 +55,6 @@ class Permission(Base):
     code: Mapped[str] = mapped_column(String(160), unique=True, index=True)
     description: Mapped[str] = mapped_column(String(500))
 
-    roles: Mapped[list[Role]] = relationship(secondary=role_permissions, back_populates="permissions")
+    roles: Mapped[list[Role]] = relationship(
+        secondary=role_permissions, back_populates="permissions"
+    )

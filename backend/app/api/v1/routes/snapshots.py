@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.auth.permissions import require_permission
@@ -15,7 +15,7 @@ def list_snapshots(
     entity_type: str | None = None,
     entity_id: str | None = None,
     event_type: str | None = None,
-    limit: int = 100,
+    limit: int = Query(default=100, ge=1, le=500),
     db: Session = Depends(get_db),
     _current_user: User = Depends(require_permission("snapshots.read")),
 ) -> list[EventSnapshotResponse]:

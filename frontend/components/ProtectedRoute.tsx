@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { ReactNode } from 'react';
-import { LoginForm } from '@/components/LoginForm';
-import { useAuth } from '@/lib/auth';
-import { hasPermission } from '@/lib/permissions';
+import { ReactNode } from "react";
+import { LoginForm } from "@/components/LoginForm";
+import { useAuth } from "@/lib/auth";
+import { hasPermission } from "@/lib/permissions";
 
 export function ProtectedRoute({
   children,
@@ -30,7 +30,9 @@ export function ProtectedRoute({
     return (
       <main className="mx-auto max-w-3xl p-8">
         <h1 className="text-3xl font-bold">Access denied</h1>
-        <p className="mt-4 text-slate-600">You do not have permission to view this page.</p>
+        <p className="mt-4 text-slate-600">
+          You do not have permission to view this page.
+        </p>
       </main>
     );
   }

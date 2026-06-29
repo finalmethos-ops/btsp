@@ -42,11 +42,16 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
+      - attachment_data:/data/attachments
+      - purchase_order_export_data:/data/purchase-order-exports
+      - analytics_report_data:/data/analytics-reports
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   frontend:
     build:
       context: ./frontend
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL-}
     restart: unless-stopped
     env_file:
       - .env
@@ -73,3 +78,6 @@ services:
 volumes:
   postgres_data:
   frontend_node_modules:
+  attachment_data:
+  purchase_order_export_data:
+  analytics_report_data:

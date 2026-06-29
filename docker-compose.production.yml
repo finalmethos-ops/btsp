@@ -1,0 +1,16 @@
+services:
+  backend:
+    environment:
+      ENVIRONMENT: production
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required for production}
+      BOOTSTRAP_ADMIN_TOKEN: ${BOOTSTRAP_ADMIN_TOKEN:?BOOTSTRAP_ADMIN_TOKEN is required for production}
+      CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS is required for production}
+    volumes: !override
+      - attachment_data:/data/attachments
+      - purchase_order_export_data:/data/purchase-order-exports
+      - analytics_report_data:/data/analytics-reports
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+  frontend:
+    volumes: !reset []
+    command: npm run start -- -H 0.0.0.0

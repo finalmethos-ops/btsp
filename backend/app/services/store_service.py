@@ -45,4 +45,8 @@ def check_region_scope(
         Store.is_ordering_enabled.is_(True),
     )
     allowed_store_numbers = set(db.scalars(statement).all())
-    return [store_number for store_number in target_store_numbers if store_number not in allowed_store_numbers]
+    return [
+        store_number
+        for store_number in target_store_numbers
+        if store_number not in allowed_store_numbers
+    ]

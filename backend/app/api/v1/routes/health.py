@@ -1,9 +1,8 @@
-from fastapi import APIRouter
-from redis import Redis
-from sqlalchemy import text
+from fastapi import APIRouter, Response, status
 
 from app.core.config import settings
 from app.db.session import engine
+from app.services.system_health_service import dependencies_ready
 
 router = APIRouter()
 
@@ -14,11 +13,8 @@ def read_health() -> dict[str, str]:
 
 
 @router.get("/ready")
-def read_ready() -> dict[str, str]:
-    with engine.connect() as connection:
-        connection.execute(text("select 1"))
-
-    redis_client = Redis.from_url(settings.redis_url)
-    redis_client.ping()
-
+def read_ready(response: Response) -> dict[str, str]:
+    if not dependencies_ready(engine, settings.redis_url):
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        return {"status": "not_ready"}
     return {"status": "ready"}

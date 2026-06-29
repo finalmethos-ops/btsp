@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { DashboardShell } from '@/components/DashboardShell';
-import { LoginForm } from '@/components/LoginForm';
-import { useAuth } from '@/lib/auth';
+import { DashboardShell } from "@/components/DashboardShell";
+import { LoginForm } from "@/components/LoginForm";
+import { useAuth } from "@/lib/auth";
 
 export default function HomePage() {
   const { user, isLoading } = useAuth();

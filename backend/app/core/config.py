@@ -11,11 +11,23 @@ class Settings(BaseSettings):
     app_name: str = Field(default="BTSP", alias="APP_NAME")
     app_version: str = Field(default="0.1.0", alias="APP_VERSION")
     secret_key: str = Field(default="change-me-before-production", alias="SECRET_KEY")
-    bootstrap_admin_token: str = Field(default="change-me-before-bootstrap", alias="BOOTSTRAP_ADMIN_TOKEN")
+    bootstrap_admin_token: str = Field(
+        default="change-me-before-bootstrap", alias="BOOTSTRAP_ADMIN_TOKEN"
+    )
     access_token_expire_minutes: int = Field(default=60, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
     database_url: str = Field(alias="DATABASE_URL")
     redis_url: str = Field(default="redis://redis:6379/0", alias="REDIS_URL")
     cors_origins_raw: str = Field(default="http://localhost:3000", alias="CORS_ORIGINS")
+    attachment_storage_path: str = Field(
+        default="/data/attachments", alias="ATTACHMENT_STORAGE_PATH"
+    )
+    attachment_max_bytes: int = Field(default=20 * 1024 * 1024, alias="ATTACHMENT_MAX_BYTES")
+    purchase_order_export_path: str = Field(
+        default="/data/purchase-order-exports", alias="PURCHASE_ORDER_EXPORT_PATH"
+    )
+    analytics_report_path: str = Field(
+        default="/data/analytics-reports", alias="ANALYTICS_REPORT_PATH"
+    )
 
     @property
     def cors_origins(self) -> list[str]:
@@ -26,8 +38,12 @@ class Settings(BaseSettings):
         if self.environment.lower() == "production":
             if self.secret_key == "change-me-before-production":
                 raise ValueError("SECRET_KEY must be changed before production deployment")
+            if len(self.secret_key.encode("utf-8")) < 32:
+                raise ValueError("SECRET_KEY must be at least 32 bytes in production")
             if self.bootstrap_admin_token == "change-me-before-bootstrap":
-                raise ValueError("BOOTSTRAP_ADMIN_TOKEN must be changed before production deployment")
+                raise ValueError(
+                    "BOOTSTRAP_ADMIN_TOKEN must be changed before production deployment"
+                )
             if "localhost" in self.cors_origins_raw:
                 raise ValueError("CORS_ORIGINS must not use localhost in production")
         return self

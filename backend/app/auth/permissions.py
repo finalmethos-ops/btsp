@@ -24,3 +24,16 @@ def require_permission(permission_code: str) -> Callable[[User], User]:
         return current_user
 
     return dependency
+
+
+def require_any_permission(permission_codes: set[str]) -> Callable[[User], User]:
+    def dependency(current_user: User = Depends(get_current_user)) -> User:
+        if get_permission_codes(current_user).isdisjoint(permission_codes):
+            required = ", ".join(sorted(permission_codes))
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Missing one of required permissions: {required}",
+            )
+        return current_user
+
+    return dependency

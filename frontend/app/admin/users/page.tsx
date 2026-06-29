@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { AdminShell } from '@/components/AdminShell';
-import { ProtectedRoute } from '@/components/ProtectedRoute';
-import { UserManagementPanel } from '@/components/UserManagementPanel';
+import { AdminShell } from "@/components/AdminShell";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { UserManagementPanel } from "@/components/UserManagementPanel";
 
 export default function AdminUsersPage() {
   return (

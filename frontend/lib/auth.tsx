@@ -1,7 +1,14 @@
-'use client';
+"use client";
 
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { CurrentUser, clearToken, getCurrentUser, getStoredToken, login, storeToken } from './api';
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import {
+  CurrentUser,
+  clearToken,
+  getCurrentUser,
+  getStoredToken,
+  login,
+  storeToken,
+} from "./api";
 
 type AuthContextValue = {
   user: CurrentUser | null;
@@ -14,15 +21,15 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<CurrentUser | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     async function loadUser() {
-      if (!getStoredToken()) {
-        setIsLoading(false);
-        return;
-      }
       try {
+        if (!getStoredToken()) {
+          return;
+        }
+        setIsLoading(true);
         setUser(await getCurrentUser());
       } catch {
         clearToken();
@@ -58,7 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function useAuth(): AuthContextValue {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
+    throw new Error("useAuth must be used within AuthProvider");
   }
   return context;
 }
