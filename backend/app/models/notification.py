@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, String, Text, func
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
@@ -28,6 +28,21 @@ class NotificationTemplate(Base):
     )
 
 
+class UserNotificationPreference(Base):
+    __tablename__ = "user_notification_preferences"
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    in_app_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    email_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    quiet_hours_start: Mapped[str | None] = mapped_column(String(5), nullable=True)
+    quiet_hours_end: Mapped[str | None] = mapped_column(String(5), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 class NotificationEvent(Base):
     __tablename__ = "notification_events"
 
@@ -43,6 +58,7 @@ class NotificationEvent(Base):
     resolved_recipients: Mapped[list[str]] = mapped_column(JSON, default=list)
     subject: Mapped[str] = mapped_column(String(500))
     body: Mapped[str] = mapped_column(Text)
+    action_href: Mapped[str | None] = mapped_column(String(500), nullable=True)
     status: Mapped[str] = mapped_column(String(32), index=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

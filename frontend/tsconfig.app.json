@@ -5,6 +5,8 @@
     "allowJs": false,
     "skipLibCheck": true,
     "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "noEmit": true,
     "esModuleInterop": true,
     "module": "esnext",
@@ -24,7 +26,9 @@
     "app/**/*.ts",
     "app/**/*.tsx",
     "components/**/*.ts",
-    "components/**/*.tsx"
+    "components/**/*.tsx",
+    "lib/**/*.ts",
+    "lib/**/*.tsx"
   ],
   "exclude": ["node_modules"]
 }

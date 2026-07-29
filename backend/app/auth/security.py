@@ -2,6 +2,7 @@ from datetime import UTC, datetime, timedelta
 from hashlib import pbkdf2_hmac
 from hmac import compare_digest
 from secrets import token_hex
+from uuid import uuid4
 
 import jwt
 
@@ -45,7 +46,37 @@ def verify_password(plain_password: str, password_hash: str) -> bool:
     return compare_digest(digest.hex(), expected_digest)
 
 
-def create_access_token(subject: str) -> str:
-    expires_at = datetime.now(UTC) + timedelta(minutes=settings.access_token_expire_minutes)
-    payload = {"sub": subject, "exp": expires_at}
+def create_access_token(
+    subject: str,
+    login_context: str = "standard",
+    active_vendor_code: str | None = None,
+    session_id: str | None = None,
+) -> str:
+    issued_at = datetime.now(UTC)
+    expires_at = issued_at + timedelta(minutes=settings.access_token_expire_minutes)
+    payload = {
+        "sub": subject,
+        "iat": issued_at,
+        "nbf": issued_at,
+        "exp": expires_at,
+        "iss": settings.app_name,
+        "aud": settings.app_name,
+        "jti": str(uuid4()),
+        "login_context": login_context,
+    }
+    if session_id:
+        payload["sid"] = session_id
+    if active_vendor_code:
+        payload["active_vendor_code"] = active_vendor_code
     return jwt.encode(payload, settings.secret_key, algorithm=ALGORITHM)
+
+
+def decode_access_token(token: str) -> dict:
+    return jwt.decode(
+        token,
+        settings.secret_key,
+        algorithms=[ALGORITHM],
+        audience=settings.app_name,
+        issuer=settings.app_name,
+        options={"require": ["sub", "iat", "nbf", "exp", "iss", "aud", "jti"]},
+    )

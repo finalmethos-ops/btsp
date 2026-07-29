@@ -1,3 +1,6 @@
+import pytest
+from pydantic import ValidationError
+
 from app.schemas.user_admin import UserCreate, UserUpdate
 
 
@@ -17,3 +20,12 @@ def test_user_update_can_assign_roles() -> None:
     payload = UserUpdate(role_codes=["INDEPENDENT_ADMIN"])
 
     assert payload.role_codes == ["INDEPENDENT_ADMIN"]
+
+
+def test_user_create_rejects_short_passwords() -> None:
+    with pytest.raises(ValidationError, match="at least 12 characters"):
+        UserCreate(
+            email="manager@example.com",
+            display_name="Store Manager",
+            password="too-short",
+        )

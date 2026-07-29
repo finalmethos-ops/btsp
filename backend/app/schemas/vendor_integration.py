@@ -1,9 +1,11 @@
 from datetime import datetime
+from decimal import Decimal
 from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.schemas.numeric import PositiveWholeQuantity
 from app.services.vendor_connector_security import configuration_contains_secret
 
 
@@ -282,7 +284,7 @@ class VendorShipmentResponse(BaseModel):
 class VendorASNLinePayload(BaseModel):
     purchase_order_line_id: int
     product_code: str = Field(min_length=1, max_length=64)
-    quantity: float = Field(gt=0)
+    quantity: PositiveWholeQuantity
     lot_number: str | None = Field(default=None, max_length=160)
 
 
@@ -300,7 +302,7 @@ class VendorASNLineResponse(BaseModel):
     id: int
     purchase_order_line_id: int
     product_code: str
-    quantity: float
+    quantity: Decimal
     lot_number: str | None
 
 

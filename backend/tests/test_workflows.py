@@ -2,7 +2,6 @@ import pytest
 
 from app.core.workflows import (
     WORKFLOW_REGISTRY,
-    WORKFLOW_ROUTES,
     WorkflowCode,
     WorkflowRegistration,
     WorkflowRegistry,
@@ -18,7 +17,6 @@ def test_workflow_registry_keeps_workflows_separate() -> None:
     assert independent.route == "/workflows/independent"
     assert bpp.route != independent.route
     assert bpp.permission_code != independent.permission_code
-    assert WORKFLOW_ROUTES[WorkflowCode.BPP] == bpp.route
 
 
 def test_workflow_registry_preserves_registration_order() -> None:

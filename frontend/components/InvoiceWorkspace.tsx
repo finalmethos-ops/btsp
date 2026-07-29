@@ -60,12 +60,12 @@ export function InvoiceWorkspace() {
         product_code: line.product_code,
         quantity,
         unit_price: unitPrice,
-        extended_amount: (quantity * unitPrice).toFixed(4),
+        extended_amount: (quantity * unitPrice).toFixed(2),
       };
     });
     const subtotal = lines
       .reduce((sum, line) => sum + Number(line.extended_amount), 0)
-      .toFixed(4);
+      .toFixed(2);
     setBusy(true);
     setMessage(null);
     try {
@@ -271,14 +271,14 @@ export function InvoiceWorkspace() {
                     <td className="p-2">
                       <input
                         className="w-28 rounded border p-2"
-                        min="0.0001"
+                        min="1"
                         onChange={(event) =>
                           setQuantities((current) => ({
                             ...current,
                             [line.id]: event.target.value,
                           }))
                         }
-                        step="0.0001"
+                        step="1"
                         type="number"
                         value={quantities[line.id] ?? line.quantity}
                       />
@@ -293,7 +293,7 @@ export function InvoiceWorkspace() {
                             [line.id]: event.target.value,
                           }))
                         }
-                        step="0.0001"
+                        step="0.01"
                         type="number"
                         value={prices[line.id] ?? line.unit_price}
                       />

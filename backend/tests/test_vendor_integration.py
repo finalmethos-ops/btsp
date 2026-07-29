@@ -627,7 +627,7 @@ def test_asn_enforces_po_line_and_cumulative_quantity(db: Session) -> None:
     db.add(line)
     db.commit()
 
-    def event(external_id: str, quantity: float):
+    def event(external_id: str, quantity: int):
         item, _ = ingest_vendor_event(
             db,
             VendorInboundEventCreate(
@@ -650,11 +650,11 @@ def test_asn_enforces_po_line_and_cumulative_quantity(db: Session) -> None:
         )
         return item
 
-    asn, created = process_asn(db, event("ASN-001", 1.5).id, "admin")
+    asn, created = process_asn(db, event("ASN-001", 1).id, "admin")
     assert created is True
     assert len(asn.lines) == 1
 
-    second = event("ASN-002", 1)
+    second = event("ASN-002", 2)
     with pytest.raises(VendorShipmentError, match="exceeds ordered"):
         process_asn(db, second.id, "admin")
     db.refresh(second)

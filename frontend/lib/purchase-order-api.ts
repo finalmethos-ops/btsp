@@ -1,4 +1,5 @@
 import { apiDownload, apiFetch } from "./api";
+import type { PurchaseOrderFilterValues } from "@/components/PurchaseOrderFilters";
 
 export type PurchaseOrderSource = {
   purchase_request_id: string;
@@ -7,16 +8,31 @@ export type PurchaseOrderSource = {
 export type PurchaseOrderLine = {
   id: number;
   source_request_id: string;
-  source_line_id: number;
+  source_line_id: number | null;
   store_number: string;
   product_code: string;
   product_name: string;
   quantity: string;
+  received_quantity: string;
   unit_price: string;
   freight_amount: string;
   tax_amount: string;
   extended_amount: string;
   notes: string | null;
+};
+export type POAttention = {
+  id: string;
+  purchase_order_id: string;
+  initiated_by_side: "vendor" | "purchasing";
+  action_type: string;
+  status: string;
+  payload: Record<string, string | number | null>;
+  reason: string | null;
+  response_note: string | null;
+  created_by: string;
+  responded_by: string | null;
+  created_at: string;
+  responded_at: string | null;
 };
 export type PurchaseOrder = {
   id: string;
@@ -29,11 +45,16 @@ export type PurchaseOrder = {
   freight_total: string;
   tax_total: string;
   total: string;
+  expected_delivery_date: string | null;
+  vendor_eta: string | null;
+  vendor_response_at: string | null;
+  vendor_rejection_reason: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
   sources: PurchaseOrderSource[];
   lines: PurchaseOrderLine[];
+  attention_items: POAttention[];
 };
 export type PurchaseOrderArtifact = {
   id: string;
@@ -74,6 +95,24 @@ export const listPurchaseOrders = () =>
   apiFetch<PurchaseOrder[]>("/purchase-orders");
 export const getPurchaseOrder = (id: string) =>
   apiFetch<PurchaseOrder>(`/purchase-orders/${id}`);
+export const handoffPurchaseOrder = (id: string) =>
+  apiFetch<PurchaseOrder>(`/purchase-orders/${id}/reconciliation-handoff`, {
+    method: "POST",
+  });
+export const listReconciliationPurchaseOrders = (
+  queue: "active" | "completed" = "active",
+  filters?: Partial<PurchaseOrderFilterValues>,
+) =>
+  apiFetch<PurchaseOrder[]>(
+    `/purchase-orders/reconciliation-queue?${new URLSearchParams({
+      queue,
+      ...Object.fromEntries(
+        Object.entries(filters ?? {}).filter(([, value]) => Boolean(value)),
+      ),
+    })}`,
+  );
+export const getReconciliationPurchaseOrder = (id: string) =>
+  apiFetch<PurchaseOrder>(`/purchase-orders/reconciliation-queue/${id}`);
 export const generatePurchaseOrders = (requestIds: string[]) =>
   apiFetch<PurchaseOrder[]>("/purchase-orders/generate", {
     method: "POST",

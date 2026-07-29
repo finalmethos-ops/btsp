@@ -1,3 +1,5 @@
+from datetime import date
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
@@ -33,7 +35,9 @@ from app.services.purchase_order_service import (
     PurchaseOrderError,
     generate_purchase_orders,
     get_purchase_order,
+    handoff_purchase_order,
     list_purchase_orders,
+    list_reconciliation_purchase_orders,
     seed_purchase_order_defaults,
 )
 from app.services.purchase_order_transmission_service import (
@@ -109,6 +113,60 @@ def read_orders(
     db: Session = Depends(get_db), user: User = Depends(get_current_user)
 ) -> list[PurchaseOrder]:
     return list_purchase_orders(db, _allowed_workflows(user))
+
+
+@router.get("/reconciliation-queue", response_model=list[PurchaseOrderResponse])
+def read_reconciliation_queue(
+    queue: str = "active",
+    search: str | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    entity_code: str | None = None,
+    region_code: str | None = None,
+    store_number: str | None = None,
+    vendor_code: str | None = None,
+    db: Session = Depends(get_db),
+    _user: User = Depends(require_permission("reconciliation.read")),
+) -> list[PurchaseOrder]:
+    return list_reconciliation_purchase_orders(
+        db,
+        completed=queue == "completed",
+        search=search,
+        date_from=date_from,
+        date_to=date_to,
+        entity_code=entity_code,
+        region_code=region_code,
+        store_number=store_number,
+        vendor_code=vendor_code,
+    )
+
+
+@router.get("/reconciliation-queue/{order_id}", response_model=PurchaseOrderResponse)
+def read_reconciliation_order(
+    order_id: str,
+    db: Session = Depends(get_db),
+    _user: User = Depends(require_permission("reconciliation.read")),
+) -> PurchaseOrder:
+    order = get_purchase_order(db, order_id)
+    if order is None or order.status != "awaiting_reconciliation":
+        raise HTTPException(status_code=404, detail="Reconciliation purchase order not found")
+    return order
+
+
+@router.post("/{order_id}/reconciliation-handoff", response_model=PurchaseOrderResponse)
+def handoff_to_reconciliation(
+    order_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission("purchase_orders.handoff")),
+) -> PurchaseOrder:
+    order = get_purchase_order(db, order_id)
+    if order is None:
+        raise HTTPException(status_code=404, detail="Purchase order not found")
+    _ensure_order_access(user, order)
+    try:
+        return handoff_purchase_order(db, order, user.email)
+    except PurchaseOrderError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.get("/{order_id}", response_model=PurchaseOrderResponse)

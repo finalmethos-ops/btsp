@@ -3,12 +3,14 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.schemas.numeric import NonNegativeWholeQuantity, PositiveWholeQuantity
+
 
 class PurchaseReceiptLineCreate(BaseModel):
     purchase_order_line_id: int
-    received_quantity: Decimal = Field(gt=0, max_digits=14, decimal_places=4)
-    accepted_quantity: Decimal = Field(ge=0, max_digits=14, decimal_places=4)
-    rejected_quantity: Decimal = Field(ge=0, max_digits=14, decimal_places=4)
+    received_quantity: PositiveWholeQuantity
+    accepted_quantity: NonNegativeWholeQuantity
+    rejected_quantity: NonNegativeWholeQuantity
     rejection_reason: str | None = Field(default=None, max_length=1000)
     lot_number: str | None = Field(default=None, max_length=160)
 
@@ -85,7 +87,7 @@ class PurchaseBackorderCreate(BaseModel):
 
 class PurchaseBackorderAction(BaseModel):
     action: str = Field(pattern="^(receive|cancel|substitute)$")
-    quantity: Decimal | None = Field(default=None, gt=0, max_digits=14, decimal_places=4)
+    quantity: PositiveWholeQuantity | None = None
     substitute_product_code: str | None = Field(default=None, max_length=64)
     note: str = Field(min_length=1, max_length=1000)
 

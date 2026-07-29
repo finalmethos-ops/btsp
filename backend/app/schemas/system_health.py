@@ -23,7 +23,8 @@ class StorageHealth(BaseModel):
 class OperationalHealthMetric(BaseModel):
     name: str
     count: int
-    severity: Literal["info", "warning"]
+    threshold: int | None = None
+    severity: Literal["info", "warning", "critical"]
 
 
 class SystemDiagnosticsResponse(BaseModel):

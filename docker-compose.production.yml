@@ -1,7 +1,19 @@
 services:
+  postgres:
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required for production}
+    ports: !reset []
+
+  redis:
+    ports: !reset []
+
   backend:
+    build:
+      args:
+        INSTALL_DEV_DEPS: "false"
     environment:
       ENVIRONMENT: production
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required for production}
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required for production}
       BOOTSTRAP_ADMIN_TOKEN: ${BOOTSTRAP_ADMIN_TOKEN:?BOOTSTRAP_ADMIN_TOKEN is required for production}
       CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS is required for production}
@@ -9,8 +21,53 @@ services:
       - attachment_data:/data/attachments
       - purchase_order_export_data:/data/purchase-order-exports
       - analytics_report_data:/data/analytics-reports
+      - invoice_intake_data:/data/invoice-intake
+    ports: !reset []
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen('http://127.0.0.1:8000/api/v1/ready', timeout=3)
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
 
   frontend:
     volumes: !reset []
+    ports: !reset []
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+      - /app/.next/cache:rw,noexec,nosuid,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:3000/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     command: npm run start -- -H 0.0.0.0
+
+  nginx:
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true

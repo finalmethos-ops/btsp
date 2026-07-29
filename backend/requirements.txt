@@ -6,10 +6,9 @@ psycopg[binary]==3.2.1
 PyJWT==2.13.0
 python-multipart==0.0.32
 redis==5.0.8
-ruff==0.6.5
 SQLAlchemy==2.0.35
 uvicorn[standard]==0.30.6
-pytest==9.1.1
-httpx2==2.5.0
 openpyxl==3.1.5
+pypdf==6.14.2
+PyMuPDF==1.26.3
 reportlab==4.5.1

@@ -102,12 +102,3 @@ WORKFLOW_REGISTRY: Final = WorkflowRegistry(
         ),
     ]
 )
-
-# Compatibility views for existing backend consumers.
-WORKFLOW_ROUTES: Final = {entry.code: entry.route for entry in WORKFLOW_REGISTRY.list()}
-WORKFLOW_PERMISSION_PREFIXES: Final = {
-    WorkflowCode.BPP: "bpp",
-    WorkflowCode.BPP_PURCHASING: "bpp",
-    WorkflowCode.INDEPENDENT: "independent",
-    WorkflowCode.IND_PURCHASING: "independent",
-}

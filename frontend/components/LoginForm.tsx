@@ -1,9 +1,35 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
 import { useAuth } from "@/lib/auth";
 
-export function LoginForm() {
+export function LoginForm({
+  logoSrc = "/brand/purchasing-intelligence-logo.png",
+  logoAlt = "Buddy's Purchasing Intelligence",
+  logoHeight = 200,
+  logoWidth = 200,
+  title = "Welcome",
+  subtitle,
+  submitLabel = "Sign in",
+  secondaryHref,
+  secondaryLabel,
+  onSignedIn,
+  loginContext = "standard",
+}: {
+  logoSrc?: string;
+  logoAlt?: string;
+  logoHeight?: number;
+  logoWidth?: number;
+  title?: string;
+  subtitle?: string;
+  submitLabel?: string;
+  secondaryHref?: string;
+  secondaryLabel?: string;
+  onSignedIn?: () => void;
+  loginContext?: "standard" | "event";
+}) {
   const { signIn } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -15,39 +41,45 @@ export function LoginForm() {
     setError(null);
     setIsSubmitting(true);
     try {
-      await signIn(email, password);
-    } catch {
-      setError("Unable to sign in with those credentials.");
+      await signIn(email, password, loginContext);
+      onSignedIn?.();
+    } catch (caught) {
+      setError(
+        caught instanceof Error && caught.message
+          ? caught.message
+          : "Unable to sign in with those credentials.",
+      );
     } finally {
       setIsSubmitting(false);
     }
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="mx-auto flex max-w-md flex-col gap-4 rounded-lg bg-white p-8 shadow"
-    >
-      <div>
-        <h1 className="text-2xl font-bold">BTSP Login</h1>
-        <p className="mt-2 text-sm text-slate-600">
-          Sign in to access your assigned workflows.
-        </p>
-      </div>
-      <label className="flex flex-col gap-2 text-sm font-medium">
+    <form onSubmit={handleSubmit} className="login-form">
+      <Image
+        alt={logoAlt}
+        className="login-icon"
+        height={logoHeight}
+        priority
+        src={logoSrc}
+        width={logoWidth}
+      />
+      {title ? <h2>{title}</h2> : null}
+      {subtitle ? <p>{subtitle}</p> : null}
+      <label>
         Email
         <input
-          className="rounded border border-slate-300 px-3 py-2"
+          autoComplete="email"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
           type="email"
           required
         />
       </label>
-      <label className="flex flex-col gap-2 text-sm font-medium">
+      <label>
         Password
         <input
-          className="rounded border border-slate-300 px-3 py-2"
+          autoComplete="current-password"
           value={password}
           onChange={(event) => setPassword(event.target.value)}
           type="password"
@@ -55,13 +87,17 @@ export function LoginForm() {
         />
       </label>
       {error ? <p className="text-sm text-red-700">{error}</p> : null}
-      <button
-        className="rounded bg-slate-900 px-4 py-2 font-semibold text-white"
-        disabled={isSubmitting}
-        type="submit"
-      >
-        {isSubmitting ? "Signing in..." : "Sign in"}
+      <button className="login-submit" disabled={isSubmitting} type="submit">
+        {isSubmitting ? "Signing in..." : submitLabel}
       </button>
+      <Link className="login-secondary-link" href="/password-reset">
+        Forgot password?
+      </Link>
+      {secondaryHref && secondaryLabel ? (
+        <Link className="login-secondary-link" href={secondaryHref}>
+          {secondaryLabel}
+        </Link>
+      ) : null}
     </form>
   );
 }

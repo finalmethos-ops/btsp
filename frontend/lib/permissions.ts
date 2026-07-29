@@ -16,13 +16,14 @@ export function hasAnyPermission(
   );
 }
 
-export type AdminNavigationItem = {
+type AdminNavigationItem = {
   label: string;
   href: string;
   permission: string;
 };
 
-export const adminNavigationItems: AdminNavigationItem[] = [
+const adminNavigationItems: AdminNavigationItem[] = [
+  { label: "Events", href: "/admin/events", permission: "events.manage" },
   { label: "Users", href: "/admin/users", permission: "system.admin" },
   { label: "Roles", href: "/admin/roles", permission: "roles.manage" },
   {

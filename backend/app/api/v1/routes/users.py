@@ -5,7 +5,7 @@ from app.auth.permissions import require_permission
 from app.db.session import get_db
 from app.models.identity import User
 from app.schemas.user_admin import UserAdminResponse, UserCreate, UserUpdate
-from app.services.user_admin_service import create_user, list_users, update_user
+from app.services.user_admin_service import create_user, get_user_by_email, list_users, update_user
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -44,3 +44,20 @@ def patch_user(
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return user
+
+
+@router.delete("/{email}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(
+    email: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("system.admin")),
+) -> None:
+    user = get_user_by_email(db, email)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if user.id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="You cannot delete your own account"
+        )
+    db.delete(user)
+    db.commit()

@@ -1,12 +1,12 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class AdminBootstrapRequest(BaseModel):
-    email: str
-    display_name: str
-    password: str
-    home_store_number: str | None = None
-    region_code: str | None = None
+    email: str = Field(min_length=3, max_length=320)
+    display_name: str = Field(min_length=1, max_length=255)
+    password: str = Field(min_length=12, max_length=128)
+    home_store_number: str | None = Field(default=None, max_length=32)
+    region_code: str | None = Field(default=None, max_length=64)
 
 
 class AdminBootstrapResponse(BaseModel):

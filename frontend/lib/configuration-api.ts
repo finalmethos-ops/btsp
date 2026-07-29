@@ -1,6 +1,6 @@
 import { getStoredToken } from "./api";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+import { getApiBaseUrl } from "./api-origin";
 
 export type ConfigEntry = {
   id: number;
@@ -25,12 +25,27 @@ export type ConfigEntryWrite = {
   updated_by: string;
 };
 
+export type ConfigurationChange = {
+  id: string;
+  scope_type: string;
+  scope_key: string;
+  key: string;
+  proposed_value: Record<string, unknown>;
+  description: string | null;
+  status: "pending" | "approved" | "rejected";
+  requested_by: string;
+  decided_by: string | null;
+  decision_note: string | null;
+  created_at: string;
+  decided_at: string | null;
+};
+
 async function configFetch<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
   const token = getStoredToken();
-  const response = await fetch(`${API_BASE_URL}/api/v1${path}`, {
+  const response = await fetch(`${getApiBaseUrl()}/api/v1${path}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -78,4 +93,36 @@ export async function seedConfigDefaults(): Promise<{ seeded_count: number }> {
   return configFetch<{ seeded_count: number }>("/configuration/seed-defaults", {
     method: "POST",
   });
+}
+
+export async function listConfigurationChanges(
+  status?: string,
+): Promise<ConfigurationChange[]> {
+  return configFetch<ConfigurationChange[]>(
+    `/configuration/changes${status ? `?status_filter=${encodeURIComponent(status)}` : ""}`,
+  );
+}
+
+export async function requestConfigurationChange(payload: {
+  scope_type: string;
+  scope_key: string;
+  key: string;
+  proposed_value: Record<string, unknown>;
+  description?: string | null;
+}): Promise<ConfigurationChange> {
+  return configFetch<ConfigurationChange>("/configuration/changes", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function decideConfigurationChange(
+  id: string,
+  decision: "approve" | "reject",
+  note?: string,
+): Promise<ConfigurationChange> {
+  return configFetch<ConfigurationChange>(
+    `/configuration/changes/${id}/${decision}`,
+    { method: "POST", body: JSON.stringify({ note }) },
+  );
 }

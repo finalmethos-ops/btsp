@@ -6,7 +6,9 @@
     "app/**/*.ts",
     "app/**/*.tsx",
     "components/**/*.ts",
-    "components/**/*.tsx"
+    "components/**/*.tsx",
+    "lib/**/*.ts",
+    "lib/**/*.tsx"
   ],
   "exclude": ["node_modules"]
 }

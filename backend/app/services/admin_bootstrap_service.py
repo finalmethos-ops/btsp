@@ -39,6 +39,13 @@ def ensure_core_roles(db: Session, permissions: dict[str, Permission]) -> dict[s
     return roles
 
 
+def system_admin_exists(db: Session) -> bool:
+    return (
+        db.scalar(select(User.id).join(User.roles).where(Role.code == "SYSTEM_ADMIN").limit(1))
+        is not None
+    )
+
+
 def bootstrap_admin_user(db: Session, payload: AdminBootstrapRequest) -> AdminBootstrapResponse:
     permissions = ensure_core_permissions(db)
     roles = ensure_core_roles(db, permissions)

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.db.session import get_db
 from app.schemas.admin_bootstrap import AdminBootstrapRequest, AdminBootstrapResponse
-from app.services.admin_bootstrap_service import bootstrap_admin_user
+from app.services.admin_bootstrap_service import bootstrap_admin_user, system_admin_exists
 
 router = APIRouter(prefix="/bootstrap", tags=["bootstrap"])
 
@@ -19,4 +19,9 @@ def create_bootstrap_admin(
 ) -> AdminBootstrapResponse:
     if not bootstrap_token or not compare_digest(bootstrap_token, settings.bootstrap_admin_token):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid bootstrap token")
+    if system_admin_exists(db):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Administrative bootstrap is already complete",
+        )
     return bootstrap_admin_user(db, payload)

@@ -1,8 +1,10 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from app.schemas.numeric import NonNegativeCurrencyAmount, PositiveWholeQuantity
 
 
 class PurchaseRequestCreate(BaseModel):
@@ -21,9 +23,9 @@ class PurchaseRequestUpdate(BaseModel):
 
 class PurchaseLineWrite(BaseModel):
     product_code: str = Field(min_length=1, max_length=64)
-    quantity: Decimal = Field(gt=0)
-    freight_amount: Decimal = Field(default=Decimal("0"), ge=0)
-    tax_amount: Decimal = Field(default=Decimal("0"), ge=0)
+    quantity: PositiveWholeQuantity
+    freight_amount: NonNegativeCurrencyAmount = Decimal("0")
+    tax_amount: NonNegativeCurrencyAmount = Decimal("0")
     notes: str | None = Field(default=None, max_length=1000)
 
 
@@ -45,6 +47,7 @@ class PurchaseRequestResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
+    order_number: str
     workflow_code: str
     workflow_instance_id: int | None
     store_number: str
@@ -55,6 +58,7 @@ class PurchaseRequestResponse(BaseModel):
     freight_total: Decimal
     tax_total: Decimal
     total: Decimal
+    expected_delivery_date: date | None
     context: dict[str, Any]
     revision: int
     expires_at: datetime | None

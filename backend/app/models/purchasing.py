@@ -1,9 +1,9 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Numeric, String, func
+from sqlalchemy import JSON, Date, DateTime, ForeignKey, Numeric, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -16,6 +16,7 @@ class PurchaseRequest(Base):
     __tablename__ = "purchase_requests"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    order_number: Mapped[str] = mapped_column(String(255), index=True)
     workflow_code: Mapped[str] = mapped_column(String(128), index=True)
     workflow_instance_id: Mapped[int | None] = mapped_column(
         ForeignKey("workflow_instances.id"), nullable=True, unique=True
@@ -24,10 +25,11 @@ class PurchaseRequest(Base):
     vendor_code: Mapped[str] = mapped_column(ForeignKey("catalog_vendors.vendor_code"), index=True)
     status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
     currency: Mapped[str] = mapped_column(String(3), default="USD")
-    subtotal: Mapped[Decimal] = mapped_column(Numeric(14, 4), default=0)
-    freight_total: Mapped[Decimal] = mapped_column(Numeric(14, 4), default=0)
-    tax_total: Mapped[Decimal] = mapped_column(Numeric(14, 4), default=0)
-    total: Mapped[Decimal] = mapped_column(Numeric(14, 4), default=0)
+    subtotal: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+    freight_total: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+    tax_total: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+    total: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+    expected_delivery_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     context: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     revision: Mapped[int] = mapped_column(default=1)
     expires_at: Mapped[datetime | None] = mapped_column(
@@ -57,14 +59,17 @@ class PurchaseRequestLineItem(Base):
     purchase_request_id: Mapped[str] = mapped_column(
         ForeignKey("purchase_requests.id", ondelete="CASCADE"), index=True
     )
-    product_code: Mapped[str] = mapped_column(ForeignKey("catalog_products.product_code"))
+    product_code: Mapped[str] = mapped_column(
+        ForeignKey("catalog_products.product_code", onupdate="CASCADE")
+    )
     product_name: Mapped[str] = mapped_column(String(255))
-    quantity: Mapped[Decimal] = mapped_column(Numeric(14, 4))
-    unit_price: Mapped[Decimal] = mapped_column(Numeric(14, 4))
-    freight_amount: Mapped[Decimal] = mapped_column(Numeric(14, 4), default=0)
-    tax_amount: Mapped[Decimal] = mapped_column(Numeric(14, 4), default=0)
-    extended_amount: Mapped[Decimal] = mapped_column(Numeric(14, 4))
+    quantity: Mapped[Decimal] = mapped_column(Numeric(14, 0))
+    unit_price: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    freight_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+    tax_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+    extended_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2))
     notes: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    requested_delivery_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

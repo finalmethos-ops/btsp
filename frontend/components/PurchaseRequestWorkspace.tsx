@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { generatePurchaseOrders } from "@/lib/purchase-order-api";
 import {
@@ -19,9 +19,11 @@ import {
   getPurchaseRequest,
   getWorkflowInstance,
   listAttachments,
+  listEligibleStores,
   listProducts,
   listPurchaseRequests,
   listVendors,
+  EligibleStore,
   submitPurchaseRequest,
   uploadAttachment,
   validatePurchaseRequest,
@@ -41,6 +43,7 @@ export function PurchaseRequestWorkspace({
 }) {
   const [requests, setRequests] = useState<PurchaseRequest[]>([]);
   const [vendors, setVendors] = useState<CatalogVendor[]>([]);
+  const [eligibleStores, setEligibleStores] = useState<EligibleStore[]>([]);
   const [selected, setSelected] = useState<PurchaseRequest | null>(null);
   const [products, setProducts] = useState<CatalogProduct[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -99,16 +102,25 @@ export function PurchaseRequestWorkspace({
     });
   }, [loadList, run]);
   useEffect(() => {
+    setStoreNumber("");
+    if (!vendorCode) {
+      setEligibleStores([]);
+      return;
+    }
+    void listEligibleStores(vendorCode)
+      .then(setEligibleStores)
+      .catch((caught: unknown) =>
+        setError(
+          caught instanceof Error ? caught.message : "Unable to load stores",
+        ),
+      );
+  }, [vendorCode]);
+  useEffect(() => {
     if (!selectedVendorCode) return;
     void run(async () =>
       setProducts(await listProducts(selectedVendorCode, search)),
     );
   }, [search, selectedVendorCode, run]);
-
-  const selectedProduct = useMemo(
-    () => products.find((item) => item.product_code === productCode),
-    [productCode, products],
-  );
 
   async function create(event: FormEvent) {
     event.preventDefault();
@@ -146,15 +158,6 @@ export function PurchaseRequestWorkspace({
           onSubmit={create}
         >
           <label className="text-sm font-medium">
-            Store number
-            <input
-              className="mt-1 w-full rounded border p-2"
-              required
-              value={storeNumber}
-              onChange={(e) => setStoreNumber(e.target.value)}
-            />
-          </label>
-          <label className="text-sm font-medium">
             Vendor
             <select
               className="mt-1 w-full rounded border p-2"
@@ -166,6 +169,26 @@ export function PurchaseRequestWorkspace({
               {vendors.map((v) => (
                 <option key={v.vendor_code} value={v.vendor_code}>
                   {v.vendor_code} — {v.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm font-medium">
+            Eligible store
+            <select
+              className="mt-1 w-full rounded border p-2"
+              disabled={!vendorCode}
+              required
+              value={storeNumber}
+              onChange={(e) => setStoreNumber(e.target.value)}
+            >
+              <option value="">
+                {vendorCode ? "Select store" : "Select vendor first"}
+              </option>
+              {eligibleStores.map((store) => (
+                <option key={store.store_number} value={store.store_number}>
+                  {store.store_number} — {store.name} ({store.city},{" "}
+                  {store.state_code})
                 </option>
               ))}
             </select>
@@ -284,16 +307,16 @@ export function PurchaseRequestWorkspace({
                   <option value="">Select product</option>
                   {products.map((p) => (
                     <option key={p.product_code} value={p.product_code}>
-                      {p.product_code} — {p.name} ({money(p.unit_price)})
+                      {p.model_identifier} — {p.name} ({money(p.unit_price)})
                     </option>
                   ))}
                 </select>
                 <input
                   aria-label="Quantity"
                   className="rounded border p-2"
-                  min={selectedProduct?.minimum_order_quantity ?? "0.0001"}
+                  min="1"
                   required
-                  step="0.0001"
+                  step="1"
                   type="number"
                   value={quantity}
                   onChange={(e) => setQuantity(e.target.value)}

@@ -17,10 +17,15 @@ __pycache__/
 backend/.venv/
 backend/htmlcov/
 backend/.coverage
+backend/backups/*.dump
+*.db
+*.sqlite
+*.sqlite3
 
 # Node
 node_modules/
 .next/
+.next.stale.*/
 out/
 dist/
 coverage/

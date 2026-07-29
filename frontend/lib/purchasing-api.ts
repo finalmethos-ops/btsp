@@ -5,12 +5,22 @@ export type CatalogVendor = {
   name: string;
   is_active: boolean;
 };
+export type EligibleStore = {
+  store_number: string;
+  name: string;
+  entity_code: string | null;
+  region_code: string;
+  city: string | null;
+  state_code: string | null;
+};
 export type CatalogProduct = {
   product_code: string;
+  model_identifier: string;
   vendor_code: string;
   name: string;
   model_number: string | null;
-  category: string | null;
+  department: string | null;
+  product_category_code: string | null;
   brand: string | null;
   unit_price: string;
   currency: string;
@@ -31,6 +41,7 @@ export type PurchaseLine = {
 };
 export type PurchaseRequest = {
   id: string;
+  order_number: string;
   workflow_code: string;
   workflow_instance_id: number | null;
   store_number: string;
@@ -41,6 +52,7 @@ export type PurchaseRequest = {
   freight_total: string;
   tax_total: string;
   total: string;
+  expected_delivery_date: string | null;
   context: Record<string, unknown>;
   revision: number;
   expires_at: string | null;
@@ -79,7 +91,25 @@ export type WorkflowInstance = {
   updated_at: string;
 };
 
-export const listVendors = () => apiFetch<CatalogVendor[]>("/catalog/vendors");
+export const listVendors = (activeOnly = true) =>
+  apiFetch<CatalogVendor[]>(`/catalog/vendors?active_only=${activeOnly}`);
+export const createCatalogVendor = (vendor_code: string, name: string) =>
+  apiFetch<CatalogVendor>("/catalog/vendors", {
+    method: "POST",
+    body: JSON.stringify({ vendor_code, name }),
+  });
+export const updateCatalogVendor = (
+  vendorCode: string,
+  payload: { name?: string; is_active?: boolean },
+) =>
+  apiFetch<CatalogVendor>(`/catalog/vendors/${vendorCode}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+export const listEligibleStores = (vendorCode: string) =>
+  apiFetch<EligibleStore[]>(
+    `/stores/eligible?vendor_code=${encodeURIComponent(vendorCode)}`,
+  );
 export const listProducts = (vendorCode: string, search = "") => {
   const params = new URLSearchParams({ vendor_code: vendorCode });
   if (search) params.set("search", search);

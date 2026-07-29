@@ -129,7 +129,12 @@ export function RoleManagementPanel() {
             </thead>
             <tbody>
               {roles.map((role) => (
-                <tr className="border-t border-slate-200" key={role.code}>
+                <tr
+                  className={`border-t border-slate-200 ${
+                    selected?.code === role.code ? "selected-object" : ""
+                  }`}
+                  key={role.code}
+                >
                   <td className="p-3">
                     <button
                       className="font-medium underline"
@@ -203,7 +208,10 @@ export function RoleManagementPanel() {
           <legend className="px-1 text-sm font-medium">Permissions</legend>
           <div className="space-y-2">
             {permissions.map((permission) => (
-              <label className="flex gap-2 text-sm" key={permission.code}>
+              <label
+                className={`permission-selection-pane selection-pane flex gap-2 rounded-lg border p-2 text-sm ${permissionCodes.includes(permission.code) ? "is-selected" : ""}`}
+                key={permission.code}
+              >
                 <input
                   checked={permissionCodes.includes(permission.code)}
                   onChange={() => togglePermission(permission.code)}

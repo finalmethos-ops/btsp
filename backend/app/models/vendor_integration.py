@@ -232,7 +232,7 @@ class VendorShipmentUpdate(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
     inbound_event_id: Mapped[str] = mapped_column(
-        ForeignKey("vendor_inbound_events.id", ondelete="RESTRICT"), unique=True, index=True
+        ForeignKey("vendor_inbound_events.id", ondelete="RESTRICT"), unique=True
     )
     shipment_id: Mapped[str] = mapped_column(
         ForeignKey("vendor_shipments.id", ondelete="CASCADE"), index=True
@@ -251,7 +251,7 @@ class VendorAdvanceShipNotice(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
     inbound_event_id: Mapped[str] = mapped_column(
-        ForeignKey("vendor_inbound_events.id", ondelete="RESTRICT"), unique=True, index=True
+        ForeignKey("vendor_inbound_events.id", ondelete="RESTRICT"), unique=True
     )
     purchase_order_id: Mapped[str] = mapped_column(
         ForeignKey("purchase_orders.id", ondelete="RESTRICT"), index=True
@@ -286,5 +286,5 @@ class VendorAdvanceShipNoticeLine(Base):
         ForeignKey("purchase_order_lines.id", ondelete="RESTRICT"), index=True
     )
     product_code: Mapped[str] = mapped_column(String(64))
-    quantity: Mapped[Decimal] = mapped_column(Numeric(14, 4))
+    quantity: Mapped[Decimal] = mapped_column(Numeric(14, 0))
     lot_number: Mapped[str | None] = mapped_column(String(160), nullable=True)

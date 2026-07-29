@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.auth.permissions import require_permission
 from app.db.session import get_db
 from app.models.identity import User
+from app.models.notification import UserNotificationPreference
 from app.schemas.notification import (
     NotificationEmitInput,
     NotificationEventResponse,
@@ -11,18 +12,63 @@ from app.schemas.notification import (
     NotificationTemplateResponse,
     NotificationTemplateUpdate,
 )
+from app.schemas.notification_preferences import (
+    NotificationPreferenceResponse,
+    NotificationPreferenceWrite,
+)
 from app.services.notification_service import (
     NotificationError,
     create_notification_template,
     emit_notification,
     list_notification_events,
     list_notification_templates,
+    list_user_notification_events,
     retry_notification_event,
     seed_bpp_notification_defaults,
     update_notification_template,
 )
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
+
+
+@router.get("/mine", response_model=list[NotificationEventResponse])
+def read_my_notification_events(
+    limit: int = Query(default=100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("notifications.read")),
+) -> list[NotificationEventResponse]:
+    return [
+        NotificationEventResponse.model_validate(event)
+        for event in list_user_notification_events(db, current_user.email, limit)
+    ]
+
+
+@router.get("/preferences", response_model=NotificationPreferenceResponse)
+def read_notification_preferences(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission("notifications.read")),
+) -> NotificationPreferenceResponse:
+    preference = db.get(UserNotificationPreference, user.id)
+    if preference is None:
+        return NotificationPreferenceResponse(user_id=user.id)
+    return NotificationPreferenceResponse.model_validate(preference, from_attributes=True)
+
+
+@router.put("/preferences", response_model=NotificationPreferenceResponse)
+def write_notification_preferences(
+    payload: NotificationPreferenceWrite,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission("notifications.read")),
+) -> NotificationPreferenceResponse:
+    preference = db.get(UserNotificationPreference, user.id)
+    if preference is None:
+        preference = UserNotificationPreference(user_id=user.id)
+        db.add(preference)
+    for key, value in payload.model_dump().items():
+        setattr(preference, key, value)
+    db.commit()
+    db.refresh(preference)
+    return NotificationPreferenceResponse.model_validate(preference, from_attributes=True)
 
 
 @router.get("/templates", response_model=list[NotificationTemplateResponse])
@@ -67,7 +113,7 @@ def read_notification_events(
     entity_id: str | None = None,
     limit: int = Query(default=100, ge=1, le=500),
     db: Session = Depends(get_db),
-    _current_user: User = Depends(require_permission("notifications.read")),
+    _current_user: User = Depends(require_permission("notifications.manage")),
 ) -> list[NotificationEventResponse]:
     return list_notification_events(
         db,

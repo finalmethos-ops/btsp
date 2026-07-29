@@ -1,9 +1,15 @@
+import json
+import smtplib
 from datetime import UTC, datetime
+from email.message import EmailMessage
 from typing import Any
+from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.models.configuration import ConfigurationEntry
 from app.models.event_snapshot import EventSnapshot
 from app.models.identity import Permission, Role, User
@@ -236,6 +242,67 @@ def _channel_status(
     return NotificationStatus.QUEUED
 
 
+def _deliver_email(event: NotificationEvent) -> None:
+    if not settings.notification_email_enabled:
+        return
+    if not settings.smtp_host:
+        raise NotificationError("SMTP_HOST is required when email delivery is enabled")
+    for recipient in event.resolved_recipients:
+        message = EmailMessage()
+        message["From"] = settings.smtp_from
+        message["To"] = recipient
+        message["Subject"] = event.subject
+        message.set_content(event.body)
+        with smtplib.SMTP(
+            settings.smtp_host,
+            settings.smtp_port,
+            timeout=settings.notification_delivery_timeout_seconds,
+        ) as smtp:
+            smtp.starttls()
+            if settings.smtp_username:
+                smtp.login(settings.smtp_username, settings.smtp_password or "")
+            smtp.send_message(message)
+
+
+def _deliver_webhook(event: NotificationEvent) -> None:
+    if not settings.notification_webhook_enabled:
+        return
+    for destination in event.resolved_recipients:
+        parsed = urlparse(destination)
+        if parsed.scheme != "https" or not parsed.hostname:
+            raise NotificationError("Webhook destinations must use HTTPS")
+        body = json.dumps(
+            {
+                "event_type": event.event_type,
+                "entity_type": event.entity_type,
+                "entity_id": event.entity_id,
+                "subject": event.subject,
+                "body": event.body,
+            }
+        )
+        request = Request(
+            destination,
+            data=body.encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        # The destination is explicitly restricted to HTTPS above.
+        with urlopen(  # nosec B310
+            request,
+            timeout=settings.notification_delivery_timeout_seconds,
+        ) as response:
+            if response.status < 200 or response.status >= 300:
+                raise NotificationError(f"Webhook delivery returned HTTP {response.status}")
+
+
+def _deliver_event(event: NotificationEvent) -> None:
+    channel = NotificationChannel(event.channel)
+    if channel == NotificationChannel.EMAIL:
+        _deliver_email(event)
+    elif channel == NotificationChannel.WEBHOOK:
+        _deliver_webhook(event)
+
+
 def _record_notification_snapshot(
     db: Session,
     event: NotificationEvent,
@@ -308,6 +375,29 @@ def emit_notification(
         db.add(event)
         db.commit()
         db.refresh(event)
+        if event.status == NotificationStatus.QUEUED and event.resolved_recipients:
+            try:
+                _deliver_event(event)
+                if (
+                    event.channel == NotificationChannel.IN_APP
+                    or (
+                        event.channel == NotificationChannel.EMAIL
+                        and not settings.notification_email_enabled
+                    )
+                    or (
+                        event.channel == NotificationChannel.WEBHOOK
+                        and not settings.notification_webhook_enabled
+                    )
+                ):
+                    pass
+                else:
+                    event.status = NotificationStatus.SENT
+                    event.sent_at = datetime.now(UTC)
+                    db.commit()
+            except (OSError, smtplib.SMTPException, NotificationError) as exc:
+                event.status = NotificationStatus.FAILED
+                event.error_message = str(exc)
+                db.commit()
         _record_notification_snapshot(
             db,
             event,
@@ -335,6 +425,25 @@ def list_notification_events(
         statement = statement.where(NotificationEvent.entity_id == entity_id)
     statement = statement.order_by(NotificationEvent.created_at.desc()).limit(limit)
     return list(db.scalars(statement).all())
+
+
+def list_user_notification_events(
+    db: Session,
+    recipient_email: str,
+    limit: int = 100,
+) -> list[NotificationEvent]:
+    normalized_email = recipient_email.strip().lower()
+    candidates = db.scalars(
+        select(NotificationEvent)
+        .order_by(NotificationEvent.created_at.desc())
+        .limit(max(limit * 10, 1000))
+    ).all()
+    return [
+        event
+        for event in candidates
+        if normalized_email
+        in {recipient.strip().lower() for recipient in event.resolved_recipients}
+    ][:limit]
 
 
 def mark_notification_sent(db: Session, notification_id: int) -> NotificationEvent | None:
