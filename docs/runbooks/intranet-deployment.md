@@ -6,8 +6,8 @@ This runbook deploys BTSP from one Windows/Docker Desktop host for users on the
 same trusted private network. It does not expose PostgreSQL, Redis, the backend,
 or the frontend directly. Nginx is the only published service.
 
-The development stack remains on port `8080`. The hardened intranet stack uses
-port `18080` until an explicit cutover.
+The development stack remains on port `8080`. The parallel intranet stack uses
+HTTPS on port `18443`; port `18080` exists only to redirect clients to HTTPS.
 
 ## Stable host address
 
@@ -22,7 +22,8 @@ From the repository root:
 ```bash
 python3 backend/scripts/generate_intranet_env.py \
   --host 192.168.0.146 \
-  --port 18080
+  --port 18080 \
+  --tls-port 18443
 ```
 
 The command creates `.env.intranet` with unique database, JWT, and bootstrap
@@ -107,8 +108,10 @@ docker compose \
 Validate from the host and a second private-network device:
 
 ```bash
-curl -f http://192.168.0.146:18080/api/v1/health
-curl -f http://192.168.0.146:18080/api/v1/ready
+curl --cacert .runtime/tls/authority/btsp-intranet-ca.crt \
+  -f https://192.168.0.146:18443/api/v1/health
+curl --cacert .runtime/tls/authority/btsp-intranet-ca.crt \
+  -f https://192.168.0.146:18443/api/v1/ready
 ```
 
 Then confirm event login, standard login, role scoping, file upload/download,
@@ -131,27 +134,55 @@ against bad changes, but not host loss or disk failure.
 
 ## Network security
 
-- Allow the chosen port only from the trusted private subnet.
+- Allow the redirect and HTTPS ports only from the trusted private subnet.
 - Do not configure router port forwarding, UPnP exposure, or a public tunnel.
 - Keep PostgreSQL, Redis, backend, and frontend ports unpublished.
-- HTTP does not encrypt credentials. Use only on a trusted isolated LAN, or add
-  an internally trusted TLS certificate before real credentials are used.
+- Never bypass the HTTPS endpoint when entering credentials.
 - Enable the Windows Firewall and create a subnet-scoped inbound rule before
   production cutover.
 
-For the current `192.168.0.0/24` network, run these commands from an elevated
-PowerShell prompt after confirming the adapter name:
+For the current `192.168.0.0/24` network, run the repository's idempotent setup
+script from an elevated PowerShell prompt:
 
 ```powershell
-Set-NetConnectionProfile -InterfaceAlias "Ethernet 2" -NetworkCategory Private
-Set-NetFirewallProfile -Profile Domain,Private,Public -Enabled True
-New-NetFirewallRule -DisplayName "BTSP Intranet 18080" `
-  -Direction Inbound -Action Allow -Protocol TCP -LocalPort 18080 `
-  -RemoteAddress 192.168.0.0/24 -Profile Private
+.\scripts\configure-btsp-intranet-firewall.ps1 `
+  -InterfaceAlias "Ethernet 2" `
+  -Ports 18080,18443 `
+  -RemoteSubnet "192.168.0.0/24"
 ```
 
 Review existing inbound services before enabling the firewall so remote access
 or file-sharing rules are not unintentionally interrupted.
+
+## Internal HTTPS
+
+Generate the private certificate authority and server certificate:
+
+```bash
+./scripts/generate-btsp-intranet-certificates.sh 192.168.0.146
+```
+
+Install `.runtime/tls/authority/btsp-intranet-ca.crt` in the trusted-root store
+on Windows and on each authorized phone or workstation. The CA private key must
+never be installed on client devices. Keep it access-restricted and include it
+only in the protected configuration backup.
+
+The intranet profile exposes HTTPS on `18443`. HTTP on `18080` performs a
+permanent redirect and does not serve the application.
+
+For iOS/iPadOS, transfer only `btsp-intranet-ca.crt`, install the downloaded
+profile, then enable full trust under **Settings → General → About →
+Certificate Trust Settings**. For Android, install the same public certificate
+as a **CA certificate** under the device's security credential settings. Device
+management policies may require an administrator to perform these steps.
+
+After trust is installed, open:
+
+```text
+https://192.168.0.146:18443
+```
+
+Never transfer `btsp-intranet-ca.key` or `server.key` to a client device.
 
 ## External service dependency
 
@@ -162,6 +193,7 @@ outbound internet access unless equivalent internal services are configured.
 ## Cutover
 
 When acceptance is complete, schedule a short write freeze, make a final
-database and durable-volume copy, stop the development stack, and move the
-intranet Nginx port to `8080` (or `80`). Do not run both projects on the same
-host port.
+database and durable-volume copy, then make the intranet project the sole
+writable environment. Keep the development project stopped during real use so
+the two databases cannot diverge. Moving to standard ports `80` and `443`
+requires updating both the Compose port mapping and the HTTP redirect target.

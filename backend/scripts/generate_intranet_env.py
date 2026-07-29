@@ -29,7 +29,7 @@ def tcp_port(value: str) -> int:
     return port
 
 
-def render_environment(host: str, port: int) -> str:
+def render_environment(host: str, port: int, tls_port: int = 18443) -> str:
     database_password = secrets.token_hex(32)
     return f"""# Generated BTSP intranet production environment.
 # Keep this file private. It is excluded by .gitignore.
@@ -53,7 +53,7 @@ LOGIN_LOCKOUT_MINUTES=15
 LOGIN_RATE_LIMIT_WINDOW_SECONDS=300
 LOGIN_RATE_LIMIT_EMAIL_ATTEMPTS=8
 LOGIN_RATE_LIMIT_HOST_ATTEMPTS=40
-CORS_ORIGINS=http://{host}:{port}
+CORS_ORIGINS=https://{host}:{tls_port}
 BRAVE_SEARCH_API_KEY=
 GEOCODING_API_URL=https://nominatim.openstreetmap.org/search
 ROUTING_API_URL=https://router.project-osrm.org/route/v1/driving
@@ -80,6 +80,7 @@ REDIS_URL=redis://redis:6379/0
 
 BTSP_BIND_ADDRESS=0.0.0.0
 NGINX_PORT={port}
+NGINX_TLS_PORT={tls_port}
 """
 
 
@@ -89,14 +90,15 @@ def main() -> None:
     )
     parser.add_argument("--host", required=True, type=private_ipv4)
     parser.add_argument("--port", default=18080, type=tcp_port)
+    parser.add_argument("--tls-port", default=18443, type=tcp_port)
     parser.add_argument("--output", default=".env.intranet", type=Path)
     args = parser.parse_args()
 
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
     descriptor = os.open(args.output, flags, 0o600)
     with os.fdopen(descriptor, "w", encoding="utf-8", newline="\n") as handle:
-        handle.write(render_environment(args.host, args.port))
-    print(f"Created {args.output} for http://{args.host}:{args.port}")
+        handle.write(render_environment(args.host, args.port, args.tls_port))
+    print(f"Created {args.output} for https://{args.host}:{args.tls_port}")
 
 
 if __name__ == "__main__":

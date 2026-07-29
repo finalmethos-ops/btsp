@@ -37,6 +37,7 @@ pnpm-debug.log*
 
 # Docker
 *.pid
+.runtime/
 
 # IDE
 .vscode/

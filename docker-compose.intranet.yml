@@ -29,3 +29,7 @@ services:
     pull_policy: always
     ports: !override
       - "${BTSP_BIND_ADDRESS:-0.0.0.0}:${NGINX_PORT:-18080}:80"
+      - "${BTSP_BIND_ADDRESS:-0.0.0.0}:${NGINX_TLS_PORT:-18443}:443"
+    volumes: !override
+      - ./infrastructure/nginx/intranet.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./.runtime/tls/server:/etc/nginx/tls:ro

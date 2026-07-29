@@ -24,9 +24,10 @@ def test_tcp_port_rejects_out_of_range_values(port: str) -> None:
 
 
 def test_render_environment_uses_unique_secrets() -> None:
-    first = render_environment("192.168.0.146", 18080)
-    second = render_environment("192.168.0.146", 18080)
+    first = render_environment("192.168.0.146", 18080, 18443)
+    second = render_environment("192.168.0.146", 18080, 18443)
 
     assert "ENVIRONMENT=production" in first
-    assert "CORS_ORIGINS=http://192.168.0.146:18080" in first
+    assert "CORS_ORIGINS=https://192.168.0.146:18443" in first
+    assert "NGINX_TLS_PORT=18443" in first
     assert first != second
