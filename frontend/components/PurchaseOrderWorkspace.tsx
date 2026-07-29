@@ -10,6 +10,7 @@ import {
   downloadPurchaseOrderArtifact,
   generatePurchaseOrderArtifact,
   getPurchaseOrder,
+  handoffPurchaseOrder,
   listPurchaseOrderArtifacts,
   listPurchaseOrderTransmissions,
   listPurchaseOrders,
@@ -166,6 +167,42 @@ export function PurchaseOrderWorkspace() {
       {notice && (
         <p className="mt-4 rounded bg-green-50 p-3 text-green-700">{notice}</p>
       )}
+      {![
+        "created",
+        "prepared",
+        "cancelled",
+        "awaiting_reconciliation",
+        "reconciliation_complete",
+      ].includes(selected.status) ? (
+        <section className="mt-5 rounded-2xl border border-yellow-300 bg-yellow-50 p-5">
+          <h2 className="font-bold text-slate-900">Reconciliation handoff</h2>
+          <p className="mt-1 text-sm text-slate-700">
+            Confirm this PO has been delivered and transfer custody from the
+            Purchasing queue to the Reconciliation queue.
+          </p>
+          <button
+            className="mt-3 rounded-xl bg-blue-900 px-4 py-2 font-bold text-white disabled:opacity-50"
+            disabled={busy}
+            onClick={() =>
+              void run(async () => {
+                if (
+                  !window.confirm(
+                    "Mark this PO delivered and send it to Reconciliation?",
+                  )
+                )
+                  return;
+                await handoffPurchaseOrder(selected.id);
+                setSelected(null);
+                await loadList();
+                setNotice("PO transferred to the Reconciliation queue.");
+              })
+            }
+            type="button"
+          >
+            Mark delivered and hand off
+          </button>
+        </section>
+      ) : null}
       <div className="mt-6 grid gap-6 lg:grid-cols-[2fr_1fr]">
         <section className="space-y-6">
           <div className="rounded-lg bg-white p-5 shadow">

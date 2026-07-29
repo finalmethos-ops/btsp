@@ -169,7 +169,8 @@ def apply_backorder_action(
     from_status = backorder.status
     quantity = payload.quantity
     if payload.action == "receive":
-        assert quantity is not None
+        if quantity is None:
+            raise BackorderError("Received quantity is required")
         if quantity > backorder.outstanding_quantity:
             raise BackorderError("Received quantity exceeds the outstanding backorder quantity")
         backorder.fulfilled_quantity += quantity

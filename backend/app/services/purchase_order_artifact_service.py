@@ -15,6 +15,7 @@ from app.models.purchase_order import PurchaseOrder, PurchaseOrderArtifact
 from app.schemas.event_snapshot import EventSnapshotCreate
 from app.schemas.purchase_order_artifact import PurchaseOrderArtifactFormat
 from app.services.snapshot_service import append_snapshot
+from app.services.spreadsheet_security import spreadsheet_safe_cell
 
 CONTENT_TYPES = {
     PurchaseOrderArtifactFormat.PDF: "application/pdf",
@@ -69,9 +70,7 @@ def render_json(order: PurchaseOrder) -> bytes:
 
 
 def _spreadsheet_safe(value: Any) -> Any:
-    if isinstance(value, str) and value.startswith(("=", "+", "-", "@")):
-        return f"'{value}"
-    return value
+    return spreadsheet_safe_cell(value)
 
 
 def render_csv(order: PurchaseOrder) -> bytes:

@@ -12,7 +12,12 @@ from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
 
 from app.db.session import Base
-from app.models.catalog import CatalogProduct, CatalogVendor
+from app.models.catalog import (
+    CatalogProduct,
+    CatalogProductCostHistory,
+    CatalogVendor,
+    ModelCategory,
+)
 from app.models.configuration import ConfigurationEntry  # noqa: F401
 from app.models.event_snapshot import EventSnapshot
 from app.models.identity import Role, User
@@ -55,7 +60,11 @@ from app.services.purchase_order_artifact_service import (
 from app.services.purchase_order_service import (
     PurchaseOrderError,
     _partition_lines,
+    allocate_po_number,
     generate_purchase_orders,
+    handoff_purchase_order,
+    list_purchase_orders,
+    list_reconciliation_purchase_orders,
     seed_purchase_order_defaults,
 )
 from app.services.purchase_order_transmission_service import (
@@ -84,10 +93,18 @@ def db() -> Session:
     with Session(engine) as session:
         session.add(Role(code="SYSTEM_ADMIN", name="System Administrator", is_system_role=True))
         session.add(
+            ModelCategory(
+                department="APPL MISC",
+                product_category_code="MISC",
+                status="VALID",
+            )
+        )
+        session.add(
             Store(
                 store_number="1001",
                 name="Test Store",
                 region_code="EAST",
+                entity_code="BHP",
                 is_active=True,
                 is_ordering_enabled=True,
             )
@@ -109,7 +126,8 @@ def workbook_bytes(price: int = 125) -> bytes:
             "vendor_code",
             "name",
             "model_number",
-            "category",
+            "department",
+            "product_category_code",
             "brand",
             "unit_price",
             "currency",
@@ -123,8 +141,9 @@ def workbook_bytes(price: int = 125) -> bytes:
             "P-100",
             "V-100",
             "Test Product",
-            "MODEL-1",
-            "Fixtures",
+            "P-100",
+            "APPL MISC",
+            "MISC",
             "BTSP",
             price,
             "USD",
@@ -146,6 +165,40 @@ def test_catalog_excel_import_is_idempotent_and_updates_current_price(db: Sessio
     assert db.scalar(select(func.count()).select_from(CatalogVendor)) == 1
     assert db.scalar(select(func.count()).select_from(CatalogProduct)) == 1
     assert db.scalar(select(CatalogProduct)).unit_price == Decimal("150.0000")
+    costs = list(
+        db.scalars(
+            select(CatalogProductCostHistory).order_by(CatalogProductCostHistory.effective_from)
+        ).all()
+    )
+    assert [cost.unit_price for cost in costs] == [Decimal("125.00"), Decimal("150.00")]
+    assert costs[0].effective_to is not None
+    assert costs[1].effective_to is None
+
+
+def test_delivered_po_moves_between_purchasing_and_reconciliation_queues(
+    db: Session,
+) -> None:
+    order = PurchaseOrder(
+        po_number="PO-HANDOFF-1",
+        workflow_code="BPP_PURCHASING",
+        vendor_code="V-100",
+        status="shipment_delivered",
+        currency="USD",
+        subtotal=100,
+        freight_total=0,
+        tax_total=0,
+        total=100,
+        created_by="buyer@example.com",
+    )
+    db.add(order)
+    db.commit()
+
+    assert order in list_purchase_orders(db, {"BPP_PURCHASING"})
+    handoff_purchase_order(db, order, "buyer@example.com")
+
+    assert order.status == "awaiting_reconciliation"
+    assert order not in list_purchase_orders(db, {"BPP_PURCHASING"})
+    assert order in list_reconciliation_purchase_orders(db)
 
 
 def test_catalog_import_rejects_unknown_vendor_without_partial_rows(db: Session) -> None:
@@ -156,8 +209,18 @@ def test_catalog_import_rejects_unknown_vendor_without_partial_rows(db: Session)
     vendors.append(["vendor_code", "name"])
     vendors.append(["V-100", "Vendor"])
     products = workbook.create_sheet("Products")
-    products.append(["product_code", "vendor_code", "name", "unit_price"])
-    products.append(["P-100", "UNKNOWN", "Product", 10])
+    products.append(
+        [
+            "product_code",
+            "model_number",
+            "vendor_code",
+            "name",
+            "unit_price",
+            "department",
+            "product_category_code",
+        ]
+    )
+    products.append(["P-100", "P-100", "UNKNOWN", "Product", 10, "APPL MISC", "MISC"])
     stream = BytesIO()
     workbook.save(stream)
 
@@ -232,7 +295,7 @@ def test_purchase_request_captures_price_calculates_totals_and_submits(db: Sessi
     assert request.status == "department_review"
 
 
-def test_line_item_requires_catalog_minimum_and_matching_vendor(db: Session) -> None:
+def test_line_item_moq_is_evaluated_at_vendor_rule_level(db: Session) -> None:
     import_catalog(db, "catalog.xlsx", workbook_bytes(), "admin@example.com")
     request = create_purchase_request(
         db,
@@ -243,14 +306,13 @@ def test_line_item_requires_catalog_minimum_and_matching_vendor(db: Session) -> 
         ),
         "buyer@example.com",
     )
-    with pytest.raises(PurchaseRequestError, match="at least"):
-        add_line_item(
-            db,
-            request,
-            PurchaseLineWrite(product_code="P-100", quantity=1),
-            "buyer@example.com",
-        )
-    assert db.scalar(select(func.count()).select_from(PurchaseRequestLineItem)) == 0
+    add_line_item(
+        db,
+        request,
+        PurchaseLineWrite(product_code="P-100", quantity=1),
+        "buyer@example.com",
+    )
+    assert db.scalar(select(func.count()).select_from(PurchaseRequestLineItem)) == 1
 
 
 def test_configured_rules_change_readiness_without_code_changes(db: Session) -> None:
@@ -278,7 +340,7 @@ def test_configured_rules_change_readiness_without_code_changes(db: Session) -> 
             scope_type="purchasing",
             scope_key="BPP_PURCHASING",
             key="rules.blocked_categories",
-            value={"categories": ["Fixtures"]},
+            value={"categories": ["MISC"]},
             updated_by="admin@example.com",
         ),
     )
@@ -543,7 +605,9 @@ def test_purchase_order_generation_numbering_snapshot_and_duplicate_guard(db: Se
     orders = generate_purchase_orders(db, [request.id], user.email, {"workflow.bpp.po_generate"})
     assert len(orders) == 1
     order = orders[0]
-    assert order.po_number.startswith("PO-")
+    now = datetime.now(UTC)
+    assert order.po_number == f"PO-1001-{now.year}-{now.month:02d}-001"
+    assert request.order_number == f"BHP-1001-V-100-{now:%Y%m%d}"
     assert order.total == request.total == Decimal("265.0000")
     assert len(order.sources) == 1
     assert len(order.lines) == 1
@@ -562,6 +626,16 @@ def test_purchase_order_generation_numbering_snapshot_and_duplicate_guard(db: Se
     )
     with pytest.raises(PurchaseOrderError, match="already exists"):
         generate_purchase_orders(db, [request.id], user.email, {"workflow.bpp.po_generate"})
+
+
+def test_po_number_sequences_reset_by_store_and_month(db: Session) -> None:
+    july = datetime(2026, 7, 1, tzinfo=UTC)
+    august = datetime(2026, 8, 1, tzinfo=UTC)
+
+    assert allocate_po_number(db, "1001", july) == "PO-1001-2026-07-001"
+    assert allocate_po_number(db, "1001", july) == "PO-1001-2026-07-002"
+    assert allocate_po_number(db, "1002", july) == "PO-1002-2026-07-001"
+    assert allocate_po_number(db, "1001", august) == "PO-1001-2026-08-001"
 
 
 def test_purchase_order_consolidates_same_workflow_vendor_and_currency(db: Session) -> None:

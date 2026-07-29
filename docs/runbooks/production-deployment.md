@@ -2,7 +2,8 @@
 
 ## Purpose
 
-Deploy BTSP 001P repeatably to an on-premises Docker host and prove the installation is operational before accepting users.
+Deploy BTSP repeatably to a production Docker host and prove the installation is operational
+before accepting users.
 
 ## Prerequisites
 
@@ -22,11 +23,21 @@ Deploy BTSP 001P repeatably to an on-premises Docker host and prove the installa
 | `SECRET_KEY` | JWT signing secret | Generate a unique high-entropy value; never use the default |
 | `BOOTSTRAP_ADMIN_TOKEN` | Initial admin bootstrap secret | Generate uniquely; rotate after bootstrap |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | JWT lifetime | Use the approved short session duration |
+| `REFRESH_TOKEN_EXPIRE_DAYS` | Revocable session lifetime | Keep within approved session policy; default 14 days |
+| `PASSWORD_RESET_EXPIRE_MINUTES` | Reset-token lifetime | Keep short; default 30 minutes |
+| `LOGIN_LOCKOUT_THRESHOLD` / `LOGIN_LOCKOUT_MINUTES` | Account lockout policy | Tune with security policy; defaults are 5 attempts / 15 minutes |
+| `NOTIFICATION_EMAIL_ENABLED` | Enable SMTP notification delivery | Keep false until SMTP is configured and tested |
+| `NOTIFICATION_WEBHOOK_ENABLED` | Enable HTTPS webhook delivery | Keep false until destinations are approved |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM` | SMTP delivery settings | Store credentials outside source control |
+| `NOTIFICATION_DELIVERY_TIMEOUT_SECONDS` | Adapter network timeout | Keep bounded; default 10 seconds |
+| `EVENT_TASK_REMINDER_INTERVAL_SECONDS` | Automated event-task reminder scan frequency | Default 300 seconds; keep between 30 and 3600 |
 | `CORS_ORIGINS` | Allowed browser origins | Comma-separated approved HTTPS origins; no localhost |
 | `DATABASE_URL` | Backend PostgreSQL connection | Use production host, database, user, and secret |
 | `ATTACHMENT_STORAGE_PATH` | Purchase attachment storage | Keep `/data/attachments` for Docker deployments |
 | `ATTACHMENT_MAX_BYTES` | Maximum upload size | Default `20971520`; tune for operational policy |
 | `PURCHASE_ORDER_EXPORT_PATH` | Generated PO artifact storage | Keep `/data/purchase-order-exports` for Docker deployments |
+| `ANALYTICS_REPORT_PATH` | Generated analytics workbook storage | Keep `/data/analytics-reports` for Docker deployments |
+| `INVOICE_INTAKE_STORAGE_PATH` | Invoice import staging storage | Keep `/data/invoice-intake` for Docker deployments |
 | `REDIS_URL` | Backend Redis connection | Use the production service/network name and protected instance |
 | `NEXT_PUBLIC_API_BASE_URL` | Browser-visible backend base URL | Use the externally reachable HTTPS API origin |
 | `NGINX_PORT` | Host Nginx port | Match ingress/firewall design |
@@ -61,18 +72,16 @@ docker compose -f docker-compose.yml -f docker-compose.production.yml exec backe
 docker compose -f docker-compose.yml -f docker-compose.production.yml exec backend alembic current
 ```
 
-Expected Alembic head: `0008_notification_framework`.
+Expected Alembic head: `0116_notification_action_href`.
 
 The production override removes source bind mounts, disables backend reload, and starts the prebuilt Next.js production server. Do not deploy the base development Compose file alone.
 
 ## Release Validation
 
-```bash
-docker compose exec backend ruff check app tests
-docker compose exec backend pytest
-docker compose exec frontend npm run build
-docker compose exec frontend npm test -- --run
-```
+Run linting, dependency audits, tests, and builds in CI and against the release-candidate
+development images before promotion. The production images intentionally exclude test and compiler
+dependencies. After deployment, run health, authentication, authorization, migration, and primary
+workflow smoke checks against the immutable production images.
 
 ## Administrator Bootstrap
 
@@ -126,6 +135,11 @@ Look for tracebacks, restart loops, authentication failures, migration errors, d
 - Start and advance a controlled BPP test request.
 - Evaluate approval policy at known threshold boundaries.
 - Emit a controlled in-app notification and review notification history.
+- With delivery flags disabled, verify email/webhook events remain queued and do not make outbound calls.
+- In staging only, enable SMTP and HTTPS webhook delivery and verify successful and failed delivery states.
+- Verify refresh-token rotation, logout revocation, password reset expiry, and lockout recovery.
+- Verify inventory ledger adjustments, reservations, releases, transfers, and available-position calculations.
+- Submit and approve a configuration change, then verify the resulting configuration snapshot.
 - Review the corresponding snapshots.
 - Confirm unauthorized users receive 403 responses.
 

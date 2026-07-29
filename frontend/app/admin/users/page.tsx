@@ -1,15 +1,5 @@
-"use client";
+import AdminHomePage from "../page";
 
-import { AdminShell } from "@/components/AdminShell";
-import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { UserManagementPanel } from "@/components/UserManagementPanel";
-
-export default function AdminUsersPage() {
-  return (
-    <ProtectedRoute requiredPermission="system.admin">
-      <AdminShell>
-        <UserManagementPanel />
-      </AdminShell>
-    </ProtectedRoute>
-  );
-}
+// Legacy route kept as an alias so bookmarked Administration links open the
+// actionable overview instead of the retired placeholder screen.
+export default AdminHomePage;

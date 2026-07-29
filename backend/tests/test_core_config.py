@@ -32,6 +32,7 @@ def test_production_settings_accept_explicit_safe_values() -> None:
             "BOOTSTRAP_ADMIN_TOKEN must be changed",
         ),
         ({"CORS_ORIGINS": "http://localhost:3000"}, "CORS_ORIGINS must not use localhost"),
+        ({"CORS_ORIGINS": "*"}, "CORS_ORIGINS must not allow wildcard origins"),
     ],
 )
 def test_production_settings_reject_unsafe_values(overrides: dict[str, str], message: str) -> None:

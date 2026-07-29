@@ -1,0 +1,840 @@
+"use client";
+
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  createEventProductSlide,
+  deleteEventProductSlide,
+  EventFillerCategory,
+  EventProductSlide,
+  EventProductSlideWrite,
+  EventProductWebFill,
+  importEventProductImage,
+  listEventProductSlides,
+  reorderEventProductSlides,
+  updateEventProductSlide,
+  uploadEventProductImage,
+  webFillEventProduct,
+} from "@/lib/event-product-slide-api";
+import { ManagedSubEvent } from "@/lib/event-admin-api";
+import { searchModelCatalog } from "@/lib/model-catalog-api";
+import { VendorModel } from "@/lib/vendor-model-api";
+
+const optionalNumber = (value: FormDataEntryValue | null) => {
+  const text = String(value ?? "").trim();
+  return text ? Number(text) : null;
+};
+
+const parseVariants = (value: FormDataEntryValue | null) =>
+  String(value ?? "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [model_number, name, eventCost, minimum = "1"] = line
+        .split("|")
+        .map((part) => part.trim());
+      return {
+        model_number,
+        name,
+        event_unit_cost: eventCost,
+        minimum_order_quantity: Number(minimum),
+      };
+    });
+
+export function EventProductSlideBuilder({
+  subEvents,
+}: {
+  subEvents: ManagedSubEvent[];
+}) {
+  const [subEventId, setSubEventId] = useState(subEvents[0]?.id ?? "");
+  const [slides, setSlides] = useState<EventProductSlide[]>([]);
+  const [catalog, setCatalog] = useState<VendorModel[]>([]);
+  const [catalogCode, setCatalogCode] = useState("");
+  const [catalogVendorFilter, setCatalogVendorFilter] = useState("");
+  const [catalogSearch, setCatalogSearch] = useState("");
+  const [editing, setEditing] = useState<EventProductSlide | null>(null);
+  const [slideType, setSlideType] = useState<"product" | "filler">("product");
+  const [draggingSlideId, setDraggingSlideId] = useState<string | null>(null);
+  const [webFill, setWebFill] = useState<EventProductWebFill | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!subEvents.some((item) => item.id === subEventId)) {
+      setSubEventId(subEvents[0]?.id ?? "");
+    }
+  }, [subEventId, subEvents]);
+
+  useEffect(() => {
+    void searchModelCatalog()
+      .then(setCatalog)
+      .catch(() => setCatalog([]));
+  }, []);
+
+  useEffect(() => {
+    if (!subEventId) {
+      setSlides([]);
+      return;
+    }
+    void listEventProductSlides(subEventId)
+      .then(setSlides)
+      .catch((caught: unknown) =>
+        setError(
+          caught instanceof Error ? caught.message : "Lineup could not load",
+        ),
+      );
+  }, [subEventId]);
+
+  const catalogProduct = catalog.find(
+    (item) => item.product_code === catalogCode,
+  );
+  const catalogVendors = useMemo(
+    () =>
+      [
+        ...new Set(catalog.map((item) => item.vendor_code).filter(Boolean)),
+      ].sort(),
+    [catalog],
+  );
+  const filteredCatalog = useMemo(() => {
+    const query = catalogSearch.trim().toLowerCase();
+    return catalog.filter((item) => {
+      if (catalogVendorFilter && item.vendor_code !== catalogVendorFilter)
+        return false;
+      if (!query) return true;
+      return [
+        item.model_identifier,
+        item.model_number,
+        item.name,
+        item.product_code,
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query));
+    });
+  }, [catalog, catalogSearch, catalogVendorFilter]);
+  const defaults = editing ?? catalogProduct;
+
+  async function refresh() {
+    if (subEventId) setSlides(await listEventProductSlides(subEventId));
+  }
+
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!subEventId) return;
+    const data = new FormData(event.currentTarget);
+    const filler = slideType === "filler";
+    const payload: EventProductSlideWrite = {
+      slide_type: slideType,
+      filler_category: filler
+        ? (String(data.get("filler_category")) as EventFillerCategory)
+        : null,
+      catalog_product_code: filler
+        ? null
+        : String(data.get("catalog_product_code") || "") || null,
+      model_number: filler ? null : String(data.get("model_number")).trim(),
+      name: String(data.get(filler ? "filler_name" : "name")).trim(),
+      vendor_code: filler
+        ? null
+        : String(data.get("vendor_code")).trim().toUpperCase(),
+      description:
+        String(data.get(filler ? "filler_description" : "description") || "") ||
+        null,
+      specifications: filler
+        ? null
+        : String(data.get("specifications") || "") || null,
+      event_unit_cost: filler ? null : String(data.get("event_unit_cost")),
+      standard_cost: filler
+        ? null
+        : String(data.get("standard_cost") || "") || null,
+      currency: String(data.get("currency") || "USD").toUpperCase(),
+      minimum_order_quantity: filler
+        ? 1
+        : Number(data.get("minimum_order_quantity")),
+      available_inventory: filler
+        ? null
+        : optionalNumber(data.get("available_inventory")),
+      max_event_units: filler
+        ? null
+        : optionalNumber(data.get("max_event_units")),
+      allow_waitlist: !filler && data.get("allow_waitlist") === "on",
+      delivery_window_start: filler
+        ? null
+        : String(data.get("delivery_window_start")),
+      delivery_window_end: filler
+        ? null
+        : String(data.get("delivery_window_end")),
+      vendor_delivery_notes:
+        String(data.get("vendor_delivery_notes") || "") || null,
+      presenter_notes: String(data.get("presenter_notes") || "") || null,
+      product_variants: filler
+        ? []
+        : parseVariants(data.get("product_variants")),
+      status: String(data.get("status")) as "draft" | "ready" | "archived",
+    };
+    setBusy(true);
+    setError(null);
+    try {
+      const saved = editing
+        ? await updateEventProductSlide(editing.id, payload)
+        : await createEventProductSlide(subEventId, payload);
+      const productImage = data.get("product_image");
+      if (productImage instanceof File && productImage.size > 0) {
+        await uploadEventProductImage(saved.id, productImage);
+      } else if (webFill?.image_url) {
+        await importEventProductImage(saved.id, webFill.image_url);
+      }
+      await refresh();
+      setEditing(null);
+      setSlideType("product");
+      setCatalogCode("");
+      setWebFill(null);
+      setMessage(editing ? "Slide updated." : "Slide added to the lineup.");
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Product slide could not save",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveOrder(ordered: EventProductSlide[]) {
+    setBusy(true);
+    setError(null);
+    try {
+      setSlides(
+        await reorderEventProductSlides(
+          subEventId,
+          ordered.map((item) => item.id),
+        ),
+      );
+      setMessage("Presentation order updated.");
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Lineup could not reorder",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function moveTo(index: number, target: number) {
+    if (
+      index < 0 ||
+      target < 0 ||
+      index >= slides.length ||
+      target >= slides.length ||
+      index === target
+    )
+      return;
+    const ordered = [...slides];
+    const [moving] = ordered.splice(index, 1);
+    ordered.splice(target, 0, moving);
+    await saveOrder(ordered);
+  }
+
+  async function removeSlide(slide: EventProductSlide) {
+    if (!window.confirm(`Remove slide “${slide.name}”?`)) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await deleteEventProductSlide(slide.id);
+      await refresh();
+      if (editing?.id === slide.id) setEditing(null);
+      setMessage("Slide removed.");
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Slide could not be removed",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!subEvents.length) {
+    return (
+      <section className="event-ui rounded-2xl border border-dashed p-5 text-slate-600">
+        Add a sub-event first, then build its live product presentation lineup.
+      </section>
+    );
+  }
+
+  return (
+    <section className="event-ui rounded-2xl border p-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="brand-eyebrow">020B · Live buying</p>
+          <h3 className="text-xl font-bold">Product lineup & slide builder</h3>
+          <p className="text-sm text-slate-600">
+            Drag slides or use the position controls. This lineup is the
+            presenter’s live order.
+          </p>
+        </div>
+        <label className="text-sm font-semibold">
+          Sub-event
+          <select
+            className="ml-2 rounded-lg border p-2"
+            onChange={(event) => {
+              setSubEventId(event.target.value);
+              setEditing(null);
+            }}
+            value={subEventId}
+          >
+            {subEvents.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      {message ? (
+        <p className="mt-3 rounded-lg bg-green-50 p-2 text-green-800">
+          {message}
+        </p>
+      ) : null}
+      {error ? (
+        <p className="mt-3 rounded-lg bg-red-50 p-2 text-red-800">{error}</p>
+      ) : null}
+
+      <div className="mt-5 grid gap-5 xl:grid-cols-[320px_1fr]">
+        <div className="space-y-2">
+          <div className="rounded-xl border border-blue-200 bg-blue-50 p-3">
+            <strong className="text-sm text-blue-950">
+              Presentation order
+            </strong>
+            <p className="mt-1 text-xs text-blue-800">
+              Drag on desktop, or use the arrows and Move to control on any
+              device.
+            </p>
+          </div>
+          {slides.map((slide, index) => (
+            <div
+              className={`rounded-xl border bg-white p-3 transition ${draggingSlideId === slide.id ? "border-blue-500 opacity-60" : ""}`}
+              draggable={!busy}
+              key={slide.id}
+              onDragEnd={() => setDraggingSlideId(null)}
+              onDragOver={(event) => event.preventDefault()}
+              onDragStart={() => setDraggingSlideId(slide.id)}
+              onDrop={(event) => {
+                event.preventDefault();
+                const source = slides.findIndex(
+                  (item) => item.id === draggingSlideId,
+                );
+                setDraggingSlideId(null);
+                if (source >= 0) void moveTo(source, index);
+              }}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <span className="text-xs font-bold text-blue-800">
+                    SLIDE {slide.position}
+                  </span>
+                  <strong className="block">
+                    {slide.slide_type === "filler"
+                      ? slide.filler_category?.replaceAll("_", " ")
+                      : slide.model_number}
+                  </strong>
+                  <span className="text-sm">{slide.name}</span>
+                </div>
+                <div className="flex gap-1">
+                  <button
+                    aria-label="Move earlier"
+                    className="min-h-10 min-w-10 rounded-lg border bg-slate-50 font-black disabled:opacity-30"
+                    disabled={busy || index === 0}
+                    onClick={() => void moveTo(index, index - 1)}
+                    type="button"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    aria-label="Move later"
+                    className="min-h-10 min-w-10 rounded-lg border bg-slate-50 font-black disabled:opacity-30"
+                    disabled={busy || index === slides.length - 1}
+                    onClick={() => void moveTo(index, index + 1)}
+                    type="button"
+                  >
+                    ↓
+                  </button>
+                </div>
+              </div>
+              <p className="mt-2 text-xs text-slate-500">
+                {slide.slide_type === "filler"
+                  ? "Non-ordering filler"
+                  : slide.max_event_units
+                    ? `${slide.max_event_units} unit event cap`
+                    : "No event cap"}{" "}
+                · {slide.status}
+              </p>
+              <label className="mt-2 block text-xs font-semibold text-slate-600">
+                Move to
+                <select
+                  aria-label={`Move ${slide.name} to slide position`}
+                  className="ml-2 min-h-10 rounded-lg border bg-white px-2"
+                  disabled={busy}
+                  onChange={(event) =>
+                    void moveTo(index, Number(event.target.value))
+                  }
+                  value={index}
+                >
+                  {slides.map((_, position) => (
+                    <option key={position} value={position}>
+                      Slide {position + 1}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="mt-2 flex gap-2">
+                <button
+                  className="text-sm font-semibold text-blue-800"
+                  onClick={() => {
+                    setEditing(slide);
+                    setSlideType(slide.slide_type);
+                    setCatalogCode(slide.catalog_product_code ?? "");
+                  }}
+                  type="button"
+                >
+                  Edit
+                </button>
+                <button
+                  className="text-sm font-semibold text-red-700"
+                  disabled={busy}
+                  onClick={() => void removeSlide(slide)}
+                  type="button"
+                >
+                  Delete slide
+                </button>
+                <label className="cursor-pointer text-sm font-semibold text-blue-800">
+                  {slide.has_image ? "Replace image" : "Add image"}
+                  <input
+                    accept="image/png,image/jpeg,image/webp"
+                    className="sr-only"
+                    type="file"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) {
+                        setBusy(true);
+                        void uploadEventProductImage(slide.id, file)
+                          .then(refresh)
+                          .catch((caught: unknown) =>
+                            setError(
+                              caught instanceof Error
+                                ? caught.message
+                                : "Image upload failed",
+                            ),
+                          )
+                          .finally(() => setBusy(false));
+                      }
+                    }}
+                  />
+                </label>
+              </div>
+            </div>
+          ))}
+          {!slides.length ? (
+            <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">
+              No products in this lineup yet.
+            </p>
+          ) : null}
+        </div>
+
+        <form
+          className="grid gap-3 rounded-xl bg-slate-50 p-4 sm:grid-cols-2"
+          key={`${editing?.id ?? "new"}-${slideType}-${catalogCode}-${webFill?.source_url ?? ""}`}
+          onSubmit={save}
+        >
+          <h4 className="font-bold sm:col-span-2">
+            {editing ? `Edit slide ${editing.position}` : "Add lineup slide"}
+          </h4>
+          <label className="text-sm font-semibold sm:col-span-2">
+            Slide type
+            <select
+              className="mt-1 w-full rounded-lg border bg-white p-2"
+              onChange={(event) => {
+                setSlideType(event.target.value as "product" | "filler");
+                setCatalogCode("");
+                setWebFill(null);
+              }}
+              value={slideType}
+            >
+              <option value="product">Orderable product</option>
+              <option value="filler">Non-ordering filler</option>
+            </select>
+          </label>
+          {slideType === "filler" ? (
+            <>
+              <label className="text-sm font-semibold">
+                Filler category
+                <select
+                  className="mt-1 w-full rounded-lg border bg-white p-2"
+                  defaultValue={editing?.filler_category ?? "trivia"}
+                  name="filler_category"
+                  required
+                >
+                  <option value="trivia">Trivia</option>
+                  <option value="giveaway">Giveaway</option>
+                  <option value="sponsorship">Sponsorship</option>
+                  <option value="special_thanks">Special thanks</option>
+                  <option value="raffle">Raffle</option>
+                </select>
+              </label>
+              <label className="text-sm font-semibold sm:col-span-2">
+                Slide title
+                <input
+                  className="mt-1 w-full rounded-lg border bg-white p-2"
+                  defaultValue={editing?.name ?? ""}
+                  name="filler_name"
+                  required
+                />
+              </label>
+              <label className="text-sm font-semibold sm:col-span-2">
+                Slide content
+                <textarea
+                  className="mt-1 min-h-32 w-full rounded-lg border bg-white p-2"
+                  defaultValue={editing?.description ?? ""}
+                  name="filler_description"
+                />
+              </label>
+            </>
+          ) : null}
+          <fieldset
+            className={slideType === "product" ? "contents" : "hidden"}
+            disabled={slideType === "filler"}
+          >
+            <label className="text-sm font-semibold sm:col-span-2">
+              Start from BTSP catalog
+              <div className="mt-1 grid gap-2 sm:grid-cols-2">
+                <select
+                  aria-label="Filter catalog by vendor"
+                  className="w-full rounded-lg border bg-white p-2 font-normal"
+                  onChange={(event) =>
+                    setCatalogVendorFilter(event.target.value)
+                  }
+                  value={catalogVendorFilter}
+                >
+                  <option value="">All vendors</option>
+                  {catalogVendors.map((vendor) => (
+                    <option key={vendor} value={vendor}>
+                      {vendor}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  aria-label="Search catalog models"
+                  className="w-full rounded-lg border bg-white p-2 font-normal"
+                  onChange={(event) => setCatalogSearch(event.target.value)}
+                  placeholder="Search model or product name"
+                  value={catalogSearch}
+                />
+              </div>
+              <select
+                className="mt-1 w-full rounded-lg border bg-white p-2"
+                name="catalog_product_code"
+                onChange={(event) => {
+                  setCatalogCode(event.target.value);
+                  setEditing(null);
+                  setWebFill(null);
+                }}
+                value={catalogCode}
+              >
+                <option value="">Manual event product</option>
+                {filteredCatalog.map((item) => (
+                  <option key={item.product_code} value={item.product_code}>
+                    {item.model_identifier} — {item.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-sm font-semibold">
+              Model number
+              <input
+                className="mt-1 w-full rounded-lg border bg-white p-2"
+                defaultValue={defaults?.model_number ?? ""}
+                name="model_number"
+                required
+              />
+            </label>
+            <label className="text-sm font-semibold">
+              Vendor code
+              <input
+                className="mt-1 w-full rounded-lg border bg-white p-2"
+                defaultValue={defaults?.vendor_code ?? ""}
+                name="vendor_code"
+                required
+              />
+            </label>
+            <label className="text-sm font-semibold sm:col-span-2">
+              Product name
+              <input
+                className="mt-1 w-full rounded-lg border bg-white p-2"
+                defaultValue={defaults?.name ?? ""}
+                name="name"
+                required
+              />
+            </label>
+            <div className="flex items-end sm:col-span-2">
+              <button
+                className="rounded-lg border border-blue-300 bg-white px-4 py-2 font-semibold text-blue-800"
+                disabled={busy}
+                onClick={(event) => {
+                  const form = event.currentTarget.form;
+                  if (!form) return;
+                  const data = new FormData(form);
+                  const modelNumber = String(
+                    data.get("model_number") || "",
+                  ).trim();
+                  if (!modelNumber) {
+                    setError(
+                      "Enter or select a model number before using Web Fill.",
+                    );
+                    return;
+                  }
+                  setBusy(true);
+                  setError(null);
+                  void webFillEventProduct(
+                    modelNumber,
+                    String(data.get("name") || ""),
+                  )
+                    .then(setWebFill)
+                    .catch((caught: unknown) =>
+                      setError(
+                        caught instanceof Error
+                          ? caught.message
+                          : "Web Fill failed",
+                      ),
+                    )
+                    .finally(() => setBusy(false));
+                }}
+                type="button"
+              >
+                Search model on web & fill slide
+              </button>
+            </div>
+            {webFill ? (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm sm:col-span-2">
+                <strong>{webFill.title}</strong>
+                <p className="mt-1">{webFill.summary}</p>
+                <a
+                  className="mt-2 inline-block font-semibold text-blue-800 underline"
+                  href={webFill.source_url}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  Review source
+                </a>
+                {webFill.image_url ? (
+                  <p className="mt-1 text-green-800">
+                    A web image will be imported when the slide is saved.
+                  </p>
+                ) : (
+                  <p className="mt-1 text-amber-800">
+                    No usable image was returned; upload one below.
+                  </p>
+                )}
+              </div>
+            ) : null}
+            <label className="text-sm font-semibold sm:col-span-2">
+              Description
+              <textarea
+                className="mt-1 w-full rounded-lg border bg-white p-2"
+                defaultValue={webFill?.summary ?? editing?.description ?? ""}
+                name="description"
+              />
+            </label>
+            <label className="text-sm font-semibold sm:col-span-2">
+              Specifications
+              <textarea
+                className="mt-1 w-full rounded-lg border bg-white p-2"
+                defaultValue={editing?.specifications ?? ""}
+                name="specifications"
+              />
+            </label>
+            <label className="text-sm font-semibold sm:col-span-2">
+              Additional orderable products on this slide
+              <textarea
+                className="mt-1 min-h-28 w-full rounded-lg border bg-white p-2 font-mono text-sm"
+                defaultValue={(editing?.product_variants ?? [])
+                  .map(
+                    (variant) =>
+                      `${variant.model_number} | ${variant.name} | ${variant.event_unit_cost} | ${variant.minimum_order_quantity}`,
+                  )
+                  .join("\n")}
+                name="product_variants"
+                placeholder={
+                  "Model | Product name or option | Event cost | MOQ\nKING-BLUE | King / Blue | 799.00 | 1"
+                }
+              />
+              <span className="mt-1 block font-normal text-slate-500">
+                Use one line per size, color, or related model. Leave blank for
+                a standard single-product slide.
+              </span>
+            </label>
+            <label className="text-sm font-semibold">
+              Event unit cost
+              <input
+                className="mt-1 w-full rounded-lg border bg-white p-2"
+                defaultValue={
+                  editing?.event_unit_cost ?? catalogProduct?.unit_price ?? ""
+                }
+                min="0"
+                name="event_unit_cost"
+                required
+                step="0.01"
+                type="number"
+              />
+            </label>
+            <label className="text-sm font-semibold">
+              Standard Cost
+              <input
+                className="mt-1 w-full rounded-lg border bg-white p-2"
+                defaultValue={
+                  editing?.standard_cost ?? catalogProduct?.unit_price ?? ""
+                }
+                min="0"
+                name="standard_cost"
+                step="0.01"
+                type="number"
+              />
+            </label>
+            <label className="text-sm font-semibold">
+              Currency
+              <input
+                className="mt-1 w-full rounded-lg border bg-white p-2"
+                defaultValue={defaults?.currency ?? "USD"}
+                maxLength={3}
+                name="currency"
+                required
+              />
+            </label>
+            <label className="text-sm font-semibold">
+              MOQ
+              <input
+                className="mt-1 w-full rounded-lg border bg-white p-2"
+                defaultValue={
+                  editing?.minimum_order_quantity ??
+                  Number(catalogProduct?.minimum_order_quantity ?? 1)
+                }
+                min="1"
+                name="minimum_order_quantity"
+                required
+                type="number"
+              />
+            </label>
+            <label className="text-sm font-semibold">
+              Available inventory
+              <input
+                className="mt-1 w-full rounded-lg border bg-white p-2"
+                defaultValue={editing?.available_inventory ?? ""}
+                min="0"
+                name="available_inventory"
+                type="number"
+              />
+            </label>
+            <label className="text-sm font-semibold">
+              Maximum event units
+              <input
+                className="mt-1 w-full rounded-lg border bg-white p-2"
+                defaultValue={editing?.max_event_units ?? ""}
+                min="1"
+                name="max_event_units"
+                type="number"
+              />
+            </label>
+            <label className="text-sm font-semibold">
+              Delivery window start
+              <input
+                className="mt-1 w-full rounded-lg border bg-white p-2"
+                defaultValue={editing?.delivery_window_start ?? ""}
+                name="delivery_window_start"
+                required
+                type="date"
+              />
+            </label>
+            <label className="text-sm font-semibold">
+              Delivery window end
+              <input
+                className="mt-1 w-full rounded-lg border bg-white p-2"
+                defaultValue={editing?.delivery_window_end ?? ""}
+                name="delivery_window_end"
+                required
+                type="date"
+              />
+            </label>
+            <label className="flex items-center gap-2 text-sm font-semibold">
+              <input
+                defaultChecked={editing?.allow_waitlist ?? false}
+                name="allow_waitlist"
+                type="checkbox"
+              />{" "}
+              Allow waitlist above event cap
+            </label>
+          </fieldset>
+          <label className="text-sm font-semibold">
+            Slide status
+            <select
+              className="mt-1 w-full rounded-lg border bg-white p-2"
+              defaultValue={editing?.status ?? "draft"}
+              name="status"
+            >
+              <option value="draft">Draft</option>
+              <option value="ready">Ready</option>
+              <option value="archived">Archived</option>
+            </select>
+          </label>
+          <label className="text-sm font-semibold sm:col-span-2">
+            Slide image
+            <input
+              accept="image/png,image/jpeg,image/webp"
+              className="mt-1 block w-full rounded-lg border bg-white p-2"
+              name="product_image"
+              type="file"
+            />
+            <span className="mt-1 block font-normal text-slate-500">
+              Upload an image now. Product slides can also use Web Fill.
+            </span>
+          </label>
+          <label className="text-sm font-semibold sm:col-span-2">
+            Vendor delivery notes
+            <textarea
+              className="mt-1 w-full rounded-lg border bg-white p-2"
+              defaultValue={editing?.vendor_delivery_notes ?? ""}
+              name="vendor_delivery_notes"
+            />
+          </label>
+          <label className="text-sm font-semibold sm:col-span-2">
+            Private presenter notes
+            <textarea
+              className="mt-1 w-full rounded-lg border bg-white p-2"
+              defaultValue={editing?.presenter_notes ?? ""}
+              name="presenter_notes"
+            />
+          </label>
+          <div className="flex justify-end gap-2 sm:col-span-2">
+            {editing ? (
+              <button
+                className="rounded-lg border px-4 py-2 font-semibold"
+                onClick={() => {
+                  setEditing(null);
+                  setSlideType("product");
+                  setCatalogCode("");
+                }}
+                type="button"
+              >
+                Cancel edit
+              </button>
+            ) : null}
+            <button
+              className="rounded-lg bg-blue-800 px-5 py-2 font-semibold text-white"
+              disabled={busy}
+              type="submit"
+            >
+              {busy ? "Saving…" : editing ? "Save slide" : "Add to lineup"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+  );
+}

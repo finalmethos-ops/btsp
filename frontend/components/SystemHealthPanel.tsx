@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { SystemDiagnostics, getSystemDiagnostics } from "@/lib/api";
 
 function bytes(value: number | null): string {
@@ -22,6 +23,18 @@ function badge(status: string): string {
   if (status === "healthy") return "bg-green-100 text-green-800";
   if (status === "degraded") return "bg-amber-100 text-amber-800";
   return "bg-red-100 text-red-800";
+}
+
+function metricBadge(severity: string): string {
+  if (severity === "critical") return "bg-red-100 text-red-800";
+  if (severity === "warning") return "bg-amber-100 text-amber-800";
+  return "bg-green-100 text-green-800";
+}
+
+function metricHref(name: string): string | null {
+  if (name.includes("notification")) return "/notifications/history";
+  if (name.includes("event_staff_task")) return "/admin/events";
+  return null;
 }
 
 export function SystemHealthPanel() {
@@ -49,6 +62,8 @@ export function SystemHealthPanel() {
 
   useEffect(() => {
     void refresh();
+    const timer = window.setInterval(() => void refresh(), 30_000);
+    return () => window.clearInterval(timer);
   }, []);
 
   return (
@@ -153,13 +168,39 @@ export function SystemHealthPanel() {
             <div className="mt-3 grid gap-3 md:grid-cols-3">
               {diagnostics.operational_metrics.map((item) => (
                 <article
-                  className={`rounded border p-4 ${item.severity === "warning" ? "border-amber-300 bg-amber-50" : ""}`}
+                  className={`rounded border p-4 ${
+                    item.severity === "critical"
+                      ? "border-red-300 bg-red-50"
+                      : item.severity === "warning"
+                        ? "border-amber-300 bg-amber-50"
+                        : ""
+                  }`}
                   key={item.name}
                 >
-                  <p className="text-sm text-slate-600">
-                    {item.name.replaceAll("_", " ")}
-                  </p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm text-slate-600">
+                      {item.name.replaceAll("_", " ")}
+                    </p>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${metricBadge(item.severity)}`}
+                    >
+                      {item.severity}
+                    </span>
+                  </div>
                   <p className="mt-1 text-3xl font-bold">{item.count}</p>
+                  {item.threshold !== null ? (
+                    <p className="text-xs text-slate-500">
+                      Critical at {item.threshold.toLocaleString()}
+                    </p>
+                  ) : null}
+                  {item.count > 0 && metricHref(item.name) ? (
+                    <Link
+                      className="mt-2 inline-block text-xs font-semibold underline"
+                      href={metricHref(item.name) ?? "#"}
+                    >
+                      Review workload
+                    </Link>
+                  ) : null}
                 </article>
               ))}
             </div>

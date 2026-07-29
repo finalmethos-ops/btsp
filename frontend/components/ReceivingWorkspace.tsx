@@ -401,7 +401,7 @@ export function ReceivingWorkspace() {
                               [line.id]: event.target.value,
                             }))
                           }
-                          step="0.0001"
+                          step="1"
                           type="number"
                           value={quantities[line.id] ?? ""}
                         />

@@ -163,7 +163,14 @@ export function NotificationAdministrationPanel() {
               </thead>
               <tbody>
                 {templates.map((template) => (
-                  <tr className="border-t" key={template.template_code}>
+                  <tr
+                    className={`border-t ${
+                      selectedCode === template.template_code
+                        ? "selected-object"
+                        : ""
+                    }`}
+                    key={template.template_code}
+                  >
                     <td className="p-3">
                       <button
                         className="font-medium underline"

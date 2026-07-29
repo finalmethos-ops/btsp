@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -20,11 +20,12 @@ class PurchaseOrderLineResponse(BaseModel):
 
     id: int
     source_request_id: str
-    source_line_id: int
+    source_line_id: int | None
     store_number: str
     product_code: str
     product_name: str
     quantity: Decimal
+    received_quantity: Decimal
     unit_price: Decimal
     freight_amount: Decimal
     tax_amount: Decimal
@@ -45,6 +46,10 @@ class PurchaseOrderResponse(BaseModel):
     freight_total: Decimal
     tax_total: Decimal
     total: Decimal
+    expected_delivery_date: date | None
+    vendor_eta: date | None
+    vendor_response_at: datetime | None
+    vendor_rejection_reason: str | None
     created_by: str
     created_at: datetime
     updated_at: datetime

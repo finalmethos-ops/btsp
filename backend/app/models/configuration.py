@@ -27,3 +27,20 @@ class ConfigurationEntry(Base):
         server_default=func.now(),
         onupdate=func.now(),
     )
+
+
+class ConfigurationChange(Base):
+    __tablename__ = "configuration_changes"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    scope_type: Mapped[str] = mapped_column(String(64), index=True)
+    scope_key: Mapped[str] = mapped_column(String(128), index=True)
+    key: Mapped[str] = mapped_column(String(160), index=True)
+    proposed_value: Mapped[dict[str, Any]] = mapped_column(JSON)
+    description: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)
+    requested_by: Mapped[str] = mapped_column(String(255))
+    decided_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    decision_note: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

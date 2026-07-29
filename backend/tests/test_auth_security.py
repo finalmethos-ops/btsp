@@ -1,7 +1,12 @@
 import jwt
 import pytest
 
-from app.auth.security import ALGORITHM, create_access_token, hash_password, verify_password
+from app.auth.security import (
+    create_access_token,
+    decode_access_token,
+    hash_password,
+    verify_password,
+)
 from app.core.config import settings
 
 
@@ -16,10 +21,23 @@ def test_access_token_round_trip(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "secret_key", "test-secret-key-with-at-least-32-bytes")
     token = create_access_token("admin@example.com")
 
-    payload = jwt.decode(token, settings.secret_key, algorithms=[ALGORITHM])
+    payload = decode_access_token(token)
 
     assert payload["sub"] == "admin@example.com"
     assert "exp" in payload
+    assert payload["iss"] == settings.app_name
+    assert payload["aud"] == settings.app_name
+    assert "jti" in payload
+
+
+def test_legacy_token_without_required_claims_is_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "secret_key", "test-secret-key-with-at-least-32-bytes")
+    token = jwt.encode({"sub": "admin@example.com"}, settings.secret_key, algorithm="HS256")
+
+    with pytest.raises(jwt.PyJWTError):
+        decode_access_token(token)
 
 
 @pytest.mark.parametrize(

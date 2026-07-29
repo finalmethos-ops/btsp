@@ -21,6 +21,8 @@ from app.services.purchasing_rule_service import (
 )
 from app.services.snapshot_service import append_snapshot
 from app.services.store_service import check_region_scope
+from app.services.vendor_geography_service import state_is_excluded
+from app.services.vendor_moq_service import evaluate_vendor_moq
 from app.services.workflow_engine import WorkflowError, get_active_definition, start_workflow
 
 SUPPORTED_WORKFLOWS = {"BPP_PURCHASING", "IND_PURCHASING"}
@@ -30,6 +32,20 @@ class PurchaseRequestError(ValueError):
     pass
 
 
+def build_order_number(
+    db: Session,
+    store_number: str,
+    vendor_code: str,
+    at: datetime | None = None,
+) -> str:
+    store = db.scalar(select(Store).where(Store.store_number == store_number))
+    if store is None:
+        raise PurchaseRequestError("Store was not found for order numbering")
+    entity = store.entity_code or store.operating_company or "UNASSIGNED"
+    order_date = (at or datetime.now(UTC)).strftime("%Y%m%d")
+    return f"{entity.strip()}-{store_number.strip()}-{vendor_code.strip()}-{order_date}"
+
+
 def _validate_references(db: Session, store_number: str, vendor_code: str) -> None:
     store = db.scalar(select(Store).where(Store.store_number == store_number))
     if store is None or not store.is_active or not store.is_ordering_enabled:
@@ -37,6 +53,8 @@ def _validate_references(db: Session, store_number: str, vendor_code: str) -> No
     vendor = db.scalar(select(CatalogVendor).where(CatalogVendor.vendor_code == vendor_code))
     if vendor is None or not vendor.is_active:
         raise PurchaseRequestError("Vendor is not active in the internal catalog")
+    if state_is_excluded(db, vendor_code, store.state_code):
+        raise PurchaseRequestError(f"Vendor does not serve stores in {store.state_code}")
 
 
 def _ensure_draft(request: PurchaseRequest) -> None:
@@ -72,6 +90,7 @@ def create_purchase_request(
         raise PurchaseRequestError("Draft expiration configuration is invalid")
     request = PurchaseRequest(
         **payload.model_dump(),
+        order_number=build_order_number(db, payload.store_number, payload.vendor_code),
         created_by=actor,
         updated_by=actor,
         expires_at=datetime.now(UTC) + timedelta(days=days),
@@ -129,8 +148,6 @@ def add_line_item(
         raise PurchaseRequestError("Product is not active and available in the internal catalog")
     if product.vendor_code != request.vendor_code:
         raise PurchaseRequestError("Product does not belong to the request vendor")
-    if payload.quantity < product.minimum_order_quantity:
-        raise PurchaseRequestError(f"Quantity must be at least {product.minimum_order_quantity}")
     line = PurchaseRequestLineItem(
         purchase_request=request,
         product_code=product.product_code,
@@ -169,8 +186,6 @@ def update_line_item(
         raise PurchaseRequestError("Product is not active and available in the internal catalog")
     if product.vendor_code != request.vendor_code:
         raise PurchaseRequestError("Product does not belong to the request vendor")
-    if payload.quantity < product.minimum_order_quantity:
-        raise PurchaseRequestError(f"Quantity must be at least {product.minimum_order_quantity}")
     line.product_code = product.product_code
     line.product_name = product.name
     line.quantity = payload.quantity
@@ -228,19 +243,11 @@ def validate_purchase_request(db: Session, request: PurchaseRequest) -> RuleEval
                     "product.invalid", f"Product {line.product_code} is unavailable", "line_items"
                 )
             )
-        elif line.quantity < product.minimum_order_quantity:
-            result.errors.append(
-                RuleIssue(
-                    "quantity.minimum",
-                    f"Product {line.product_code} requires quantity "
-                    f"{product.minimum_order_quantity}",
-                    "line_items",
-                )
-            )
+    result.errors.extend(evaluate_vendor_moq(db, request))
     configured = evaluate_purchase_request(
         request,
         store_region=store.region_code,
-        buying_group=store.buying_group_code,
+        buying_group=store.purchasing_program,
         config=load_purchasing_rules(db, request.workflow_code),
     )
     result.errors.extend(configured.errors)

@@ -1,7 +1,9 @@
 from datetime import UTC, datetime
 
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
+from app.models.store import Store
 from app.schemas.event_snapshot import EventSnapshotCreate
 from app.schemas.store import StoreUpsert
 from app.schemas.store_batch import StoreBatchError, StoreBatchRequest, StoreBatchResult
@@ -60,3 +62,33 @@ def process_store_batch(db: Session, payload: StoreBatchRequest) -> StoreBatchRe
         ),
     )
     return result
+
+
+def deactivate_stores_missing_from_batch(
+    db: Session,
+    payload: StoreBatchRequest,
+) -> int:
+    store_numbers = [row.store_number for row in payload.rows]
+    result = db.execute(
+        update(Store)
+        .where(
+            Store.is_active.is_(True),
+            Store.store_number.not_in(store_numbers),
+        )
+        .values(is_active=False, is_ordering_enabled=False)
+    )
+    deactivated = int(result.rowcount or 0)
+    append_snapshot(
+        db,
+        EventSnapshotCreate(
+            event_type="store.directory.synchronized",
+            entity_type="store_directory",
+            entity_id=payload.source_system,
+            actor=payload.submitted_by,
+            payload={
+                "active_store_count": len(store_numbers),
+                "deactivated_store_count": deactivated,
+            },
+        ),
+    )
+    return deactivated

@@ -54,7 +54,8 @@ class SpendDimension(StrEnum):
     VENDOR = "vendor"
     STORE = "store"
     WORKFLOW = "workflow"
-    CATEGORY = "category"
+    DEPARTMENT = "department"
+    PRODUCT_CODE = "product_code"
     MONTH = "month"
 
 
@@ -72,6 +73,30 @@ class SpendAnalysisResponse(BaseModel):
     date_from: datetime | None
     date_to: datetime | None
     metrics: list[SpendMetric]
+
+
+class ExecutiveEntitySpendMetric(BaseModel):
+    entity_code: str
+    currency: str
+    amount: Decimal
+
+
+class ExecutiveBestSellerMetric(BaseModel):
+    rank: int
+    product_code: str
+    product_name: str
+    currency: str
+    quantity: Decimal
+    amount: Decimal
+
+
+class ExecutiveSpendDashboardResponse(BaseModel):
+    as_of: datetime
+    month_start: datetime
+    year_start: datetime
+    mtd_by_entity: list[ExecutiveEntitySpendMetric]
+    ytd_by_entity: list[ExecutiveEntitySpendMetric]
+    top_sellers_mtd: list[ExecutiveBestSellerMetric]
 
 
 class VendorScorecard(BaseModel):
@@ -94,6 +119,12 @@ class VendorScorecard(BaseModel):
     invoice_match_rate: Decimal | None
     approved_reconciliation_count: int
     rejected_reconciliation_count: int
+    vendor_fulfillment_event_count: int
+    delay_event_count: int
+    backorder_event_count: int
+    out_of_stock_event_count: int
+    substitution_event_count: int
+    confirmed_po_change_count: int
 
 
 class VendorScorecardResponse(BaseModel):
@@ -143,6 +174,7 @@ class InventoryPositionResponse(BaseModel):
 
 
 class AnalyticsReportType(StrEnum):
+    EXECUTIVE_PACK = "executive_pack"
     INVENTORY_POSITION = "inventory_position"
     SPEND = "spend"
     VENDOR_SCORECARDS = "vendor_scorecards"
@@ -160,15 +192,30 @@ class AnalyticsReportScheduleCreate(BaseModel):
     @model_validator(mode="after")
     def validate_parameters(self) -> "AnalyticsReportScheduleCreate":
         allowed = {
+            AnalyticsReportType.EXECUTIVE_PACK: {
+                "date_from",
+                "date_to",
+                "vendor_code",
+                "store_number",
+                "product_code",
+                "workflow_code",
+                "minimum_orders",
+            },
             AnalyticsReportType.INVENTORY_POSITION: {"store_number", "product_code"},
             AnalyticsReportType.SPEND: {
                 "group_by",
+                "date_from",
+                "date_to",
                 "vendor_code",
                 "store_number",
                 "workflow_code",
             },
-            AnalyticsReportType.VENDOR_SCORECARDS: {"minimum_orders"},
-            AnalyticsReportType.WORKFLOWS: {"workflow_code"},
+            AnalyticsReportType.VENDOR_SCORECARDS: {
+                "date_from",
+                "date_to",
+                "minimum_orders",
+            },
+            AnalyticsReportType.WORKFLOWS: {"date_from", "date_to", "workflow_code"},
         }[self.report_type]
         unknown = set(self.parameters) - allowed
         if unknown:

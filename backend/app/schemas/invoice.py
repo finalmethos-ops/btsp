@@ -3,14 +3,16 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.schemas.numeric import NonNegativeCurrencyAmount, PositiveWholeQuantity
+
 
 class VendorInvoiceLineCreate(BaseModel):
     line_number: int = Field(gt=0)
     purchase_order_line_id: int
     product_code: str = Field(min_length=1, max_length=64)
-    quantity: Decimal = Field(gt=0, max_digits=14, decimal_places=4)
-    unit_price: Decimal = Field(ge=0, max_digits=14, decimal_places=4)
-    extended_amount: Decimal = Field(ge=0, max_digits=14, decimal_places=4)
+    quantity: PositiveWholeQuantity
+    unit_price: NonNegativeCurrencyAmount
+    extended_amount: NonNegativeCurrencyAmount
 
     @model_validator(mode="after")
     def validate_extension(self) -> "VendorInvoiceLineCreate":
@@ -26,10 +28,10 @@ class VendorInvoiceCreate(BaseModel):
     invoice_date: datetime
     due_date: datetime | None = None
     currency: str = Field(min_length=3, max_length=3)
-    subtotal: Decimal = Field(ge=0, max_digits=14, decimal_places=4)
-    freight_total: Decimal = Field(ge=0, max_digits=14, decimal_places=4)
-    tax_total: Decimal = Field(ge=0, max_digits=14, decimal_places=4)
-    total: Decimal = Field(ge=0, max_digits=14, decimal_places=4)
+    subtotal: NonNegativeCurrencyAmount
+    freight_total: NonNegativeCurrencyAmount
+    tax_total: NonNegativeCurrencyAmount
+    total: NonNegativeCurrencyAmount
     lines: list[VendorInvoiceLineCreate] = Field(min_length=1, max_length=1000)
 
     @model_validator(mode="after")

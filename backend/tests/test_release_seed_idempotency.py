@@ -13,7 +13,7 @@ from app.models.notification import NotificationEvent, NotificationTemplate
 from app.models.store import Store  # noqa: F401
 from app.models.workflow import WorkflowDefinition, WorkflowInstance  # noqa: F401
 from app.schemas.admin_bootstrap import AdminBootstrapRequest
-from app.services.admin_bootstrap_service import bootstrap_admin_user
+from app.services.admin_bootstrap_service import bootstrap_admin_user, system_admin_exists
 from app.services.approval_policy_defaults import BPP_APPROVAL_CONFIGURATION_DEFAULTS
 from app.services.approval_policy_service import seed_bpp_approval_defaults
 from app.services.bpp_purchasing import BPP_PURCHASING_CONFIGURATION_DEFAULTS
@@ -49,6 +49,7 @@ def test_complete_release_seed_sequence_is_idempotent() -> None:
     with Session(engine) as db:
         first_bootstrap = bootstrap_admin_user(db, bootstrap)
         second_bootstrap = bootstrap_admin_user(db, bootstrap)
+        assert system_admin_exists(db) is True
 
         counts: list[tuple[int, ...]] = []
         for _ in range(2):

@@ -144,10 +144,15 @@ def evaluate_purchase_request(
                     "product.blocked", f"Product {line.product_code} is restricted", "line_items"
                 )
             )
-        if product is not None and (product.category or "").casefold() in blocked_categories:
+        if (
+            product is not None
+            and (product.product_category_code or "").casefold() in blocked_categories
+        ):
             result.errors.append(
                 RuleIssue(
-                    "category.blocked", f"Category {product.category} is restricted", "line_items"
+                    "category.blocked",
+                    f"Product Code {product.product_category_code} is restricted",
+                    "line_items",
                 )
             )
         if product is not None and (product.brand or "").casefold() in blocked_brands:

@@ -5,15 +5,16 @@ import { AdminShell } from "@/components/AdminShell";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import {
   listConfigEntries,
-  saveConfigEntry,
+  listConfigurationChanges,
+  decideConfigurationChange,
+  requestConfigurationChange,
   seedConfigDefaults,
 } from "@/lib/configuration-api";
-import type { ConfigEntry } from "@/lib/configuration-api";
-import { useAuth } from "@/lib/auth";
+import type { ConfigEntry, ConfigurationChange } from "@/lib/configuration-api";
 
 export default function AdminConfigurationPage() {
-  const { user } = useAuth();
   const [entries, setEntries] = useState<ConfigEntry[]>([]);
+  const [changes, setChanges] = useState<ConfigurationChange[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [scopeType, setScopeType] = useState("");
@@ -25,6 +26,7 @@ export default function AdminConfigurationPage() {
     setEntries(
       await listConfigEntries(scopeType || undefined, scopeKey || undefined),
     );
+    setChanges(await listConfigurationChanges("pending"));
   }, [scopeKey, scopeType]);
 
   useEffect(() => {
@@ -56,15 +58,20 @@ export default function AdminConfigurationPage() {
       return;
     }
 
-    await saveConfigEntry({
+    await requestConfigurationChange({
       scope_type: scopeType || "global",
       scope_key: scopeKey || "default",
       key: settingKey,
-      value,
-      is_active: true,
-      updated_by: user?.email ?? "frontend",
+      proposed_value: value,
     });
-    setMessage("Configuration saved.");
+    setMessage("Configuration change submitted for approval.");
+    await loadEntries();
+  }
+
+  async function decideChange(id: string, decision: "approve" | "reject") {
+    setError(null);
+    await decideConfigurationChange(id, decision);
+    setMessage(`Configuration change ${decision}d.`);
     await loadEntries();
   }
 
@@ -138,6 +145,43 @@ export default function AdminConfigurationPage() {
           <p className="mt-4 text-sm text-green-700">{message}</p>
         ) : null}
         {error ? <p className="mt-4 text-sm text-red-700">{error}</p> : null}
+        {changes.length ? (
+          <section className="mt-6 rounded border border-amber-300 bg-amber-50 p-4">
+            <h3 className="font-semibold">Pending configuration changes</h3>
+            <div className="mt-3 space-y-3">
+              {changes.map((change) => (
+                <article
+                  className="rounded border border-amber-200 bg-white p-3"
+                  key={change.id}
+                >
+                  <p className="font-semibold">{change.key}</p>
+                  <p className="text-sm text-slate-600">
+                    {change.scope_type} / {change.scope_key}
+                  </p>
+                  <pre className="mt-2 overflow-x-auto rounded bg-slate-100 p-2 text-xs">
+                    {JSON.stringify(change.proposed_value, null, 2)}
+                  </pre>
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      className="rounded bg-green-700 px-3 py-1 text-sm font-semibold text-white"
+                      onClick={() => void decideChange(change.id, "approve")}
+                      type="button"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      className="rounded bg-red-700 px-3 py-1 text-sm font-semibold text-white"
+                      onClick={() => void decideChange(change.id, "reject")}
+                      type="button"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null}
         <div className="mt-6 space-y-3">
           {entries.map((entry) => (
             <article

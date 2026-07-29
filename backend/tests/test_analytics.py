@@ -1,8 +1,10 @@
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from io import BytesIO
 
 import pytest
-from sqlalchemy import create_engine
+from openpyxl import load_workbook
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 from app.db.session import Base
@@ -31,6 +33,7 @@ from app.services.analytics_report_service import (
     run_due_reports,
 )
 from app.services.analytics_service import (
+    executive_spend_dashboard,
     inventory_positions,
     operational_dashboard,
     spend_analysis,
@@ -80,6 +83,95 @@ def test_operational_dashboard_has_stable_zero_state(db: Session) -> None:
     assert dashboard.invoices.invoice_count == 0
     assert dashboard.reconciliation.open_exception_count == 0
     assert vendor_scorecards(db).scorecards == []
+
+
+def test_executive_spend_dashboard_tracks_entity_periods_and_best_sellers(
+    db: Session,
+) -> None:
+    store = db.scalar(select(Store).where(Store.store_number == "001"))
+    assert store is not None
+    store.entity_code = "BEBE"
+    db.add(
+        Store(
+            store_number="002",
+            name="Second Store",
+            region_code="EAST",
+            entity_code="CRD",
+            is_active=True,
+        )
+    )
+    orders = [
+        (
+            datetime(2026, 7, 10, tzinfo=UTC),
+            "PO-MTD-BEBE",
+            "001",
+            "SKU-A",
+            "Product A",
+            3,
+            300,
+        ),
+        (
+            datetime(2026, 7, 12, tzinfo=UTC),
+            "PO-MTD-CRD",
+            "002",
+            "SKU-B",
+            "Product B",
+            2,
+            500,
+        ),
+        (
+            datetime(2026, 2, 1, tzinfo=UTC),
+            "PO-YTD-BEBE",
+            "001",
+            "SKU-A",
+            "Product A",
+            1,
+            100,
+        ),
+        (
+            datetime(2025, 12, 20, tzinfo=UTC),
+            "PO-PRIOR-YEAR",
+            "001",
+            "SKU-C",
+            "Prior Product",
+            10,
+            1000,
+        ),
+    ]
+    for created_at, number, store_number, code, name, quantity, total in orders:
+        order = _order("USD", total, number)
+        order.created_at = created_at
+        order.lines.append(
+            PurchaseOrderLine(
+                source_request_id=f"request-{number}",
+                source_line_id=1,
+                store_number=store_number,
+                product_code=code,
+                product_name=name,
+                quantity=quantity,
+                unit_price=total / quantity,
+                freight_amount=0,
+                tax_amount=0,
+                extended_amount=total,
+            )
+        )
+        db.add(order)
+    db.commit()
+
+    dashboard = executive_spend_dashboard(db, datetime(2026, 7, 26, 12, tzinfo=UTC))
+
+    assert [(item.entity_code, item.currency, item.amount) for item in dashboard.mtd_by_entity] == [
+        ("CRD", "USD", 500),
+        ("BEBE", "USD", 300),
+    ]
+    assert [(item.entity_code, item.currency, item.amount) for item in dashboard.ytd_by_entity] == [
+        ("CRD", "USD", 500),
+        ("BEBE", "USD", 400),
+    ]
+    assert [
+        (item.rank, item.product_code, item.quantity, item.amount)
+        for item in dashboard.top_sellers_mtd
+    ] == [(1, "SKU-A", 3, 300), (2, "SKU-B", 2, 500)]
 
 
 def test_operational_dashboard_aggregates_without_cross_currency_sums(db: Session) -> None:
@@ -198,6 +290,45 @@ def test_operational_dashboard_aggregates_without_cross_currency_sums(db: Sessio
         )
     )
     db.add(case)
+    db.add_all(
+        [
+            EventSnapshot(
+                event_type="vendor.fulfillment.delay_reported",
+                entity_type="purchase_order",
+                entity_id=usd_order.id,
+                actor="vendor@example.com",
+                payload={"vendor_code": "V-A"},
+            ),
+            EventSnapshot(
+                event_type="vendor.fulfillment.backorder_reported",
+                entity_type="purchase_order",
+                entity_id=usd_order.id,
+                actor="vendor@example.com",
+                payload={"vendor_code": "V-A"},
+            ),
+            EventSnapshot(
+                event_type="vendor.fulfillment.out_of_stock_reported",
+                entity_type="purchase_order",
+                entity_id=usd_order.id,
+                actor="vendor@example.com",
+                payload={"vendor_code": "V-A"},
+            ),
+            EventSnapshot(
+                event_type="vendor.fulfillment.substitution_proposed",
+                entity_type="purchase_order",
+                entity_id=usd_order.id,
+                actor="vendor@example.com",
+                payload={"vendor_code": "V-A"},
+            ),
+            EventSnapshot(
+                event_type="purchase_order.vendor_change_confirmed",
+                entity_type="purchase_order",
+                entity_id=usd_order.id,
+                actor="vendor@example.com",
+                payload={"vendor_code": "V-A"},
+            ),
+        ]
+    )
     db.commit()
 
     dashboard = operational_dashboard(db)
@@ -232,6 +363,12 @@ def test_operational_dashboard_aggregates_without_cross_currency_sums(db: Sessio
     assert scorecard.on_time_delivery_rate is None
     assert scorecard.receiving_acceptance_rate == Decimal("87.50")
     assert scorecard.invoice_match_rate == Decimal("0.00")
+    assert scorecard.vendor_fulfillment_event_count == 4
+    assert scorecard.delay_event_count == 1
+    assert scorecard.backorder_event_count == 1
+    assert scorecard.out_of_stock_event_count == 1
+    assert scorecard.substitution_event_count == 1
+    assert scorecard.confirmed_po_change_count == 1
 
 
 def test_spend_analysis_groups_landed_line_spend_and_applies_filters(db: Session) -> None:
@@ -240,7 +377,8 @@ def test_spend_analysis_groups_landed_line_spend_and_applies_filters(db: Session
             product_code="SKU-SPEND",
             vendor_code="V-A",
             name="Analytics product",
-            category="Fixtures",
+            department="FURNITURE",
+            product_category_code="FIXTURES",
             unit_price=10,
             currency="USD",
             minimum_order_quantity=1,
@@ -274,17 +412,19 @@ def test_spend_analysis_groups_landed_line_spend_and_applies_filters(db: Session
 
     by_vendor = spend_analysis(db, SpendDimension.VENDOR)
     by_store = spend_analysis(db, SpendDimension.STORE, store_number="001")
-    by_category = spend_analysis(db, SpendDimension.CATEGORY)
+    by_department = spend_analysis(db, SpendDimension.DEPARTMENT)
+    by_product_code = spend_analysis(db, SpendDimension.PRODUCT_CODE)
 
     assert [(item.currency, item.amount) for item in by_vendor.metrics] == [
-        ("EUR", 20),
         ("USD", 107),
+        ("EUR", 20),
     ]
     assert len(by_store.metrics) == 1
     assert by_store.metrics[0].dimension_key == "001"
     assert by_store.metrics[0].quantity == 10
     assert by_store.metrics[0].amount == 107
-    assert {item.dimension_key for item in by_category.metrics} == {"Fixtures"}
+    assert {item.dimension_key for item in by_department.metrics} == {"FURNITURE"}
+    assert {item.dimension_key for item in by_product_code.metrics} == {"SKU-SPEND"}
 
 
 def test_workflow_analytics_measures_only_completed_cycle_times(db: Session) -> None:
@@ -411,13 +551,34 @@ def test_scheduled_report_generation_is_due_once_and_content_addressed(
     assert runs[0].status == "completed"
     assert runs[0].size_bytes and runs[0].size_bytes > 0
     assert len(runs[0].sha256 or "") == 64
-    assert (
-        report_run_path(runs[0], str(tmp_path)).read_bytes().startswith(b"dimension_key,currency")
+    report_path = report_run_path(runs[0], str(tmp_path))
+    assert report_path.suffix == ".xlsx"
+    assert runs[0].content_type == (
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
+    spend_workbook = load_workbook(report_path, data_only=True)
+    assert spend_workbook.sheetnames == ["Dashboard", "Spend Detail"]
+    assert spend_workbook["Dashboard"]["A1"].value.startswith("BTSP Executive Analytics")
+    assert spend_workbook["Spend Detail"]["A1"].value == "Vendor"
     assert schedule.next_run_at.replace(tzinfo=UTC) == now + timedelta(days=1)
 
-    inventory_csv = render_analytics_report(db, AnalyticsReportType.INVENTORY_POSITION, {})
-    assert inventory_csv.startswith(b"store_number,product_code")
+    inventory_export = render_analytics_report(db, AnalyticsReportType.INVENTORY_POSITION, {})
+    inventory_workbook = load_workbook(BytesIO(inventory_export), data_only=True)
+    assert inventory_workbook.sheetnames == ["Dashboard", "Inventory Detail"]
+    assert inventory_workbook["Inventory Detail"]["A1"].value == "Store Number"
+
+    executive_export = render_analytics_report(db, AnalyticsReportType.EXECUTIVE_PACK, {})
+    executive_workbook = load_workbook(BytesIO(executive_export), data_only=True)
+    assert executive_workbook.sheetnames == [
+        "Dashboard",
+        "Spend by Vendor",
+        "Spend by Department",
+        "Product Performance",
+        "Vendor Scorecards",
+        "Workflow Performance",
+        "Inventory Position",
+    ]
+    assert len(executive_workbook["Dashboard"]._charts) == 1
 
 
 def test_report_exports_escape_spreadsheet_formulas_and_verify_artifacts(
@@ -443,7 +604,8 @@ def test_report_exports_escape_spreadsheet_formulas_and_verify_artifacts(
     db.commit()
 
     content = render_analytics_report(db, AnalyticsReportType.SPEND, {"group_by": "vendor"})
-    assert b"'=DANGEROUS()" in content
+    workbook = load_workbook(BytesIO(content), data_only=False)
+    assert workbook["Spend Detail"]["A2"].value == "'=DANGEROUS()"
 
     now = datetime(2026, 6, 29, 12, tzinfo=UTC)
     create_report_schedule(

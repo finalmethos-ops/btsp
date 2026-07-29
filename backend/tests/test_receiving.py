@@ -255,17 +255,17 @@ def test_rejected_quantity_creates_exception_variance(db: Session) -> None:
     assert receipt.variances[0].actual_quantity == Decimal("1")
 
 
-def _rejected_receipt(db: Session) -> PurchaseReceipt:
+def _rejected_receipt(db: Session, rejected_quantity: Decimal = Decimal("1")) -> PurchaseReceipt:
     order = _order(db)
     payload = _payload(order, order.lines[0].id)
-    payload.lines[0].accepted_quantity = Decimal("1")
-    payload.lines[0].rejected_quantity = Decimal("1")
+    payload.lines[0].accepted_quantity = Decimal("2") - rejected_quantity
+    payload.lines[0].rejected_quantity = rejected_quantity
     payload.lines[0].rejection_reason = "Damaged carton"
     return create_receipt(db, payload, "receiver@example.com")[0]
 
 
 def test_backorder_is_variance_linked_idempotent_and_partially_fulfilled(db: Session) -> None:
-    receipt = _rejected_receipt(db)
+    receipt = _rejected_receipt(db, Decimal("2"))
     variance = receipt.variances[0]
     payload = PurchaseBackorderCreate(
         source_variance_id=variance.id,
@@ -281,22 +281,22 @@ def test_backorder_is_variance_linked_idempotent_and_partially_fulfilled(db: Ses
     assert repeated_created is False
     assert repeated.id == backorder.id
     assert backorder.backorder_number == "BO-2026-000001"
-    assert backorder.original_quantity == Decimal("1")
+    assert backorder.original_quantity == Decimal("2")
     assert variance.status == "resolved"
     assert receipt.status == "posted"
 
     partial = apply_backorder_action(
         db,
         backorder.id,
-        PurchaseBackorderAction(action="receive", quantity=Decimal("0.5"), note="First carton"),
+        PurchaseBackorderAction(action="receive", quantity=Decimal("1"), note="First carton"),
         "receiver@example.com",
     )
     assert partial.status == "partially_fulfilled"
-    assert partial.outstanding_quantity == Decimal("0.5")
+    assert partial.outstanding_quantity == Decimal("1")
     complete = apply_backorder_action(
         db,
         backorder.id,
-        PurchaseBackorderAction(action="receive", quantity=Decimal("0.5"), note="Final carton"),
+        PurchaseBackorderAction(action="receive", quantity=Decimal("1"), note="Final carton"),
         "receiver@example.com",
     )
     assert complete.status == "fulfilled"

@@ -16,6 +16,7 @@ from app.models.purchasing import PurchaseRequest, PurchaseRequestLineItem
 from app.schemas.configuration_entry import ConfigEntryWrite
 from app.schemas.event_snapshot import EventSnapshotCreate
 from app.services.configuration_service import get_config_entry, upsert_config_entry
+from app.services.purchase_order_filter_service import apply_purchase_order_filters
 from app.services.snapshot_service import append_snapshot
 
 NUMBERING_DEFAULT = {"prefix": "PO", "padding": 6}
@@ -63,29 +64,37 @@ def _numbering_config(db: Session) -> tuple[str, int]:
     return prefix, padding
 
 
-def allocate_po_number(db: Session, at: datetime | None = None) -> str:
-    prefix, padding = _numbering_config(db)
-    year = (at or datetime.now(UTC)).year
+def allocate_po_number(db: Session, store_number: str, at: datetime | None = None) -> str:
+    moment = at or datetime.now(UTC)
+    year = moment.year
+    month = moment.month
+    prefix = f"PO-{store_number.strip()}"
     if db.bind is not None and db.bind.dialect.name == "postgresql":
         db.execute(
             text("SELECT pg_advisory_xact_lock(hashtext(:lock_key))"),
-            {"lock_key": f"purchase-order:{prefix}:{year}"},
+            {"lock_key": f"purchase-order:{prefix}:{year}:{month}"},
         )
     sequence = db.scalar(
         select(PurchaseOrderSequence)
         .where(
             PurchaseOrderSequence.prefix == prefix,
             PurchaseOrderSequence.sequence_year == year,
+            PurchaseOrderSequence.sequence_month == month,
         )
         .with_for_update()
     )
     if sequence is None:
-        sequence = PurchaseOrderSequence(prefix=prefix, sequence_year=year, next_value=1)
+        sequence = PurchaseOrderSequence(
+            prefix=prefix,
+            sequence_year=year,
+            sequence_month=month,
+            next_value=1,
+        )
         db.add(sequence)
         db.flush()
     value = sequence.next_value
     sequence.next_value += 1
-    return f"{prefix}-{year}-{value:0{padding}d}"
+    return f"{prefix}-{year}-{month:02d}-{value:03d}"
 
 
 def _required_permission(workflow_code: str) -> str:
@@ -168,7 +177,7 @@ def generate_purchase_orders(
     )
     if existing_ids:
         raise PurchaseOrderError("A purchase order already exists for a source request")
-    consolidation_enabled, consolidation_by_store, max_lines, max_total = _generation_config(db)
+    consolidation_enabled, _consolidation_by_store, max_lines, max_total = _generation_config(db)
     grouped: dict[tuple[str, str, str, str, str], list[PurchaseRequest]] = defaultdict(list)
     for request in requests:
         if request.status != "po_created":
@@ -181,7 +190,8 @@ def generate_purchase_orders(
         if not request.line_items:
             raise PurchaseOrderError(f"Purchase request {request.id} has no line items")
         group_marker = "consolidated" if consolidation_enabled else request.id
-        store_marker = request.store_number if consolidation_by_store else "all-stores"
+        # The number identifies one store, so cross-store consolidation is invalid.
+        store_marker = request.store_number
         grouped[
             (
                 request.workflow_code,
@@ -209,7 +219,7 @@ def generate_purchase_orders(
             freight = sum((line.freight_amount for _source, line in partition), Decimal("0"))
             tax = sum((line.tax_amount for _source, line in partition), Decimal("0"))
             order = PurchaseOrder(
-                po_number=allocate_po_number(db),
+                po_number=allocate_po_number(db, _store_marker),
                 workflow_code=workflow_code,
                 vendor_code=vendor_code,
                 status="created",
@@ -218,6 +228,7 @@ def generate_purchase_orders(
                 freight_total=freight,
                 tax_total=tax,
                 total=subtotal + freight + tax,
+                expected_delivery_date=partition[0][0].expected_delivery_date,
                 created_by=actor,
             )
             db.add(order)
@@ -278,7 +289,55 @@ def list_purchase_orders(db: Session, allowed_workflows: set[str]) -> list[Purch
     )
     if allowed_workflows:
         statement = statement.where(PurchaseOrder.workflow_code.in_(allowed_workflows))
+    statement = statement.where(
+        PurchaseOrder.status.notin_({"awaiting_reconciliation", "reconciliation_complete"})
+    )
     return list(db.scalars(statement).unique().all())
+
+
+def list_reconciliation_purchase_orders(
+    db: Session, completed: bool = False, **filters
+) -> list[PurchaseOrder]:
+    queue_status = "reconciliation_complete" if completed else "awaiting_reconciliation"
+    statement = (
+        select(PurchaseOrder)
+        .options(selectinload(PurchaseOrder.sources), selectinload(PurchaseOrder.lines))
+        .where(PurchaseOrder.status == queue_status)
+    )
+    statement = apply_purchase_order_filters(statement, **filters)
+    return list(db.scalars(statement.order_by(PurchaseOrder.updated_at.desc())).unique().all())
+
+
+def handoff_purchase_order(db: Session, order: PurchaseOrder, actor: str) -> PurchaseOrder:
+    if order.status in {
+        "created",
+        "prepared",
+        "cancelled",
+        "awaiting_reconciliation",
+        "reconciliation_complete",
+    }:
+        raise PurchaseOrderError(
+            "Purchase order must be delivered or in fulfillment before reconciliation handoff"
+        )
+    previous_status = order.status
+    order.status = "awaiting_reconciliation"
+    db.commit()
+    db.refresh(order)
+    append_snapshot(
+        db,
+        EventSnapshotCreate(
+            event_type="purchase_order.reconciliation_handoff",
+            entity_type="purchase_order",
+            entity_id=order.id,
+            actor=actor,
+            payload={
+                "po_number": order.po_number,
+                "from_status": previous_status,
+                "to_status": order.status,
+            },
+        ),
+    )
+    return order
 
 
 def get_purchase_order(db: Session, order_id: str) -> PurchaseOrder | None:

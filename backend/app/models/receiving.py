@@ -25,7 +25,7 @@ class PurchaseReceipt(Base):
     )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
-    receipt_number: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    receipt_number: Mapped[str] = mapped_column(String(64), unique=True)
     purchase_order_id: Mapped[str] = mapped_column(
         ForeignKey("purchase_orders.id", ondelete="RESTRICT"), index=True
     )
@@ -71,9 +71,9 @@ class PurchaseReceiptLine(Base):
         ForeignKey("vendor_advance_ship_notice_lines.id", ondelete="SET NULL"), nullable=True
     )
     product_code: Mapped[str] = mapped_column(String(64))
-    received_quantity: Mapped[Decimal] = mapped_column(Numeric(14, 4))
-    accepted_quantity: Mapped[Decimal] = mapped_column(Numeric(14, 4))
-    rejected_quantity: Mapped[Decimal] = mapped_column(Numeric(14, 4))
+    received_quantity: Mapped[Decimal] = mapped_column(Numeric(14, 0))
+    accepted_quantity: Mapped[Decimal] = mapped_column(Numeric(14, 0))
+    rejected_quantity: Mapped[Decimal] = mapped_column(Numeric(14, 0))
     rejection_reason: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     lot_number: Mapped[str | None] = mapped_column(String(160), nullable=True)
 
@@ -96,9 +96,9 @@ class ReceiptVariance(Base):
     )
     variance_type: Mapped[str] = mapped_column(String(32), index=True)
     severity: Mapped[str] = mapped_column(String(16), index=True)
-    expected_quantity: Mapped[Decimal] = mapped_column(Numeric(14, 4))
-    actual_quantity: Mapped[Decimal] = mapped_column(Numeric(14, 4))
-    difference_quantity: Mapped[Decimal] = mapped_column(Numeric(14, 4))
+    expected_quantity: Mapped[Decimal] = mapped_column(Numeric(14, 0))
+    actual_quantity: Mapped[Decimal] = mapped_column(Numeric(14, 0))
+    difference_quantity: Mapped[Decimal] = mapped_column(Numeric(14, 0))
     status: Mapped[str] = mapped_column(String(32), default="open", index=True)
     detected_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -128,9 +128,9 @@ class PurchaseBackorder(Base):
     __tablename__ = "purchase_backorders"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
-    backorder_number: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    backorder_number: Mapped[str] = mapped_column(String(64), unique=True)
     source_variance_id: Mapped[str] = mapped_column(
-        ForeignKey("receipt_variances.id", ondelete="RESTRICT"), unique=True, index=True
+        ForeignKey("receipt_variances.id", ondelete="RESTRICT"), unique=True
     )
     purchase_order_id: Mapped[str] = mapped_column(
         ForeignKey("purchase_orders.id", ondelete="RESTRICT"), index=True
@@ -142,9 +142,9 @@ class PurchaseBackorder(Base):
         ForeignKey("stores.store_number", ondelete="RESTRICT"), index=True
     )
     product_code: Mapped[str] = mapped_column(String(64))
-    original_quantity: Mapped[Decimal] = mapped_column(Numeric(14, 4))
-    fulfilled_quantity: Mapped[Decimal] = mapped_column(Numeric(14, 4), default=0)
-    outstanding_quantity: Mapped[Decimal] = mapped_column(Numeric(14, 4))
+    original_quantity: Mapped[Decimal] = mapped_column(Numeric(14, 0))
+    fulfilled_quantity: Mapped[Decimal] = mapped_column(Numeric(14, 0), default=0)
+    outstanding_quantity: Mapped[Decimal] = mapped_column(Numeric(14, 0))
     status: Mapped[str] = mapped_column(String(32), default="open", index=True)
     expected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     substitute_product_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
@@ -172,7 +172,7 @@ class PurchaseBackorderEvent(Base):
     action: Mapped[str] = mapped_column(String(32), index=True)
     from_status: Mapped[str] = mapped_column(String(32))
     to_status: Mapped[str] = mapped_column(String(32))
-    quantity: Mapped[Decimal | None] = mapped_column(Numeric(14, 4), nullable=True)
+    quantity: Mapped[Decimal | None] = mapped_column(Numeric(14, 0), nullable=True)
     note: Mapped[str] = mapped_column(String(1000))
     actor: Mapped[str] = mapped_column(String(320))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -198,10 +198,10 @@ class VendorInvoice(Base):
     invoice_date: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     due_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     currency: Mapped[str] = mapped_column(String(3))
-    subtotal: Mapped[Decimal] = mapped_column(Numeric(14, 4))
-    freight_total: Mapped[Decimal] = mapped_column(Numeric(14, 4))
-    tax_total: Mapped[Decimal] = mapped_column(Numeric(14, 4))
-    total: Mapped[Decimal] = mapped_column(Numeric(14, 4))
+    subtotal: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    freight_total: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    tax_total: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    total: Mapped[Decimal] = mapped_column(Numeric(14, 2))
     status: Mapped[str] = mapped_column(String(32), index=True)
     received_by: Mapped[str] = mapped_column(String(320))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -226,9 +226,9 @@ class VendorInvoiceLine(Base):
         ForeignKey("purchase_order_lines.id", ondelete="RESTRICT"), index=True
     )
     product_code: Mapped[str] = mapped_column(String(64))
-    quantity: Mapped[Decimal] = mapped_column(Numeric(14, 4))
-    unit_price: Mapped[Decimal] = mapped_column(Numeric(14, 4))
-    extended_amount: Mapped[Decimal] = mapped_column(Numeric(14, 4))
+    quantity: Mapped[Decimal] = mapped_column(Numeric(14, 0))
+    unit_price: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    extended_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2))
 
     invoice: Mapped[VendorInvoice] = relationship(back_populates="lines")
     match: Mapped["InvoiceLineMatch"] = relationship(
@@ -241,15 +241,15 @@ class InvoiceLineMatch(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
     invoice_line_id: Mapped[int] = mapped_column(
-        ForeignKey("vendor_invoice_lines.id", ondelete="CASCADE"), unique=True, index=True
+        ForeignKey("vendor_invoice_lines.id", ondelete="CASCADE"), unique=True
     )
-    ordered_quantity: Mapped[Decimal] = mapped_column(Numeric(14, 4))
-    accepted_quantity: Mapped[Decimal] = mapped_column(Numeric(14, 4))
-    invoiced_quantity: Mapped[Decimal] = mapped_column(Numeric(14, 4))
-    quantity_difference: Mapped[Decimal] = mapped_column(Numeric(14, 4))
-    ordered_unit_price: Mapped[Decimal] = mapped_column(Numeric(14, 4))
-    invoiced_unit_price: Mapped[Decimal] = mapped_column(Numeric(14, 4))
-    price_difference: Mapped[Decimal] = mapped_column(Numeric(14, 4))
+    ordered_quantity: Mapped[Decimal] = mapped_column(Numeric(14, 0))
+    accepted_quantity: Mapped[Decimal] = mapped_column(Numeric(14, 0))
+    invoiced_quantity: Mapped[Decimal] = mapped_column(Numeric(14, 0))
+    quantity_difference: Mapped[Decimal] = mapped_column(Numeric(14, 0))
+    ordered_unit_price: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    invoiced_unit_price: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    price_difference: Mapped[Decimal] = mapped_column(Numeric(14, 2))
     status: Mapped[str] = mapped_column(String(32), index=True)
     matched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -261,7 +261,7 @@ class InvoiceReconciliation(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
     invoice_id: Mapped[str] = mapped_column(
-        ForeignKey("vendor_invoices.id", ondelete="RESTRICT"), unique=True, index=True
+        ForeignKey("vendor_invoices.id", ondelete="RESTRICT"), unique=True
     )
     purchase_order_id: Mapped[str] = mapped_column(
         ForeignKey("purchase_orders.id", ondelete="RESTRICT"), index=True
@@ -309,9 +309,9 @@ class ReconciliationException(Base):
         ForeignKey("vendor_invoice_lines.id", ondelete="CASCADE"), nullable=True, index=True
     )
     exception_type: Mapped[str] = mapped_column(String(32), index=True)
-    expected_amount: Mapped[Decimal] = mapped_column(Numeric(14, 4))
-    actual_amount: Mapped[Decimal] = mapped_column(Numeric(14, 4))
-    difference_amount: Mapped[Decimal] = mapped_column(Numeric(14, 4))
+    expected_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    actual_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    difference_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2))
     status: Mapped[str] = mapped_column(String(32), default="open", index=True)
     disposition: Mapped[str | None] = mapped_column(String(32), nullable=True)
     resolution_note: Mapped[str | None] = mapped_column(String(1000), nullable=True)

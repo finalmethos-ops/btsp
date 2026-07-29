@@ -133,6 +133,7 @@ class NotificationEventResponse(BaseModel):
     resolved_recipients: list[str]
     subject: str
     body: str
+    action_href: str | None = None
     status: NotificationStatus
     error_message: str | None
     created_at: datetime

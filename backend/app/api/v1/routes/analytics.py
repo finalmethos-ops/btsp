@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
+from app.api.responses import content_disposition
 from app.auth.permissions import require_permission
 from app.core.config import settings
 from app.db.session import get_db
@@ -14,6 +15,7 @@ from app.schemas.analytics import (
     AnalyticsReportScheduleCreate,
     AnalyticsReportScheduleResponse,
     AnalyticsReportType,
+    ExecutiveSpendDashboardResponse,
     InventoryPositionResponse,
     OperationalDashboardResponse,
     SpendAnalysisResponse,
@@ -31,6 +33,7 @@ from app.services.analytics_report_service import (
     run_due_reports,
 )
 from app.services.analytics_service import (
+    executive_spend_dashboard,
     inventory_positions,
     operational_dashboard,
     spend_analysis,
@@ -55,6 +58,17 @@ def read_operational_dashboard(
     _user: User = Depends(require_permission("analytics.read")),
 ) -> OperationalDashboardResponse:
     return operational_dashboard(db)
+
+
+@router.get(
+    "/executive-spend-dashboard",
+    response_model=ExecutiveSpendDashboardResponse,
+)
+def read_executive_spend_dashboard(
+    db: Session = Depends(get_db),
+    _user: User = Depends(require_permission("analytics.read")),
+) -> ExecutiveSpendDashboardResponse:
+    return executive_spend_dashboard(db)
 
 
 @router.get("/spend", response_model=SpendAnalysisResponse)
@@ -117,14 +131,41 @@ def read_inventory_position(
 @router.get("/exports/{report_type}")
 def export_report(
     report_type: AnalyticsReportType,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    group_by: str | None = None,
+    vendor_code: str | None = None,
+    store_number: str | None = None,
+    product_code: str | None = None,
+    workflow_code: str | None = None,
+    minimum_orders: int | None = Query(default=None, ge=1, le=1000000),
     db: Session = Depends(get_db),
     _user: User = Depends(require_permission("analytics.read")),
 ) -> Response:
-    content = render_analytics_report(db, report_type, {})
+    parameters = {
+        key: value
+        for key, value in {
+            "date_from": date_from,
+            "date_to": date_to,
+            "group_by": group_by,
+            "vendor_code": vendor_code,
+            "store_number": store_number,
+            "product_code": product_code,
+            "workflow_code": workflow_code,
+            "minimum_orders": str(minimum_orders) if minimum_orders is not None else None,
+        }.items()
+        if value is not None
+    }
+    try:
+        content = render_analytics_report(db, report_type, parameters)
+    except (AnalyticsReportError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
     return Response(
         content=content,
-        media_type="text/csv",
-        headers={"Content-Disposition": f'attachment; filename="{report_type.value}.csv"'},
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": content_disposition(f"{report_type.value}.xlsx")},
     )
 
 
@@ -190,4 +231,8 @@ def download_report_run(
         path = report_run_path(run, settings.analytics_report_path)
     except AnalyticsReportError as exc:
         raise HTTPException(status_code=status.HTTP_410_GONE, detail=str(exc)) from exc
-    return FileResponse(path, media_type=run.content_type, filename=f"analytics-{run.id}.csv")
+    return FileResponse(
+        path,
+        media_type=run.content_type,
+        filename=f"analytics-{run.id}{path.suffix}",
+    )

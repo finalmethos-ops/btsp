@@ -7,6 +7,11 @@ const testUser = {
   roles: ["SYSTEM_ADMIN"],
   permissions: ["system.admin", "configuration.manage"],
   workflows: [],
+  vendor_code: null,
+  active_vendor_code: null,
+  vendor_accounts: [],
+  login_context: "standard" as const,
+  password_change_required: false,
 };
 
 describe("access helpers", () => {
