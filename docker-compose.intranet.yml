@@ -1,0 +1,31 @@
+services:
+  postgres:
+    image: >-
+      postgres:16-alpine@sha256:e013e867e712fec275706a6c51c966f0bb0c93cfa8f51000f85a15f9865a28cb
+    pull_policy: always
+
+  redis:
+    image: >-
+      redis:7-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
+    pull_policy: always
+
+  backend:
+    image: >-
+      ghcr.io/finalmethos-ops/btsp-backend:v1.0.0-rc.3@sha256:310136c645891949a81df3de8f92e945e873166c0a1491fdfeec594f14f5eba9
+    build: !reset null
+    pull_policy: always
+    env_file: !override
+      - .env.intranet
+
+  frontend:
+    image: >-
+      ghcr.io/finalmethos-ops/btsp-frontend:v1.0.0-rc.3@sha256:e2f7b4f3f4a28afa5b25b3c2804ae052ad3982ef3a1aa58f86b34ab9d4de72fe
+    build: !reset null
+    pull_policy: always
+
+  nginx:
+    image: >-
+      nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10
+    pull_policy: always
+    ports: !override
+      - "${BTSP_BIND_ADDRESS:-0.0.0.0}:${NGINX_PORT:-18080}:80"
