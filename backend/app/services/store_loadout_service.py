@@ -1,6 +1,5 @@
 from datetime import UTC, datetime
 from io import BytesIO
-# This helper escapes report text and does not parse XML.
 from xml.sax.saxutils import escape  # nosec B406
 
 from reportlab.lib import colors
@@ -1263,6 +1262,7 @@ def store_loadout_packing_lists_pdf(
     )
 
     def cell(value: object, header: bool = False) -> Paragraph:
+        # Escape report text for XML-safe rendering; no XML input is parsed here.
         return Paragraph(escape(str(value)), table_header_style if header else table_cell_style)
 
     story = []
