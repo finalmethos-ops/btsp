@@ -201,6 +201,19 @@ def main() -> int:
     else:
         add("environment.mode", "pass", "Production mode is explicitly enabled.")
 
+    if environment.get("BOOTSTRAP_ENABLED", "").casefold() not in {"false", "0", "no", "off"}:
+        add(
+            "bootstrap.disabled",
+            "fail",
+            "Administrative bootstrap is not explicitly disabled in production.",
+        )
+    else:
+        add(
+            "bootstrap.disabled",
+            "pass",
+            "Administrative bootstrap is explicitly disabled in production.",
+        )
+
     origins = [
         value.strip()
         for value in environment.get("CORS_ORIGINS", "").split(",")

@@ -6,6 +6,7 @@ This runbook provisions the first BTSP administrator after installation.
 
 - Database migrations have been applied.
 - `BOOTSTRAP_ADMIN_TOKEN` is set in the environment.
+- `BOOTSTRAP_ENABLED=true` is set only for the initial provisioning window.
 - The backend service is running.
 
 ## Request
@@ -28,6 +29,7 @@ The endpoint creates or updates the administrator user and ensures core roles an
 ## Security Notes
 
 - Change `BOOTSTRAP_ADMIN_TOKEN` before production use.
-- Rotate the bootstrap token after initial provisioning.
+- Rotate the bootstrap token and set `BOOTSTRAP_ENABLED=false` after initial provisioning.
+- Recreate the backend container and confirm `/api/v1/bootstrap/admin` returns HTTP 404.
 - Replace the initial admin password immediately after first login.
 - This endpoint is for installation bootstrap only.

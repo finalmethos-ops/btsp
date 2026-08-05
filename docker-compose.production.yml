@@ -26,6 +26,7 @@ services:
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required for production}
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required for production}
       BOOTSTRAP_ADMIN_TOKEN: ${BOOTSTRAP_ADMIN_TOKEN:?BOOTSTRAP_ADMIN_TOKEN is required for production}
+      BOOTSTRAP_ENABLED: ${BOOTSTRAP_ENABLED:-false}
       CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS is required for production}
     volumes: !override
       - attachment_data:/data/attachments

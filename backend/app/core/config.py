@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     bootstrap_admin_token: str = Field(
         default="change-me-before-bootstrap", alias="BOOTSTRAP_ADMIN_TOKEN"
     )
+    bootstrap_enabled: bool = Field(default=True, alias="BOOTSTRAP_ENABLED")
     access_token_expire_minutes: int = Field(
         default=60, ge=5, le=1440, alias="ACCESS_TOKEN_EXPIRE_MINUTES"
     )

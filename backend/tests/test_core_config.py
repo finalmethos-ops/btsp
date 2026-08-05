@@ -20,6 +20,7 @@ def test_production_settings_accept_explicit_safe_values() -> None:
     settings = _production_settings()
 
     assert settings.environment == "production"
+    assert settings.bootstrap_enabled is True
 
 
 @pytest.mark.parametrize(

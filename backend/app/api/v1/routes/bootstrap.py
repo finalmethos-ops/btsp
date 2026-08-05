@@ -17,6 +17,10 @@ def create_bootstrap_admin(
     db: Session = Depends(get_db),
     bootstrap_token: str | None = Header(default=None, alias="X-BTSP-Bootstrap-Token"),
 ) -> AdminBootstrapResponse:
+    if not settings.bootstrap_enabled:
+        # Do not disclose that an installation-only route exists after the
+        # production administrator has been provisioned.
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
     if not bootstrap_token or not compare_digest(bootstrap_token, settings.bootstrap_admin_token):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Invalid bootstrap token")
     if system_admin_exists(db):

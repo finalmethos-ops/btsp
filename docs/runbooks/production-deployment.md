@@ -22,6 +22,7 @@ before accepting users.
 | `APP_VERSION` | Deployed release identifier | Set to approved release version |
 | `SECRET_KEY` | JWT signing secret | Generate a unique high-entropy value; never use the default |
 | `BOOTSTRAP_ADMIN_TOKEN` | Initial admin bootstrap secret | Generate uniquely; rotate after bootstrap |
+| `BOOTSTRAP_ENABLED` | Exposes the initial administrator bootstrap route | Set `true` only for initial provisioning, then permanently set `false` |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | JWT lifetime | Use the approved short session duration |
 | `REFRESH_TOKEN_EXPIRE_DAYS` | Revocable session lifetime | Keep within approved session policy; default 14 days |
 | `PASSWORD_RESET_EXPIRE_MINUTES` | Reset-token lifetime | Keep short; default 30 minutes |
@@ -116,7 +117,9 @@ curl -X POST https://btsp.example/api/v1/bootstrap/admin \
   -d '{"email":"admin@example.com","display_name":"BTSP Admin","password":"temporary-secret"}'
 ```
 
-Immediately change the administrator password through the approved administrative procedure and rotate `BOOTSTRAP_ADMIN_TOKEN` in `.env`, then recreate the backend container.
+Immediately change the administrator password through the approved administrative procedure,
+rotate `BOOTSTRAP_ADMIN_TOKEN`, set `BOOTSTRAP_ENABLED=false`, and recreate the backend container.
+Confirm the bootstrap URL then returns HTTP 404 and is absent from the production OpenAPI surface.
 
 ## Seed Order
 

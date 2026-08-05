@@ -57,6 +57,7 @@ from app.auth.event_scope import (
     enforce_event_login_scope,
     enforce_event_portal_api_boundary,
 )
+from app.core.config import settings
 
 api_router = APIRouter(dependencies=[Depends(enforce_event_portal_api_boundary)])
 api_router.include_router(analytics.router)
@@ -103,7 +104,8 @@ api_router.include_router(event_staff_tasks.router, dependencies=event_scope_dep
 api_router.include_router(event_vendor_booths.router, dependencies=event_scope_dependencies)
 api_router.include_router(event_live_insights.router, dependencies=event_scope_dependencies)
 api_router.include_router(communications.router)
-api_router.include_router(bootstrap.router)
+if settings.bootstrap_enabled:
+    api_router.include_router(bootstrap.router)
 api_router.include_router(users.router)
 api_router.include_router(vendor_integrations.router)
 api_router.include_router(vendor_hall.router, dependencies=event_scope_dependencies)

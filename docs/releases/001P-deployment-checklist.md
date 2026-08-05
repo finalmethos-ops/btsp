@@ -44,6 +44,7 @@
 - [ ] Initial administrator is bootstrapped.
 - [ ] Administrator password is changed from the initial value.
 - [ ] Bootstrap token is rotated after provisioning.
+- [ ] `BOOTSTRAP_ENABLED=false` after provisioning and the bootstrap URL returns HTTP 404.
 - [ ] Platform configuration defaults are seeded.
 - [ ] Workflow registry defaults are verified.
 - [ ] BPP purchasing definition is seeded.
@@ -72,7 +73,7 @@
 
 - [ ] Default `SECRET_KEY` is absent.
 - [ ] Default `BOOTSTRAP_ADMIN_TOKEN` is absent.
-- [ ] Bootstrap endpoint requires the secret header.
+- [ ] Bootstrap endpoint is absent after provisioning; when temporarily enabled for a new installation it requires the secret header.
 - [ ] Administrator password was rotated.
 - [ ] CORS is restricted to production origins.
 - [ ] PostgreSQL password was changed.

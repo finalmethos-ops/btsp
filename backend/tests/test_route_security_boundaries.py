@@ -64,6 +64,23 @@ def test_only_explicit_bootstrap_and_probe_routes_are_public() -> None:
     assert TestClient(app).get("/api/v1/health").headers["cache-control"] == "no-store"
 
 
+def test_disabled_bootstrap_route_is_indistinguishable_from_missing_route(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "bootstrap_enabled", False)
+
+    response = TestClient(app).post(
+        "/api/v1/bootstrap/admin",
+        headers={"X-BTSP-Bootstrap-Token": settings.bootstrap_admin_token},
+        json={
+            "email": "bootstrap@example.com",
+            "display_name": "Bootstrap Administrator",
+            "password": "A-valid-bootstrap-password-2026!",
+        },
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Not found"}
+
+
 def test_projector_display_uses_scoped_link_instead_of_user_login(
     monkeypatch,
 ) -> None:
