@@ -1,59 +1,50 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
+import { EventAccessUnavailable } from "@/components/EventAccessUnavailable";
 import { EventPresentationDisplay } from "@/components/EventPresentationDisplay";
-import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { useAuth } from "@/lib/auth";
-import { listMyEvents } from "@/lib/event-admin-api";
-import { liveEventDestination } from "@/lib/live-event-destination";
-import { hasPermission } from "@/lib/permissions";
-
-function EventPresentationEntry({ subEventId }: { subEventId: string }) {
-  const { user } = useAuth();
-  const router = useRouter();
-  const [allowed, setAllowed] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    if (!user) return;
-    if (hasPermission(user, "events.manage")) {
-      setAllowed(true);
-      return;
-    }
-    let active = true;
-    void listMyEvents()
-      .then((events) => {
-        const event = events.find((item) =>
-          item.sub_events.some((subEvent) => subEvent.id === subEventId),
-        );
-        if (!active) return;
-        router.replace(
-          event
-            ? liveEventDestination(user, event.id, subEventId)
-            : "/events/calendar",
-        );
-      })
-      .catch(() => {
-        if (active) router.replace("/events/calendar");
-      });
-    return () => {
-      active = false;
-    };
-  }, [router, subEventId, user]);
-
-  if (allowed !== true)
-    return <main className="loading-screen">Opening event tools…</main>;
-  return <EventPresentationDisplay subEventId={subEventId} />;
-}
 
 export default function EventPresentationPage() {
   const params = useParams<{ subEventId: string }>();
+  const [projectorToken, setProjectorToken] = useState<string | null>();
+
+  useEffect(() => {
+    const fragment = new URLSearchParams(window.location.hash.slice(1));
+    const storageKey = `btsp.projector.${params.subEventId}`;
+    const fragmentToken = fragment.get("projector_token");
+    try {
+      if (fragmentToken)
+        window.sessionStorage.setItem(storageKey, fragmentToken);
+      setProjectorToken(
+        fragmentToken ?? window.sessionStorage.getItem(storageKey),
+      );
+    } catch {
+      setProjectorToken(fragmentToken);
+    }
+    if (fragmentToken)
+      window.history.replaceState(
+        null,
+        "",
+        `${window.location.pathname}${window.location.search}`,
+      );
+  }, [params.subEventId]);
+
+  if (projectorToken === undefined)
+    return <main className="loading-screen">Opening projector display…</main>;
+
+  if (!projectorToken)
+    return (
+      <EventAccessUnavailable
+        message="Open a fresh projector link from the live presentation control panel."
+        title="Projector link required"
+      />
+    );
+
   return (
-    <ProtectedRoute
-      loginMode="event"
-      loginRedirectTo={`/events/present/${params.subEventId}`}
-    >
-      <EventPresentationEntry subEventId={params.subEventId} />
-    </ProtectedRoute>
+    <EventPresentationDisplay
+      projectorToken={projectorToken}
+      subEventId={params.subEventId}
+    />
   );
 }

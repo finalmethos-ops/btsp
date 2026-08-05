@@ -6,7 +6,6 @@ import { useEffect, useState } from "react";
 import { EventBrandingProvider } from "@/components/EventBrandingProvider";
 import { EventVendorBuyFairWorkspace } from "@/components/EventVendorBuyFairWorkspace";
 import { EventOrderingPortal } from "@/components/EventOrderingPortal";
-import { EventPresentationDisplay } from "@/components/EventPresentationDisplay";
 import { EventVendorBoothLanding } from "@/components/EventVendorBoothLanding";
 import { EventVendorHallDirectory } from "@/components/EventVendorHallDirectory";
 import { EventVendorBuyFairSummaryPanel } from "@/components/EventVendorBuyFairSummaryPanel";
@@ -148,10 +147,6 @@ function SubEventWorkspace({ subEventId }: { subEventId: string }) {
             ) : null}
             {!isAdmin && modules.has("ordering") ? (
               <EventOrderingPortal subEventId={subEvent.id} />
-            ) : null}
-            {(modules.has("live-display") || modules.has("product-slides")) &&
-            !isAdmin ? (
-              <EventPresentationDisplay subEventId={subEvent.id} />
             ) : null}
             {(modules.has("live-display") || modules.has("product-slides")) &&
             isAdmin ? (

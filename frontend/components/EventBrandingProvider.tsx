@@ -16,7 +16,7 @@ import {
 } from "@/lib/event-admin-api";
 import { useAuth } from "@/lib/auth";
 
-type EventBrandStyle = CSSProperties & {
+export type EventBrandStyle = CSSProperties & {
   "--event-brand-image"?: string;
   "--event-theme-primary"?: string;
   "--event-theme-accent"?: string;
@@ -38,8 +38,10 @@ const EventBrandingContext = createContext<EventBrandingContextValue>({
   brandedStyle: () => undefined,
 });
 
-function eventThemeStyle(
-  event: ManagedEvent | undefined,
+export function eventThemeStyle(
+  event:
+    | Pick<ManagedEvent, "theme_primary_color" | "theme_accent_color">
+    | undefined,
   brandingUrl?: string | null,
 ): EventBrandStyle | undefined {
   if (!event && !brandingUrl) return undefined;

@@ -7,6 +7,8 @@ from sqlalchemy.pool import StaticPool
 
 from app.api.v1.routes.event_realtime import _realtime_access_allowed
 from app.auth.dependencies import get_current_user
+from app.auth.security import create_projector_token
+from app.core.config import settings
 from app.db.session import Base, get_db
 from app.main import app
 from app.models import (  # noqa: F401
@@ -60,6 +62,75 @@ def test_only_explicit_bootstrap_and_probe_routes_are_public() -> None:
         ("POST", "/api/v1/bootstrap/admin"),
     }
     assert TestClient(app).get("/api/v1/health").headers["cache-control"] == "no-store"
+
+
+def test_projector_display_uses_scoped_link_instead_of_user_login(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(settings, "secret_key", "test-secret-key-with-at-least-32-bytes")
+    engine = create_engine(
+        "sqlite+pysqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        event = create_event(
+            db,
+            EventWrite(
+                name="Projector Test Event",
+                slug="projector-test-event",
+                starts_at=datetime(2030, 1, 10, 12, tzinfo=UTC),
+                ends_at=datetime(2030, 1, 11, 12, tzinfo=UTC),
+                venue_name="Test Hall",
+                address_line1="1 Projector Way",
+                city="Orlando",
+                state_code="FL",
+                postal_code="32801",
+            ),
+            "admin@example.com",
+        )
+        event = add_sub_event(
+            db,
+            event.id,
+            SubEventWrite(
+                name="Live Buying",
+                starts_at=datetime(2030, 1, 10, 14, tzinfo=UTC),
+                ends_at=datetime(2030, 1, 10, 16, tzinfo=UTC),
+                location="Ballroom",
+                module_codes=["live-display"],
+            ),
+        )
+        assert event is not None
+        sub_event_id = event.sub_events[0].id
+
+        def override_db():
+            yield db
+
+        app.dependency_overrides[get_db] = override_db
+        client = TestClient(app)
+        token, _expires_at = create_projector_token(sub_event_id)
+        try:
+            missing = client.get(f"/api/v1/public-event-presentations/{sub_event_id}")
+            assert missing.status_code in {401, 403}
+
+            response = client.get(
+                f"/api/v1/public-event-presentations/{sub_event_id}",
+                headers={"X-BTSP-Projector-Token": token},
+            )
+            assert response.status_code == 200
+            assert response.json()["sub_event_id"] == sub_event_id
+            assert response.json()["presenter_notes"] is None
+            assert response.json()["slide_queue"] == []
+
+            wrong_token, _expires_at = create_projector_token("different-sub-event")
+            rejected = client.get(
+                f"/api/v1/public-event-presentations/{sub_event_id}",
+                headers={"X-BTSP-Projector-Token": wrong_token},
+            )
+            assert rejected.status_code == 401
+        finally:
+            app.dependency_overrides.pop(get_db, None)
 
 
 def test_completed_event_realtime_channel_is_closed_to_managers() -> None:

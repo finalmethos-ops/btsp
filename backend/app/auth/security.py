@@ -10,6 +10,7 @@ from app.core.config import settings
 
 ALGORITHM = "HS256"
 PASSWORD_ITERATIONS = 600_000
+PROJECTOR_TOKEN_EXPIRE_HOURS = 24
 
 
 def hash_password(password: str) -> str:
@@ -80,3 +81,51 @@ def decode_access_token(token: str) -> dict:
         issuer=settings.app_name,
         options={"require": ["sub", "iat", "nbf", "exp", "iss", "aud", "jti"]},
     )
+
+
+def create_projector_token(sub_event_id: str) -> tuple[str, datetime]:
+    """Create a short-lived, read-only token for a projector display."""
+    issued_at = datetime.now(UTC)
+    expires_at = issued_at + timedelta(hours=PROJECTOR_TOKEN_EXPIRE_HOURS)
+    payload = {
+        "sub": f"projector:{sub_event_id}",
+        "sub_event_id": sub_event_id,
+        "scope": "event_projector",
+        "iat": issued_at,
+        "nbf": issued_at,
+        "exp": expires_at,
+        "iss": settings.app_name,
+        "aud": f"{settings.app_name}:projector",
+        "jti": str(uuid4()),
+    }
+    return jwt.encode(payload, settings.secret_key, algorithm=ALGORITHM), expires_at
+
+
+def decode_projector_token(token: str, sub_event_id: str) -> dict:
+    payload = jwt.decode(
+        token,
+        settings.secret_key,
+        algorithms=[ALGORITHM],
+        audience=f"{settings.app_name}:projector",
+        issuer=settings.app_name,
+        options={
+            "require": [
+                "sub",
+                "sub_event_id",
+                "scope",
+                "iat",
+                "nbf",
+                "exp",
+                "iss",
+                "aud",
+                "jti",
+            ]
+        },
+    )
+    if (
+        payload.get("scope") != "event_projector"
+        or payload.get("sub_event_id") != sub_event_id
+        or payload.get("sub") != f"projector:{sub_event_id}"
+    ):
+        raise jwt.InvalidTokenError("Projector token scope does not match the display")
+    return payload

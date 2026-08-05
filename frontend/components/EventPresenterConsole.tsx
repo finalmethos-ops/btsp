@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { ManagedSubEvent } from "@/lib/event-admin-api";
 import {
   controlEventPresentation,
+  createEventProjectorAccess,
   EventLiveAnalytics,
   EventPresentation,
   getEventLiveAnalytics,
@@ -28,6 +29,8 @@ export function EventPresenterConsole({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [imageFit, setImageFit] = useState<"contain" | "cover">("contain");
+  const [projectorToken, setProjectorToken] = useState<string | null>(null);
+  const [projectorLinkError, setProjectorLinkError] = useState(false);
 
   useEffect(() => {
     const saved = window.localStorage.getItem(IMAGE_FIT_STORAGE_KEY);
@@ -60,6 +63,23 @@ export function EventPresenterConsole({
     return () => {
       window.clearInterval(timer);
       unsubscribe();
+    };
+  }, [subEventId]);
+
+  useEffect(() => {
+    let active = true;
+    setProjectorToken(null);
+    setProjectorLinkError(false);
+    if (!subEventId) return;
+    void createEventProjectorAccess(subEventId)
+      .then((access) => {
+        if (active) setProjectorToken(access.projector_token);
+      })
+      .catch(() => {
+        if (active) setProjectorLinkError(true);
+      });
+    return () => {
+      active = false;
     };
   }, [subEventId]);
 
@@ -309,13 +329,25 @@ export function EventPresenterConsole({
         >
           End event
         </button>
-        <Link
-          className="rounded-lg border border-white px-4 py-2 font-semibold"
-          href={`/events/present/${subEventId}`}
-          target="_blank"
-        >
-          Open projector display ↗
-        </Link>
+        {projectorToken ? (
+          <Link
+            className="rounded-lg border border-white px-4 py-2 font-semibold"
+            href={`/events/present/${subEventId}#${new URLSearchParams({ projector_token: projectorToken }).toString()}`}
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            Open projector display ↗
+          </Link>
+        ) : (
+          <button
+            className="rounded-lg border border-slate-600 px-4 py-2 font-semibold text-slate-400"
+            disabled
+          >
+            {projectorLinkError
+              ? "Projector link unavailable"
+              : "Preparing projector link…"}
+          </button>
+        )}
       </div>
       <p className="mt-3 text-xs text-slate-400">
         Keyboard: ←/→ slides · Space opens product ordering · Enter closes

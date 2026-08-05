@@ -28,10 +28,18 @@ class EventPresentationQueueItem(BaseModel):
     presenter_notes: str | None = None
 
 
+class EventProjectorAccessResponse(BaseModel):
+    projector_token: str
+    expires_at: datetime
+
+
 class EventPresentationResponse(BaseModel):
     sub_event_id: str
     event_id: str
     event_name: str
+    event_theme_primary_color: str = "#07142c"
+    event_theme_accent_color: str = "#ffd400"
+    event_has_branding: bool = False
     sub_event_name: str
     status: Literal["idle", "live", "ended"]
     ordering_status: Literal["open", "closed"]

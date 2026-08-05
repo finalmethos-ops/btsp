@@ -1,10 +1,14 @@
 import { apiDownload, apiFetch } from "./api";
+import { getApiBaseUrl } from "./api-origin";
 import { EventProductSlide } from "./event-product-slide-api";
 
 export type EventPresentation = {
   sub_event_id: string;
   event_id: string;
   event_name: string;
+  event_theme_primary_color: string;
+  event_theme_accent_color: string;
+  event_has_branding: boolean;
   sub_event_name: string;
   status: "idle" | "live" | "ended";
   ordering_status: "open" | "closed";
@@ -69,6 +73,17 @@ export const getEventPresentation = (subEventId: string) =>
 export const getEventPresenterPresentation = (subEventId: string) =>
   apiFetch<EventPresentation>(`/event-presentations/${subEventId}/presenter`);
 
+export type EventProjectorAccess = {
+  projector_token: string;
+  expires_at: string;
+};
+
+export const createEventProjectorAccess = (subEventId: string) =>
+  apiFetch<EventProjectorAccess>(
+    `/event-presentations/${subEventId}/projector-access`,
+    { method: "POST" },
+  );
+
 export const controlEventPresentation = (
   subEventId: string,
   action: PresentationAction,
@@ -83,3 +98,57 @@ export const downloadPresentationImage = (slideId: string) =>
 
 export const getEventLiveAnalytics = (subEventId: string) =>
   apiFetch<EventLiveAnalytics>(`/event-presentations/${subEventId}/analytics`);
+
+async function projectorRequest(
+  path: string,
+  projectorToken: string,
+): Promise<Response> {
+  const response = await fetch(`${getApiBaseUrl()}/api/v1${path}`, {
+    headers: { "X-BTSP-Projector-Token": projectorToken },
+  });
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as {
+      detail?: unknown;
+    } | null;
+    throw new Error(
+      typeof payload?.detail === "string"
+        ? payload.detail
+        : `Projector request failed with status ${response.status}`,
+    );
+  }
+  return response;
+}
+
+export async function getPublicEventPresentation(
+  subEventId: string,
+  projectorToken: string,
+) {
+  const response = await projectorRequest(
+    `/public-event-presentations/${subEventId}`,
+    projectorToken,
+  );
+  return response.json() as Promise<EventPresentation>;
+}
+
+export async function downloadPublicPresentationImage(
+  subEventId: string,
+  slideId: string,
+  projectorToken: string,
+) {
+  const response = await projectorRequest(
+    `/public-event-presentations/${subEventId}/slides/${slideId}/image`,
+    projectorToken,
+  );
+  return response.blob();
+}
+
+export async function downloadPublicPresentationBranding(
+  subEventId: string,
+  projectorToken: string,
+) {
+  const response = await projectorRequest(
+    `/public-event-presentations/${subEventId}/branding`,
+    projectorToken,
+  );
+  return response.blob();
+}

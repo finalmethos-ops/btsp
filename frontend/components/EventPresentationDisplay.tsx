@@ -2,19 +2,21 @@
 
 import { useEffect, useState } from "react";
 import {
-  downloadPresentationImage,
+  downloadPublicPresentationBranding,
+  downloadPublicPresentationImage,
   EventPresentation,
-  getEventPresentation,
+  getPublicEventPresentation,
 } from "@/lib/event-presentation-api";
 import { EventAccessUnavailable } from "@/components/EventAccessUnavailable";
-import { useEventBrandAsset } from "@/components/EventBrandingProvider";
-import { subscribeEventRealtime } from "@/lib/event-realtime";
+import { eventThemeStyle } from "@/components/EventBrandingProvider";
 
 const IMAGE_FIT_STORAGE_KEY = "btsp.presentation.image-fit";
 
 export function EventPresentationDisplay({
+  projectorToken,
   subEventId,
 }: {
+  projectorToken: string;
   subEventId: string;
 }) {
   const [presentation, setPresentation] = useState<EventPresentation | null>(
@@ -22,12 +24,21 @@ export function EventPresentationDisplay({
   );
   const [error, setError] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [brandingUrl, setBrandingUrl] = useState<string | null>(null);
   const [imageFit, setImageFit] = useState<"contain" | "cover">("contain");
   const slide = presentation?.current_slide;
   const isFiller = slide?.slide_type === "filler";
   const slideId = slide?.id;
   const slideHasImage = slide?.has_image;
-  const eventBranding = useEventBrandAsset(presentation?.event_id);
+  const brandedStyle = eventThemeStyle(
+    presentation
+      ? {
+          theme_primary_color: presentation.event_theme_primary_color,
+          theme_accent_color: presentation.event_theme_accent_color,
+        }
+      : undefined,
+    brandingUrl,
+  );
   const offerLimit = slide?.max_event_units ?? slide?.available_inventory;
   const unitsRemaining =
     offerLimit == null
@@ -47,7 +58,7 @@ export function EventPresentationDisplay({
   useEffect(() => {
     let active = true;
     const refresh = () =>
-      void getEventPresentation(subEventId)
+      void getPublicEventPresentation(subEventId, projectorToken)
         .then((value) => {
           if (active) {
             setPresentation(value);
@@ -63,20 +74,18 @@ export function EventPresentationDisplay({
             );
         });
     refresh();
-    const timer = window.setInterval(refresh, 15_000);
-    const unsubscribe = subscribeEventRealtime(subEventId, refresh);
+    const timer = window.setInterval(refresh, 2_000);
     return () => {
       active = false;
       window.clearInterval(timer);
-      unsubscribe();
     };
-  }, [subEventId]);
+  }, [projectorToken, subEventId]);
 
   useEffect(() => {
     let url: string | null = null;
     setImageUrl(null);
     if (slideId && slideHasImage)
-      void downloadPresentationImage(slideId)
+      void downloadPublicPresentationImage(subEventId, slideId, projectorToken)
         .then((blob) => {
           url = URL.createObjectURL(blob);
           setImageUrl(url);
@@ -85,7 +94,24 @@ export function EventPresentationDisplay({
     return () => {
       if (url) URL.revokeObjectURL(url);
     };
-  }, [slideHasImage, slideId]);
+  }, [projectorToken, slideHasImage, slideId, subEventId]);
+
+  useEffect(() => {
+    let active = true;
+    let url: string | null = null;
+    setBrandingUrl(null);
+    if (presentation?.event_has_branding)
+      void downloadPublicPresentationBranding(subEventId, projectorToken)
+        .then((blob) => {
+          url = URL.createObjectURL(blob);
+          if (active) setBrandingUrl(url);
+        })
+        .catch(() => undefined);
+    return () => {
+      active = false;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [presentation?.event_has_branding, projectorToken, subEventId]);
 
   if (!presentation && error)
     return (
@@ -97,11 +123,14 @@ export function EventPresentationDisplay({
 
   return (
     <main
-      className={eventBranding.brandedClassName(
-        "event-ui event-presentation-display flex min-h-screen flex-col bg-slate-950 p-4 text-white sm:p-8",
-      )}
-      style={eventBranding.brandedStyle()}
+      className={`event-ui event-presentation-display event-branded-surface flex min-h-screen flex-col bg-slate-950 p-4 text-white sm:p-8 ${presentation ? "has-event-theme" : ""} ${brandingUrl ? "has-event-branding-image" : ""}`}
+      style={brandedStyle}
     >
+      {error ? (
+        <p className="mb-4 rounded-xl border border-red-400 bg-red-950/90 p-3 text-center font-bold text-red-100">
+          {error}
+        </p>
+      ) : null}
       <header className="flex justify-between border-b border-slate-700 pb-4">
         <div>
           <p className="text-blue-300">{presentation?.event_name}</p>
@@ -130,7 +159,7 @@ export function EventPresentationDisplay({
               {slide.filler_category?.replaceAll("_", " ")}
             </span>
             {imageUrl ? (
-              // Authenticated blob URL cannot use the Next image optimizer.
+              // Protected blob URL cannot use the Next image optimizer.
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 alt={slide.name}
@@ -146,13 +175,13 @@ export function EventPresentationDisplay({
                 </p>
               ) : null}
             </div>
-            {eventBranding.brandingUrl ? (
-              // Authenticated event-brand blob URL.
+            {brandingUrl ? (
+              // Protected event-brand blob URL.
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 alt={`${presentation?.event_name ?? "Event"} branding`}
                 className="mt-4 max-h-24 max-w-64 object-contain"
-                src={eventBranding.brandingUrl}
+                src={brandingUrl}
               />
             ) : null}
           </section>
@@ -160,7 +189,7 @@ export function EventPresentationDisplay({
           <>
             <div className="grid flex-1 items-stretch gap-6 py-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)_minmax(18rem,0.72fr)]">
               {imageUrl ? (
-                // Authenticated blob URLs cannot use the Next image optimizer.
+                // Protected blob URLs cannot use the Next image optimizer.
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   alt={slide.name}
@@ -319,13 +348,13 @@ export function EventPresentationDisplay({
                 </small>
               </div>
               <div className="flex min-w-48 flex-col items-center text-center">
-                {eventBranding.brandingUrl ? (
-                  // Authenticated event-brand blob URL.
+                {brandingUrl ? (
+                  // Protected event-brand blob URL.
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     alt={`${presentation?.event_name ?? "Event"} branding`}
                     className="mb-2 max-h-20 max-w-48 object-contain"
-                    src={eventBranding.brandingUrl}
+                    src={brandingUrl}
                   />
                 ) : (
                   <strong className="text-xl">

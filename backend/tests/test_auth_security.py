@@ -3,7 +3,9 @@ import pytest
 
 from app.auth.security import (
     create_access_token,
+    create_projector_token,
     decode_access_token,
+    decode_projector_token,
     hash_password,
     verify_password,
 )
@@ -38,6 +40,31 @@ def test_legacy_token_without_required_claims_is_rejected(
 
     with pytest.raises(jwt.PyJWTError):
         decode_access_token(token)
+
+
+def test_projector_token_is_read_only_and_sub_event_scoped(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "secret_key", "test-secret-key-with-at-least-32-bytes")
+    token, expires_at = create_projector_token("sub-event-a")
+
+    payload = decode_projector_token(token, "sub-event-a")
+
+    assert payload["scope"] == "event_projector"
+    assert payload["sub_event_id"] == "sub-event-a"
+    assert payload["aud"] == f"{settings.app_name}:projector"
+    assert expires_at.isoformat()
+    with pytest.raises(jwt.PyJWTError):
+        decode_projector_token(token, "sub-event-b")
+
+
+def test_user_access_token_cannot_be_used_as_projector_token(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "secret_key", "test-secret-key-with-at-least-32-bytes")
+
+    with pytest.raises(jwt.PyJWTError):
+        decode_projector_token(create_access_token("admin@example.com"), "sub-event-a")
 
 
 @pytest.mark.parametrize(

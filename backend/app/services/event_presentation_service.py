@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.models.catalog import CatalogProduct, CatalogVendor
 from app.models.event_management import (
+    EventBrandingAsset,
     EventEntityOrder,
     EventMembership,
     EventPresentationState,
@@ -176,6 +177,9 @@ def get_presentation(
         sub_event_id=sub_event.id,
         event_id=sub_event.event_id,
         event_name=event.name,
+        event_theme_primary_color=event.theme_primary_color,
+        event_theme_accent_color=event.theme_accent_color,
+        event_has_branding=db.get(EventBrandingAsset, event.id) is not None,
         sub_event_name=sub_event.name,
         status=state.status if state else "idle",
         ordering_status=(
