@@ -103,8 +103,10 @@ operation:
 ## Nightly Windows Schedule
 
 Docker Desktop must be running and the Windows user must be signed in because
-the scheduled task uses an interactive WSL session. Register the task from a
-PowerShell window at the repository root:
+the scheduled task uses an interactive WSL session. The registration script
+runs WSL through a hidden `wscript.exe` launcher under
+`.runtime\task-launchers`, so the nightly job does not open a console window.
+Register the task from a PowerShell window at the repository root:
 
 ```powershell
 .\scripts\register-btsp-backup-task.ps1 -Distro Ubuntu -At 02:00

@@ -23,10 +23,19 @@ if (-not (Test-Path -LiteralPath $repositoryWindows)) {
 
 $logDirectory = "$repositoryLinux/.runtime/monitoring"
 $bashCommand = "mkdir -p '$logDirectory'; cd '$repositoryLinux'; ./scripts/monitor-btsp-production.sh >> '$logDirectory/watchdog.log' 2>&1"
-$escapedBashCommand = $bashCommand.Replace('"', '\"')
+$launcherDirectory = Join-Path $repositoryWindows ".runtime\task-launchers"
+$launcherPath = Join-Path $launcherDirectory "btsp-production-monitor.vbs"
+New-Item -ItemType Directory -Path $launcherDirectory -Force | Out-Null
+$wslCommand = "wsl.exe -d $Distro -- bash -lc `"$bashCommand`""
+$vbsCommand = $wslCommand.Replace('"', '""')
+@"
+Set shell = CreateObject("WScript.Shell")
+exitCode = shell.Run("$vbsCommand", 0, True)
+WScript.Quit exitCode
+"@ | Set-Content -LiteralPath $launcherPath -Encoding ASCII
 $action = New-ScheduledTaskAction `
-    -Execute "wsl.exe" `
-    -Argument "-d $Distro -- bash -lc `"$escapedBashCommand`""
+    -Execute "$env:SystemRoot\System32\wscript.exe" `
+    -Argument "//B //NoLogo `"$launcherPath`""
 $trigger = New-ScheduledTaskTrigger `
     -Once `
     -At (Get-Date).AddMinutes(1) `
@@ -36,7 +45,8 @@ $settings = New-ScheduledTaskSettingsSet `
     -AllowStartIfOnBatteries `
     -DontStopIfGoingOnBatteries `
     -ExecutionTimeLimit (New-TimeSpan -Minutes 4) `
-    -MultipleInstances IgnoreNew
+    -MultipleInstances IgnoreNew `
+    -Hidden
 $principal = New-ScheduledTaskPrincipal `
     -UserId "$env:USERDOMAIN\$env:USERNAME" `
     -LogonType Interactive `

@@ -42,6 +42,11 @@ notepad .runtime\monitoring\monitor.env
 powershell -ExecutionPolicy Bypass -File scripts\register-btsp-monitor-task.ps1
 ```
 
+Registration creates a hidden `wscript.exe` launcher under
+`.runtime\task-launchers`; the five-minute WSL check must not open a console
+window. The Windows user must remain signed in for this interactive WSL task.
+After registration, manually start the task once and confirm its result is `0`.
+
 The optional `BTSP_ALERT_WEBHOOK_URL` receives a small JSON body containing
 only the monitor status and operational findings. Do not place credentials,
 user records, or business payloads in monitoring settings or messages.

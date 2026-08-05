@@ -23,16 +23,26 @@ if (-not (Test-Path -LiteralPath $repositoryWindows)) {
 
 $logDirectory = "$repositoryLinux/.runtime/backup-logs"
 $bashCommand = "mkdir -p '$logDirectory'; cd '$repositoryLinux'; ./scripts/backup-and-upload-btsp-production.sh >> '$logDirectory/nightly.log' 2>&1"
-$escapedBashCommand = $bashCommand.Replace('"', '\"')
+$launcherDirectory = Join-Path $repositoryWindows ".runtime\task-launchers"
+$launcherPath = Join-Path $launcherDirectory "btsp-production-backup.vbs"
+New-Item -ItemType Directory -Path $launcherDirectory -Force | Out-Null
+$wslCommand = "wsl.exe -d $Distro -- bash -lc `"$bashCommand`""
+$vbsCommand = $wslCommand.Replace('"', '""')
+@"
+Set shell = CreateObject("WScript.Shell")
+exitCode = shell.Run("$vbsCommand", 0, True)
+WScript.Quit exitCode
+"@ | Set-Content -LiteralPath $launcherPath -Encoding ASCII
 $action = New-ScheduledTaskAction `
-    -Execute "wsl.exe" `
-    -Argument "-d $Distro -- bash -lc `"$escapedBashCommand`""
+    -Execute "$env:SystemRoot\System32\wscript.exe" `
+    -Argument "//B //NoLogo `"$launcherPath`""
 $trigger = New-ScheduledTaskTrigger -Daily -At ([datetime]::ParseExact($At, "HH:mm", $null))
 $settings = New-ScheduledTaskSettingsSet `
     -StartWhenAvailable `
     -AllowStartIfOnBatteries `
     -DontStopIfGoingOnBatteries `
-    -ExecutionTimeLimit (New-TimeSpan -Hours 2)
+    -ExecutionTimeLimit (New-TimeSpan -Hours 2) `
+    -Hidden
 $principal = New-ScheduledTaskPrincipal `
     -UserId "$env:USERDOMAIN\$env:USERNAME" `
     -LogonType Interactive `
