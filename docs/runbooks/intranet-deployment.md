@@ -85,6 +85,15 @@ The durable file volumes are:
 - `analytics_report_data`
 - `invoice_intake_data`
 
+In the intranet/production override these stores are declared as externally
+managed volumes with the fixed names `btsp-intranet_attachment_data`,
+`btsp-intranet_purchase_order_export_data`,
+`btsp-intranet_analytics_report_data`, and
+`btsp-intranet_invoice_intake_data`. Create or restore all four before the first
+production start. Compose will now stop instead of creating an empty replacement
+if one is missing. `scripts/check-btsp-production-readiness.sh` also verifies
+that each volume exists and is mounted at the expected backend path.
+
 ## Start and validate
 
 ```bash

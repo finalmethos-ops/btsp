@@ -14,6 +14,32 @@ compose=(
   -f docker-compose.tunnel.yml
 )
 
+declare -A durable_volume_mounts=(
+  [btsp-intranet_attachment_data]=/data/attachments
+  [btsp-intranet_purchase_order_export_data]=/data/purchase-order-exports
+  [btsp-intranet_analytics_report_data]=/data/analytics-reports
+  [btsp-intranet_invoice_intake_data]=/data/invoice-intake
+)
+
+echo "Checking externally managed production file stores..."
+for volume_name in "${!durable_volume_mounts[@]}"; do
+  if ! docker volume inspect "$volume_name" >/dev/null 2>&1; then
+    echo "FAIL required production volume $volume_name does not exist" >&2
+    exit 1
+  fi
+
+  mount_destination="${durable_volume_mounts[$volume_name]}"
+  mounted_volume="$(
+    docker inspect --format "{{range .Mounts}}{{if eq .Destination \"$mount_destination\"}}{{.Name}}{{end}}{{end}}" \
+      btsp-intranet-backend-1 2>/dev/null || true
+  )"
+  if [[ "$mounted_volume" != "$volume_name" ]]; then
+    echo "FAIL $mount_destination is mounted from ${mounted_volume:-nothing}, expected $volume_name" >&2
+    exit 1
+  fi
+  echo "PASS $volume_name is mounted at $mount_destination"
+done
+
 echo "Checking public health and security headers..."
 "$repository_root/scripts/check-btsp-public-health.sh"
 

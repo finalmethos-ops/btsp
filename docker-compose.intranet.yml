@@ -37,3 +37,21 @@ services:
       - ./infrastructure/nginx/intranet.conf:/etc/nginx/conf.d/default.conf:ro
       - ./infrastructure/nginx/security-headers.conf:/etc/nginx/snippets/btsp-security-headers.conf:ro
       - ./.runtime/tls/server:/etc/nginx/tls:ro
+
+# These file stores contain production records and are intentionally managed
+# outside the Compose lifecycle. Explicit names prevent project-name drift,
+# and `external` prevents a deployment from silently creating empty volumes
+# when a durable store is missing.
+volumes:
+  attachment_data:
+    external: true
+    name: btsp-intranet_attachment_data
+  purchase_order_export_data:
+    external: true
+    name: btsp-intranet_purchase_order_export_data
+  analytics_report_data:
+    external: true
+    name: btsp-intranet_analytics_report_data
+  invoice_intake_data:
+    external: true
+    name: btsp-intranet_invoice_intake_data
