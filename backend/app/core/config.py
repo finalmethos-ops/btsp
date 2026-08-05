@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     )
     bootstrap_enabled: bool = Field(default=True, alias="BOOTSTRAP_ENABLED")
     access_token_expire_minutes: int = Field(
-        default=60, ge=5, le=1440, alias="ACCESS_TOKEN_EXPIRE_MINUTES"
+        default=15, ge=5, le=1440, alias="ACCESS_TOKEN_EXPIRE_MINUTES"
     )
     refresh_token_expire_days: int = Field(
         default=14, ge=1, le=90, alias="REFRESH_TOKEN_EXPIRE_DAYS"
@@ -98,6 +98,8 @@ class Settings(BaseSettings):
                 raise ValueError("SECRET_KEY must be changed before production deployment")
             if len(self.secret_key.encode("utf-8")) < 32:
                 raise ValueError("SECRET_KEY must be at least 32 bytes in production")
+            if self.access_token_expire_minutes > 30:
+                raise ValueError("ACCESS_TOKEN_EXPIRE_MINUTES must not exceed 30 in production")
             if self.bootstrap_admin_token == "change-me-before-bootstrap":  # nosec B105
                 raise ValueError(
                     "BOOTSTRAP_ADMIN_TOKEN must be changed before production deployment"

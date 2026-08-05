@@ -10,6 +10,7 @@ def _production_settings(**overrides: str) -> Settings:
         "DATABASE_URL": "sqlite+pysqlite:///:memory:",
         "SECRET_KEY": "production-secret-key-with-32-bytes",
         "BOOTSTRAP_ADMIN_TOKEN": "production-bootstrap-token",
+        "ACCESS_TOKEN_EXPIRE_MINUTES": "15",
         "CORS_ORIGINS": "https://btsp.example.com",
     }
     values.update(overrides)
@@ -28,6 +29,10 @@ def test_production_settings_accept_explicit_safe_values() -> None:
     [
         ({"SECRET_KEY": "change-me-before-production"}, "SECRET_KEY must be changed"),
         ({"SECRET_KEY": "too-short"}, "SECRET_KEY must be at least 32 bytes"),
+        (
+            {"ACCESS_TOKEN_EXPIRE_MINUTES": "31"},
+            "ACCESS_TOKEN_EXPIRE_MINUTES must not exceed 30",
+        ),
         (
             {"BOOTSTRAP_ADMIN_TOKEN": "change-me-before-bootstrap"},
             "BOOTSTRAP_ADMIN_TOKEN must be changed",

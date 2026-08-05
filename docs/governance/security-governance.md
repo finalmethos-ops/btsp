@@ -72,7 +72,7 @@ Rotations require a change record, coordinated container recreation, health chec
 
 ## Session Expiration Policy
 
-- `ACCESS_TOKEN_EXPIRE_MINUTES` is risk-approved and as short as practical.
+- `ACCESS_TOKEN_EXPIRE_MINUTES` is 15 minutes and never exceeds the enforced 30-minute production maximum.
 - Production uses HTTPS only.
 - Secret-key rotation invalidates outstanding JWTs and requires a communications plan.
 - Shared/public workstations are not approved for administrative sessions.

@@ -214,6 +214,23 @@ def main() -> int:
             "Administrative bootstrap is explicitly disabled in production.",
         )
 
+    try:
+        access_token_minutes = int(environment.get("ACCESS_TOKEN_EXPIRE_MINUTES", ""))
+    except ValueError:
+        access_token_minutes = 0
+    if not 5 <= access_token_minutes <= 30:
+        add(
+            "authentication.access_token_lifetime",
+            "fail",
+            "Production access-token lifetime must be between 5 and 30 minutes.",
+        )
+    else:
+        add(
+            "authentication.access_token_lifetime",
+            "pass",
+            f"Production access-token lifetime is bounded at {access_token_minutes} minutes.",
+        )
+
     origins = [
         value.strip()
         for value in environment.get("CORS_ORIGINS", "").split(",")

@@ -23,7 +23,7 @@ before accepting users.
 | `SECRET_KEY` | JWT signing secret | Generate a unique high-entropy value; never use the default |
 | `BOOTSTRAP_ADMIN_TOKEN` | Initial admin bootstrap secret | Generate uniquely; rotate after bootstrap |
 | `BOOTSTRAP_ENABLED` | Exposes the initial administrator bootstrap route | Set `true` only for initial provisioning, then permanently set `false` |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | JWT lifetime | Use the approved short session duration |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | JWT lifetime | Use 15 minutes; production rejects values above 30 minutes |
 | `REFRESH_TOKEN_EXPIRE_DAYS` | Revocable session lifetime | Keep within approved session policy; default 14 days |
 | `PASSWORD_RESET_EXPIRE_MINUTES` | Reset-token lifetime | Keep short; default 30 minutes |
 | `LOGIN_LOCKOUT_THRESHOLD` / `LOGIN_LOCKOUT_MINUTES` | Account lockout policy | Tune with security policy; defaults are 5 attempts / 15 minutes |
