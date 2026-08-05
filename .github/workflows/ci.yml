@@ -83,10 +83,12 @@ jobs:
       - run: npm run build
 
   compose:
-    name: Compose validation
+    name: Container and Compose validation
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - run: docker build --check backend
+      - run: docker build --check frontend
       - run: cp .env.example .env
       - run: docker compose config --quiet
       - run: docker compose -f docker-compose.yml -f docker-compose.production.yml config --quiet

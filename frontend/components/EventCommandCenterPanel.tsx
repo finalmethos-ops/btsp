@@ -188,7 +188,7 @@ export function EventCommandCenterPanel({
           setError(
             caught instanceof Error
               ? caught.message
-              : "Event command center could not load",
+              : "Unable to load the event command center.",
           );
         }
       });
@@ -439,18 +439,18 @@ export function EventCommandCenterPanel({
   }
 
   return (
-    <section className="event-ui space-y-5 rounded-2xl border bg-slate-50 p-5">
+    <section className="event-ui event-command-center-shell space-y-5 rounded-2xl border p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="brand-eyebrow">Event command center</p>
           <h3 className="text-xl font-bold">Operational overview</h3>
-          <p className="text-sm text-slate-600">
+          <p className="event-command-muted text-sm">
             Monitor setup, ordering, loadout, and settlement readiness across
             this event before drilling into a selected sub-event.
           </p>
         </div>
         <button
-          className="rounded-lg border bg-white px-4 py-2 text-sm font-bold"
+          className="event-command-action rounded-lg border px-4 py-2 text-sm font-bold"
           onClick={downloadCommandCenterSnapshot}
           type="button"
         >
@@ -459,9 +459,7 @@ export function EventCommandCenterPanel({
       </div>
 
       {error ? (
-        <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
-          {error}
-        </p>
+        <p className="event-command-error rounded-lg p-3 text-sm">{error}</p>
       ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
@@ -479,7 +477,7 @@ export function EventCommandCenterPanel({
       </div>
 
       {state.loadout?.teams.length ? (
-        <section className="rounded-2xl border bg-white p-4">
+        <section className="event-command-panel rounded-2xl border p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <p className="brand-eyebrow">Loadout oversight</p>
@@ -492,22 +490,22 @@ export function EventCommandCenterPanel({
           <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {state.loadout.teams.map((team) => (
               <article
-                className="rounded-xl border bg-slate-50 p-3"
+                className="event-command-subcard rounded-xl border p-3"
                 key={team.team_name}
               >
                 <div className="flex justify-between gap-2">
                   <strong>{team.team_name}</strong>
-                  <span className="text-xs font-bold uppercase text-slate-600">
+                  <span className="event-command-muted text-xs font-bold uppercase">
                     {team.status.replaceAll("_", " ")}
                   </span>
                 </div>
-                <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200">
+                <div className="event-command-progress-track mt-2 h-2 overflow-hidden rounded-full">
                   <div
                     className="h-full rounded-full bg-emerald-500"
                     style={{ width: `${team.completion_percentage}%` }}
                   />
                 </div>
-                <p className="mt-2 text-xs text-slate-600">
+                <p className="event-command-muted mt-2 text-xs">
                   {team.completion_percentage}% complete · {team.released}/
                   {team.assignment_total} released · {team.reviewed}/
                   {team.assignment_total} reviewed
@@ -519,20 +517,20 @@ export function EventCommandCenterPanel({
       ) : null}
 
       {state.vendorMap?.booths.length ? (
-        <section className="rounded-2xl border bg-white p-4">
+        <section className="event-command-panel rounded-2xl border p-4">
           <p className="brand-eyebrow">Vendor hall operations</p>
           <h4 className="font-bold">Live booth progress map</h4>
           <VendorHallLiveMap mapStatus={state.vendorMap} offlineReadOnly />
         </section>
       ) : null}
 
-      <section className="rounded-2xl border bg-white p-4">
+      <section className="event-command-panel rounded-2xl border p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="brand-eyebrow">Attention queue</p>
             <h4 className="font-bold">Admin action items</h4>
           </div>
-          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
+          <span className="event-command-pill rounded-full px-3 py-1 text-xs font-bold">
             {filteredAttentionItems.length} shown / {attentionItems.length} open
           </span>
         </div>
@@ -548,8 +546,8 @@ export function EventCommandCenterPanel({
             <button
               className={`rounded-full border px-3 py-1 text-xs font-bold ${
                 attentionFilter === filter
-                  ? "bg-slate-950 text-white"
-                  : "bg-white text-slate-700"
+                  ? "event-command-filter is-active"
+                  : "event-command-filter"
               }`}
               key={filter}
               onClick={() => setAttentionFilter(filter)}
@@ -564,26 +562,26 @@ export function EventCommandCenterPanel({
             <AttentionCard item={item} key={`${item.title}-${item.detail}`} />
           ))}
           {!attentionItems.length ? (
-            <p className="rounded-xl border border-dashed bg-slate-50 p-4 text-sm text-slate-600">
+            <p className="event-command-empty rounded-xl border border-dashed p-4 text-sm">
               No command-center action items are open. Keep monitoring the event
               as vendors, stores, and admins continue working.
             </p>
           ) : null}
           {attentionItems.length && !filteredAttentionItems.length ? (
-            <p className="rounded-xl border border-dashed bg-slate-50 p-4 text-sm text-slate-600">
+            <p className="event-command-empty rounded-xl border border-dashed p-4 text-sm">
               No action items match this filter.
             </p>
           ) : null}
         </div>
       </section>
 
-      <section className="rounded-2xl border bg-white p-4">
+      <section className="event-command-panel rounded-2xl border p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="brand-eyebrow">Module health</p>
             <h4 className="font-bold">Lifecycle status</h4>
           </div>
-          <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-800">
+          <span className="event-command-pill rounded-full px-3 py-1 text-xs font-bold">
             Auto-refreshes every 30 seconds
           </span>
         </div>
@@ -676,9 +674,9 @@ export function EventCommandCenterPanel({
         </div>
       </section>
 
-      <section className="overflow-x-auto rounded-2xl border bg-white">
+      <section className="event-command-panel overflow-x-auto rounded-2xl border">
         <div className="min-w-[760px]">
-          <div className="grid grid-cols-[1fr_0.8fr_1.4fr_0.6fr_0.6fr] gap-3 bg-slate-50 p-3 text-xs font-bold uppercase text-slate-500">
+          <div className="event-command-subcard grid grid-cols-[1fr_0.8fr_1.4fr_0.6fr_0.6fr] gap-3 p-3 text-xs font-bold uppercase">
             <span>Sub-event</span>
             <span>Status</span>
             <span>Enabled controls</span>
@@ -692,7 +690,7 @@ export function EventCommandCenterPanel({
             >
               <div>
                 <strong className="block">{subEvent.name}</strong>
-                <span className="text-slate-500">{subEvent.location}</span>
+                <span className="event-command-muted">{subEvent.location}</span>
               </div>
               <span className="capitalize">{subEvent.status}</span>
               <span>
@@ -726,8 +724,8 @@ export function EventCommandCenterPanel({
 
 function Metric({ label, value }: { label: string; value: number | string }) {
   return (
-    <div className="rounded-xl border bg-white p-3">
-      <span className="text-xs font-bold uppercase text-slate-500">
+    <div className="event-command-metric rounded-xl border p-3">
+      <span className="event-command-muted text-xs font-bold uppercase">
         {label}
       </span>
       <strong className="mt-1 block text-2xl">{value}</strong>
@@ -738,10 +736,10 @@ function Metric({ label, value }: { label: string; value: number | string }) {
 function AttentionCard({ item }: { item: AttentionItem }) {
   const toneClass =
     item.severity === "critical"
-      ? "border-red-200 bg-red-50 text-red-900"
+      ? "system-health-metric-card system-health-metric-critical"
       : item.severity === "warning"
-        ? "border-amber-200 bg-amber-50 text-amber-900"
-        : "border-blue-200 bg-blue-50 text-blue-900";
+        ? "system-health-metric-card system-health-metric-warning"
+        : "system-health-metric-card";
   const label =
     item.severity === "critical"
       ? "Critical"
@@ -758,7 +756,7 @@ function AttentionCard({ item }: { item: AttentionItem }) {
         <p className="text-sm opacity-80">{item.detail}</p>
       </div>
       <button
-        className="rounded-lg border bg-white/70 px-3 py-2 text-sm font-bold"
+        className="event-command-action rounded-lg border px-3 py-2 text-sm font-bold"
         onClick={item.onAction}
         type="button"
       >
@@ -785,22 +783,22 @@ function ModuleCard({
 }) {
   const toneClass =
     tone === "danger"
-      ? "border-red-200 bg-red-50 text-red-900"
+      ? "system-health-metric-card system-health-metric-critical"
       : tone === "warning"
-        ? "border-amber-200 bg-amber-50 text-amber-900"
-        : "border-slate-200 bg-white text-slate-900";
+        ? "system-health-metric-card system-health-metric-warning"
+        : "system-health-metric-card";
   return (
     <article className={`rounded-xl border p-4 ${toneClass}`}>
       <div className="flex items-center justify-between gap-3">
         <h5 className="font-bold">{label}</h5>
-        <span className="rounded-full bg-white/70 px-2 py-1 text-xs font-bold">
+        <span className="event-command-pill rounded-full px-2 py-1 text-xs font-bold">
           {enabled ? "Enabled" : "Off"}
         </span>
       </div>
       <strong className="mt-3 block capitalize">{status}</strong>
       <p className="mt-1 text-sm opacity-80">{detail}</p>
       <button
-        className="mt-4 rounded-lg border bg-white/70 px-3 py-2 text-sm font-bold disabled:opacity-60"
+        className="event-command-action mt-4 rounded-lg border px-3 py-2 text-sm font-bold disabled:opacity-60"
         disabled={!enabled}
         onClick={onAction}
         type="button"

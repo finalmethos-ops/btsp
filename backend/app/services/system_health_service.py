@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import Settings
 from app.models.analytics import AnalyticsReportRun
-from app.models.event_management import EventStaffTask
+from app.models.event_management import EventStaffTask, ManagedEvent
 from app.models.notification import NotificationEvent
 from app.models.vendor_integration import VendorConnectorImportRun
 from app.schemas.system_health import (
@@ -134,9 +134,29 @@ def system_diagnostics(
     if dependencies[0].status == "healthy":
         try:
             database_revision = db.execute(text("select version_num from alembic_version")).scalar()
+            now = datetime.now(UTC)
+            # In-app notifications are the persistent notification feed. They intentionally stay
+            # queued until the user reads them and therefore are not delivery backlog. Only
+            # transports that require an external handoff belong in operational queue metrics.
+            queued_delivery = NotificationEvent.channel != "in_app"
+            active_event = (
+                EventStaffTask.event_id == ManagedEvent.id,
+                ManagedEvent.status.in_(("draft", "published")),
+                ManagedEvent.ends_at > now,
+            )
             values = [
                 ("failed_notifications", _failed_count(db, NotificationEvent, ("failed",))),
-                ("queued_notifications", _failed_count(db, NotificationEvent, ("queued",))),
+                (
+                    "queued_notifications",
+                    int(
+                        db.scalar(
+                            select(func.count())
+                            .select_from(NotificationEvent)
+                            .where(NotificationEvent.status == "queued", queued_delivery)
+                        )
+                        or 0
+                    ),
+                ),
                 (
                     "stale_queued_notifications",
                     int(
@@ -145,25 +165,39 @@ def system_diagnostics(
                             .select_from(NotificationEvent)
                             .where(
                                 NotificationEvent.status == "queued",
+                                queued_delivery,
                                 NotificationEvent.created_at
-                                < datetime.now(UTC)
+                                < now
                                 - timedelta(minutes=settings.stale_notification_after_minutes),
                             )
                         )
                         or 0
                     ),
                 ),
-                ("blocked_event_staff_tasks", _failed_count(db, EventStaffTask, ("blocked",))),
+                (
+                    "blocked_event_staff_tasks",
+                    int(
+                        db.scalar(
+                            select(func.count())
+                            .select_from(EventStaffTask)
+                            .join(ManagedEvent, ManagedEvent.id == EventStaffTask.event_id)
+                            .where(EventStaffTask.status == "blocked", *active_event)
+                        )
+                        or 0
+                    ),
+                ),
                 (
                     "overdue_event_staff_tasks",
                     int(
                         db.scalar(
                             select(func.count())
                             .select_from(EventStaffTask)
+                            .join(ManagedEvent, ManagedEvent.id == EventStaffTask.event_id)
                             .where(
                                 EventStaffTask.due_at.is_not(None),
-                                EventStaffTask.due_at < datetime.now(UTC),
+                                EventStaffTask.due_at < now,
                                 EventStaffTask.status != "done",
+                                *active_event,
                             )
                         )
                         or 0

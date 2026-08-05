@@ -41,6 +41,7 @@ export function EventVendorBuyFairWorkspace({
   const [deliveryDate, setDeliveryDate] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [orderError, setOrderError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -57,7 +58,9 @@ export function EventVendorBuyFairWorkspace({
   useEffect(() => {
     void load().catch((caught: unknown) =>
       setError(
-        caught instanceof Error ? caught.message : "Buy fair could not load",
+        caught instanceof Error
+          ? caught.message
+          : "Unable to load the buy fair.",
       ),
     );
   }, [load]);
@@ -121,14 +124,21 @@ export function EventVendorBuyFairWorkspace({
     [cart, workspace?.models],
   );
 
-  async function run(operation: () => Promise<void>) {
+  async function run(
+    operation: () => Promise<void>,
+    errorTarget: "page" | "order" = "page",
+  ) {
     setBusy(true);
-    setError(null);
+    if (errorTarget === "order") setOrderError(null);
+    else setError(null);
     setNotice(null);
     try {
       await operation();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Operation failed");
+      const message =
+        caught instanceof Error ? caught.message : "Operation failed.";
+      if (errorTarget === "order") setOrderError(message);
+      else setError(message);
     } finally {
       setBusy(false);
     }
@@ -170,7 +180,7 @@ export function EventVendorBuyFairWorkspace({
           ? "Event order draft created."
           : `${created.length} event order drafts created.`,
       );
-    });
+    }, "order");
   }
 
   if (!workspace && error)
@@ -394,6 +404,14 @@ export function EventVendorBuyFairWorkspace({
           <span className="font-bold">
             Cart total per store: {money(String(cartTotal))}
           </span>
+          {orderError ? (
+            <p
+              className="event-order-submit-error basis-full rounded-xl border border-red-300 bg-red-50 p-3 text-red-900"
+              role="alert"
+            >
+              {orderError}
+            </p>
+          ) : null}
           <button
             className="rounded-xl bg-blue-900 px-5 py-3 font-bold text-white disabled:bg-slate-400"
             disabled={
@@ -523,6 +541,14 @@ export function EventVendorBuyFairWorkspace({
             ) : null}
             {selected.status === "vendor_draft" ? (
               <div className="flex flex-wrap gap-2">
+                {orderError ? (
+                  <p
+                    className="event-order-submit-error basis-full rounded-xl border border-red-300 bg-red-50 p-3 text-red-900"
+                    role="alert"
+                  >
+                    {orderError}
+                  </p>
+                ) : null}
                 <button
                   className="rounded-xl bg-green-700 px-5 py-3 font-bold text-white"
                   disabled={busy}
@@ -533,7 +559,7 @@ export function EventVendorBuyFairWorkspace({
                       setNotice(
                         "Event order submitted into the standard Purchasing workflow.",
                       );
-                    })
+                    }, "order")
                   }
                   type="button"
                 >

@@ -88,7 +88,9 @@ export function VendorHallSetupPanel({ event }: { event: ManagedEvent }) {
     setError(null);
     void load().catch((caught: unknown) =>
       setError(
-        caught instanceof Error ? caught.message : "Vendor hall could not load",
+        caught instanceof Error
+          ? caught.message
+          : "Unable to load the vendor hall.",
       ),
     );
   }, [load]);
@@ -126,7 +128,7 @@ export function VendorHallSetupPanel({ event }: { event: ManagedEvent }) {
       setMessage(success);
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Vendor hall action failed",
+        caught instanceof Error ? caught.message : "Vendor hall action failed.",
       );
     } finally {
       setBusy(false);

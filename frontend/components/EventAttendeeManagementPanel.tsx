@@ -133,7 +133,7 @@ export function EventAttendeeManagementPanel({
       setError(
         caught instanceof Error
           ? caught.message
-          : "Attendee could not be added",
+          : "Unable to add the attendee.",
       );
     } finally {
       setBusy(false);
@@ -143,7 +143,7 @@ export function EventAttendeeManagementPanel({
   return (
     <section className="event-ui rounded-2xl border bg-white p-5">
       <p className="brand-eyebrow">Event administration</p>
-      <h3 className="text-xl font-bold">Attendees &amp; event accounts</h3>
+      <h3 className="text-xl font-bold">Attendees and event accounts</h3>
       <p className="mt-1 text-sm text-slate-600">
         Enter an existing account email to link it, or supply a password to
         create a new account.
@@ -526,7 +526,7 @@ function VendorRegistrationEditor({
               setError(
                 caught instanceof Error
                   ? caught.message
-                  : "Vendor access could not be updated",
+                  : "Unable to update vendor access.",
               ),
             )
             .finally(() => setBusy(false));

@@ -52,7 +52,7 @@ export function EventLivePoll({ subEventId }: { subEventId: string }) {
                   setError(
                     caught instanceof Error
                       ? caught.message
-                      : "Vote could not be recorded",
+                      : "Unable to record the vote.",
                   ),
                 )
                 .finally(() => setBusy(false));

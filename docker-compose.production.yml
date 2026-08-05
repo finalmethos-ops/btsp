@@ -1,13 +1,23 @@
+x-btsp-log-rotation: &btsp-log-rotation
+  driver: local
+  options:
+    max-size: "${BTSP_CONTAINER_LOG_MAX_SIZE:-20m}"
+    max-file: "${BTSP_CONTAINER_LOG_MAX_FILES:-10}"
+    compress: "true"
+
 services:
   postgres:
+    logging: *btsp-log-rotation
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required for production}
     ports: !reset []
 
   redis:
+    logging: *btsp-log-rotation
     ports: !reset []
 
   backend:
+    logging: *btsp-log-rotation
     build:
       args:
         INSTALL_DEV_DEPS: "false"
@@ -45,6 +55,7 @@ services:
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
 
   frontend:
+    logging: *btsp-log-rotation
     volumes: !reset []
     ports: !reset []
     read_only: true
@@ -64,6 +75,7 @@ services:
     command: npm run start -- -H 0.0.0.0
 
   nginx:
+    logging: *btsp-log-rotation
     depends_on:
       backend:
         condition: service_healthy

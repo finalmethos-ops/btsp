@@ -168,17 +168,11 @@ export function SystemHealthPanel() {
             <div className="mt-3 grid gap-3 md:grid-cols-3">
               {diagnostics.operational_metrics.map((item) => (
                 <article
-                  className={`rounded border p-4 ${
-                    item.severity === "critical"
-                      ? "border-red-300 bg-red-50"
-                      : item.severity === "warning"
-                        ? "border-amber-300 bg-amber-50"
-                        : ""
-                  }`}
+                  className={`system-health-metric-card system-health-metric-${item.severity}`}
                   key={item.name}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm text-slate-600">
+                    <p className="system-health-metric-label text-sm">
                       {item.name.replaceAll("_", " ")}
                     </p>
                     <span
@@ -187,9 +181,11 @@ export function SystemHealthPanel() {
                       {item.severity}
                     </span>
                   </div>
-                  <p className="mt-1 text-3xl font-bold">{item.count}</p>
+                  <p className="system-health-metric-count mt-1 text-3xl font-bold">
+                    {item.count}
+                  </p>
                   {item.threshold !== null ? (
-                    <p className="text-xs text-slate-500">
+                    <p className="system-health-metric-threshold text-xs">
                       Critical at {item.threshold.toLocaleString()}
                     </p>
                   ) : null}

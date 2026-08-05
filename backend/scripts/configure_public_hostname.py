@@ -15,9 +15,7 @@ HOSTNAME_PATTERN = re.compile(
 def public_hostname(value: str) -> str:
     hostname = value.strip().lower().rstrip(".")
     if not HOSTNAME_PATTERN.fullmatch(hostname):
-        raise argparse.ArgumentTypeError(
-            "hostname must be a fully qualified public DNS name"
-        )
+        raise argparse.ArgumentTypeError("hostname must be a fully qualified public DNS name")
     return hostname
 
 

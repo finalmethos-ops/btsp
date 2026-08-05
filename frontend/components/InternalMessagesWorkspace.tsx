@@ -42,7 +42,7 @@ export function InternalMessagesWorkspace() {
   useEffect(() => {
     void refresh().catch((caught: unknown) =>
       setError(
-        caught instanceof Error ? caught.message : "Unable to load messages",
+        caught instanceof Error ? caught.message : "Unable to load messages.",
       ),
     );
   }, [refresh]);

@@ -43,6 +43,7 @@ from app.services.auth_service import (
     user_role_codes,
     user_workflow_codes,
 )
+from app.services.security_audit_service import record_login_event
 from app.services.vendor_access_service import (
     user_has_vendor_access,
     vendor_accounts_for_user,
@@ -136,9 +137,20 @@ def _token_response(
 @router.post("/login", response_model=TokenResponse)
 def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)) -> TokenResponse:
     client_host = request.client.host if request.client is not None else "unknown"
+    request_id = getattr(request.state, "request_id", "unknown")
     try:
         rate_limit_keys = register_login_attempt(payload.email, client_host)
     except LoginRateLimitError as exc:
+        record_login_event(
+            db,
+            submitted_email=payload.email,
+            login_context=payload.login_context,
+            outcome="rate_limited",
+            reason="rate_limit_exceeded",
+            request_id=request_id,
+            client_address=client_host,
+        )
+        db.commit()
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Too many login attempts; try again later",
@@ -146,6 +158,16 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
         ) from exc
     user = authenticate_user(db, payload.email, payload.password)
     if user is None:
+        record_login_event(
+            db,
+            submitted_email=payload.email,
+            login_context=payload.login_context,
+            outcome="failed",
+            reason="invalid_credentials",
+            request_id=request_id,
+            client_address=client_host,
+        )
+        db.commit()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
@@ -161,11 +183,33 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
         is not None
     )
     if payload.login_context == "event" and not has_event_membership:
+        record_login_event(
+            db,
+            submitted_email=payload.email,
+            login_context=payload.login_context,
+            outcome="denied",
+            reason="event_membership_required",
+            request_id=request_id,
+            client_address=client_host,
+            user=user,
+        )
+        db.commit()
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This account is not assigned to an event",
         )
     if payload.login_context == "standard" and not user.roles:
+        record_login_event(
+            db,
+            submitted_email=payload.email,
+            login_context=payload.login_context,
+            outcome="denied",
+            reason="standard_portal_assignment_required",
+            request_id=request_id,
+            client_address=client_host,
+            user=user,
+        )
+        db.commit()
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=(
@@ -178,6 +222,15 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
         vendor_accounts_for_user(db, user) if payload.login_context == "standard" else []
     )
     active_vendor_code = vendor_accounts[0].vendor_code if len(vendor_accounts) == 1 else None
+    record_login_event(
+        db,
+        submitted_email=payload.email,
+        login_context=payload.login_context,
+        outcome="succeeded",
+        request_id=request_id,
+        client_address=client_host,
+        user=user,
+    )
     return _token_response(db, user, payload.login_context, active_vendor_code)
 
 
@@ -189,6 +242,10 @@ def refresh(payload: RefreshTokenRequest, db: Session = Depends(get_db)) -> Toke
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token"
         )
     user, session = refreshed
+    # Rotate refresh tokens so a captured token cannot be replayed after a
+    # successful refresh. The replacement session preserves the login context
+    # and active vendor selection while the submitted token is revoked.
+    revoke_session(db, payload.refresh_token)
     return _token_response(db, user, session.login_context, session.active_vendor_code)
 
 

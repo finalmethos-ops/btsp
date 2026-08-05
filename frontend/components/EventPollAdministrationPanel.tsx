@@ -28,7 +28,7 @@ export function EventPollAdministrationPanel({
   useEffect(() => {
     void refresh().catch((caught: unknown) =>
       setError(
-        caught instanceof Error ? caught.message : "Polls could not load",
+        caught instanceof Error ? caught.message : "Unable to load polls.",
       ),
     );
     if (!subEventId) return;
@@ -63,7 +63,7 @@ export function EventPollAdministrationPanel({
       await refresh();
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Poll could not be created",
+        caught instanceof Error ? caught.message : "Unable to create the poll.",
       );
     } finally {
       setBusy(false);
@@ -78,7 +78,7 @@ export function EventPollAdministrationPanel({
       await refresh();
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Poll could not be updated",
+        caught instanceof Error ? caught.message : "Unable to update the poll.",
       );
     } finally {
       setBusy(false);
@@ -88,7 +88,7 @@ export function EventPollAdministrationPanel({
   return (
     <section className="event-ui rounded-2xl border bg-white p-5">
       <p className="brand-eyebrow">Live engagement</p>
-      <h3 className="text-xl font-bold">Polls &amp; product voting</h3>
+      <h3 className="text-xl font-bold">Polls and product voting</h3>
       {!subEvents.length ? (
         <p className="mt-3 text-sm text-slate-500">
           Add a sub-event before creating a poll.

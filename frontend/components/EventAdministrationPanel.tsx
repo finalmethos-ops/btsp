@@ -67,7 +67,7 @@ export function EventAdministrationPanel() {
   useEffect(() => {
     void load().catch((caught: unknown) =>
       setError(
-        caught instanceof Error ? caught.message : "Events could not load",
+        caught instanceof Error ? caught.message : "Unable to load events.",
       ),
     );
   }, [load]);
@@ -97,7 +97,7 @@ export function EventAdministrationPanel() {
       return updated;
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Event operation failed",
+        caught instanceof Error ? caught.message : "Event operation failed.",
       );
       return null;
     } finally {
@@ -235,7 +235,7 @@ export function EventAdministrationPanel() {
         setError(
           caught instanceof Error
             ? caught.message
-            : "Event could not be removed",
+            : "Unable to remove the event.",
         ),
       )
       .finally(() => setBusy(false));
@@ -245,7 +245,7 @@ export function EventAdministrationPanel() {
     <div className="event-ui space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold">Event Management</h2>
+          <h2 className="text-2xl font-bold">Event management</h2>
           <p className="mt-2 text-slate-600">
             Create events, maintain dates and locations, and build the sub-event
             calendar.
@@ -476,7 +476,7 @@ function EventDetailsForm({
 }) {
   return (
     <form
-      className="event-glass-pane grid gap-4 rounded-2xl border p-5 sm:grid-cols-2"
+      className="event-details-form event-glass-pane grid gap-4 rounded-2xl border p-5 sm:grid-cols-2"
       key={event ? `${event.id}-${event.starts_at}-${event.venue_name}` : "new"}
       onSubmit={onSubmit}
     >
@@ -589,7 +589,7 @@ function SubEventForm({
 }) {
   return (
     <form
-      className="event-glass-pane grid gap-2 rounded-xl border p-4 sm:grid-cols-2"
+      className="event-sub-event-form event-glass-pane grid gap-2 rounded-xl border p-4 sm:grid-cols-2"
       key={item?.id ?? "new-sub-event"}
       onSubmit={onSubmit}
     >
@@ -647,6 +647,7 @@ function SubEventForm({
 function Field({
   label,
   required = true,
+  type,
   ...props
 }: {
   label: string;
@@ -657,11 +658,17 @@ function Field({
   required?: boolean;
 }) {
   return (
-    <label className="text-sm font-semibold">
+    <label className="event-form-field text-sm font-semibold">
       {label}
       <input
         {...props}
-        className="mt-1 w-full rounded-lg border bg-white p-3"
+        type={type}
+        className={[
+          "event-form-input mt-1 w-full rounded-lg border bg-white p-3",
+          type === "date" || type === "datetime-local"
+            ? "event-date-input"
+            : "",
+        ].join(" ")}
         required={required}
       />
     </label>

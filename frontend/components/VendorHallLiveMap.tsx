@@ -177,15 +177,19 @@ export function VendorHallLiveMap({
     ? mapStatus.floor_map.layout_json.entryways
     : [];
   const firstEntryway = entryways[0] as { x?: number } | undefined;
+  const savedMapGroups = mapGroups.filter((group) =>
+    group.some((booth) => "is_saved" in booth && booth.is_saved),
+  );
+  const visitedGroupCount = savedMapGroups.filter((group) =>
+    group.every((booth) => "is_visited" in booth && booth.is_visited),
+  ).length;
   const savedVisitGroups = orderBoothVisitGroups(
-    mapGroups.filter((group) =>
-      group.some((booth) => "is_saved" in booth && booth.is_saved),
+    savedMapGroups.filter(
+      (group) =>
+        !group.every((booth) => "is_visited" in booth && booth.is_visited),
     ),
     { x: firstEntryway?.x ?? 50, y: 100 },
   );
-  const visitedGroupCount = savedVisitGroups.filter((group) =>
-    group.every((booth) => "is_visited" in booth && booth.is_visited),
-  ).length;
   const visiblePopoverGroupKey = selectedMapGroup ?? hoveredMapGroup;
   const visiblePopoverGroup =
     mapGroups.find(
@@ -634,19 +638,13 @@ export function VendorHallLiveMap({
             <strong>My suggested booth route</strong>
             <span>Starts at the mapped entrance and reduces backtracking.</span>
             <span>
-              {visitedGroupCount} of {savedVisitGroups.length} stops visited
+              {visitedGroupCount} of {savedMapGroups.length} stops visited ·{" "}
+              {savedVisitGroups.length} remaining
             </span>
           </div>
           <ol>
             {savedVisitGroups.map((group) => (
-              <li
-                className={
-                  group.every((item) => "is_visited" in item && item.is_visited)
-                    ? "is-visited"
-                    : ""
-                }
-                key={group.map((item) => item.id).join(":")}
-              >
+              <li key={group.map((item) => item.id).join(":")}>
                 <button
                   onClick={() => selectDirectoryGroup(group)}
                   type="button"
@@ -788,8 +786,8 @@ export function VendorHallLiveMap({
             return (
               <article
                 aria-expanded={selectedMapGroup === groupKey}
-                aria-label={`${vendorNames.join(" / ")}, booth ${boothNumbers.join(" / ") || "to be determined"}`}
-                className={`vendor-hall-map-booth ${directoryMode ? "vendor-hall-status-submitted" : status.className} ${detailPlacement} ${selectedMapGroup === groupKey ? "is-detail-open" : ""} ${directoryMode && (query || savedOnly) && !matchesQuery ? "is-search-dimmed" : ""} ${highlightedBoothIds.length && !groupIsHighlighted ? "is-loadout-dimmed" : ""} ${groupIsHighlighted ? "is-loadout-assigned" : ""} ${groupIsActive ? "is-loadout-active" : ""} ${groupIsSaved ? "is-saved" : ""} ${groupIsVisited ? "is-visited" : ""}`}
+                aria-label={`${vendorNames.join(" / ")}, booth ${boothNumbers.join(" / ") || "to be determined"}${routeIndex >= 0 ? `, route stop ${routeIndex + 1}` : ""}${groupIsVisited ? ", visited" : ""}`}
+                className={`vendor-hall-map-booth ${directoryMode ? "vendor-hall-status-submitted" : status.className} ${detailPlacement} ${selectedMapGroup === groupKey ? "is-detail-open" : ""} ${directoryMode && (query || savedOnly) && !matchesQuery ? "is-search-dimmed" : ""} ${highlightedBoothIds.length && !groupIsHighlighted ? "is-loadout-dimmed" : ""} ${groupIsHighlighted ? "is-loadout-assigned" : ""} ${groupIsActive ? "is-loadout-active" : ""} ${groupIsSaved ? "is-saved" : ""} ${groupIsVisited ? "is-visited" : ""} ${routeIndex >= 0 ? "is-route-stop" : ""}`}
                 key={groupKey}
                 ref={(element) => {
                   if (element) {

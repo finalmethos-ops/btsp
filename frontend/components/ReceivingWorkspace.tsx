@@ -59,7 +59,7 @@ export function ReceivingWorkspace() {
   useEffect(() => {
     void load().catch((error: unknown) =>
       setMessage(
-        error instanceof Error ? error.message : "Unable to load receiving",
+        error instanceof Error ? error.message : "Unable to load receiving.",
       ),
     );
   }, [load]);
@@ -110,7 +110,7 @@ export function ReceivingWorkspace() {
       await load();
     } catch (error) {
       setMessage(
-        error instanceof Error ? error.message : "Receipt could not be posted",
+        error instanceof Error ? error.message : "Unable to post the receipt.",
       );
     } finally {
       setBusy(false);
@@ -135,7 +135,7 @@ export function ReceivingWorkspace() {
       setMessage(
         error instanceof Error
           ? error.message
-          : "Variance could not be updated",
+          : "Unable to update the variance.",
       );
     } finally {
       setBusy(false);
@@ -154,7 +154,7 @@ export function ReceivingWorkspace() {
       setMessage(
         error instanceof Error
           ? error.message
-          : "Backorder could not be created",
+          : "Unable to create the backorder.",
       );
     } finally {
       setBusy(false);
@@ -187,7 +187,7 @@ export function ReceivingWorkspace() {
       setMessage(
         error instanceof Error
           ? error.message
-          : "Backorder could not be updated",
+          : "Unable to update the backorder.",
       );
     } finally {
       setBusy(false);

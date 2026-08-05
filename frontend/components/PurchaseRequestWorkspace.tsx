@@ -66,7 +66,7 @@ export function PurchaseRequestWorkspace({
     try {
       await operation();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Operation failed");
+      setError(caught instanceof Error ? caught.message : "Operation failed.");
     } finally {
       setBusy(false);
     }
@@ -111,7 +111,7 @@ export function PurchaseRequestWorkspace({
       .then(setEligibleStores)
       .catch((caught: unknown) =>
         setError(
-          caught instanceof Error ? caught.message : "Unable to load stores",
+          caught instanceof Error ? caught.message : "Unable to load stores.",
         ),
       );
   }, [vendorCode]);

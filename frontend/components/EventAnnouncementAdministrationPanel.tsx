@@ -86,7 +86,7 @@ export function EventAnnouncementAdministrationPanel({
       setError(
         caught instanceof Error
           ? caught.message
-          : "Announcement could not be saved",
+          : "Unable to save the announcement.",
       );
     } finally {
       setBusy(false);

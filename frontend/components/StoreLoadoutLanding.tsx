@@ -225,7 +225,7 @@ export function StoreLoadoutLanding() {
                     {assignment.store_name ? ` · ${assignment.store_name}` : ""}
                   </h3>
                   <p>
-                    Zone {assignment.loadout_zone ?? "TBD"} · depart{" "}
+                    Zone {assignment.loadout_zone ?? "TBD"} · departure{" "}
                     {timeLabel(assignment.recommended_departure_at)}
                   </p>
                   {assignment.team_name ||

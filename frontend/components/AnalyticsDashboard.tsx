@@ -142,7 +142,9 @@ export function AnalyticsDashboard({
       .then(setDashboard)
       .catch((reason: unknown) =>
         setError(
-          reason instanceof Error ? reason.message : "Unable to load analytics",
+          reason instanceof Error
+            ? reason.message
+            : "Unable to load analytics.",
         ),
       );
   }, [mode]);
@@ -153,7 +155,7 @@ export function AnalyticsDashboard({
       .then((inventory) => setPositions(inventory.positions))
       .catch((reason: unknown) =>
         setError(
-          reason instanceof Error ? reason.message : "Unable to load reports",
+          reason instanceof Error ? reason.message : "Unable to load reports.",
         ),
       );
   }, [inventoryFilters, mode]);
@@ -167,7 +169,7 @@ export function AnalyticsDashboard({
       })
       .catch((reason: unknown) =>
         setError(
-          reason instanceof Error ? reason.message : "Unable to load reports",
+          reason instanceof Error ? reason.message : "Unable to load reports.",
         ),
       );
   }, [mode]);
@@ -187,7 +189,7 @@ export function AnalyticsDashboard({
         setError(
           reason instanceof Error
             ? reason.message
-            : "Unable to load workflow analytics",
+            : "Unable to load workflow analytics.",
         ),
       );
   }, [workflowFilters, mode]);
@@ -207,7 +209,7 @@ export function AnalyticsDashboard({
         setError(
           reason instanceof Error
             ? reason.message
-            : "Unable to load spend analysis",
+            : "Unable to load spend analysis.",
         ),
       );
   }, [mode, spendDimension, spendFilters]);
@@ -236,7 +238,7 @@ export function AnalyticsDashboard({
         setError(
           reason instanceof Error
             ? reason.message
-            : "Unable to load vendor scorecards",
+            : "Unable to load vendor scorecards.",
         ),
       );
   }, [mode, scorecardFilters]);
@@ -285,7 +287,7 @@ export function AnalyticsDashboard({
       anchor.click();
       URL.revokeObjectURL(url);
     } catch (reason) {
-      setMessage(reason instanceof Error ? reason.message : "Download failed");
+      setMessage(reason instanceof Error ? reason.message : "Download failed.");
     }
   }
 

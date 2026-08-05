@@ -20,6 +20,7 @@ export function EventOrderingPortal({ subEventId }: { subEventId: string }) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [orderError, setOrderError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [draftQuantities, setDraftQuantities] = useState<
     Record<string, number>
@@ -38,7 +39,9 @@ export function EventOrderingPortal({ subEventId }: { subEventId: string }) {
         .catch((caught: unknown) => {
           if (active)
             setError(
-              caught instanceof Error ? caught.message : "Event could not load",
+              caught instanceof Error
+                ? caught.message
+                : "Unable to load the event.",
             );
         });
     refresh();
@@ -103,7 +106,7 @@ export function EventOrderingPortal({ subEventId }: { subEventId: string }) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     setBusy(true);
-    setError(null);
+    setOrderError(null);
     setMessage(null);
     try {
       const variantQuantities = Object.fromEntries(
@@ -129,10 +132,10 @@ export function EventOrderingPortal({ subEventId }: { subEventId: string }) {
           : "Order confirmed for your entity.",
       );
     } catch (caught) {
-      setError(
+      setOrderError(
         caught instanceof Error
           ? caught.message
-          : "Order could not be submitted",
+          : "Unable to submit the order.",
       );
     } finally {
       setBusy(false);
@@ -337,7 +340,19 @@ export function EventOrderingPortal({ subEventId }: { subEventId: string }) {
                   })}
                 </strong>
               </div>
+              {orderError ? (
+                <p
+                  className="event-order-submit-error rounded-xl border border-red-300 bg-red-50 p-3 text-red-900"
+                  id="event-order-submit-error"
+                  role="alert"
+                >
+                  {orderError}
+                </p>
+              ) : null}
               <button
+                aria-describedby={
+                  orderError ? "event-order-submit-error" : undefined
+                }
                 className="rounded-xl bg-blue-800 p-3 font-bold text-white disabled:bg-slate-400"
                 disabled={busy || workspace.ordering_status !== "open"}
               >

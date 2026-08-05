@@ -134,7 +134,7 @@ def test_department_default_applies_without_higher_match(db: Session) -> None:
     assert result.matched_policy_codes == ["department_default"]
 
 
-def test_disabled_policy_returns_no_approval(db: Session) -> None:
+def test_disabled_policy_returns_no_approval_with_audit_evidence(db: Session) -> None:
     seed_bpp_approval_defaults(db, actor="admin@example.com")
     update_config(db, "approval.enabled", {"enabled": False})
 
@@ -150,6 +150,18 @@ def test_disabled_policy_returns_no_approval(db: Session) -> None:
         .where(EventSnapshot.event_type == "approval.policy.matched")
     )
     assert snapshot_count == 0
+    disabled_snapshot = db.scalar(
+        select(EventSnapshot).where(EventSnapshot.event_type == "approval.policy.disabled")
+    )
+    assert disabled_snapshot is not None
+    assert disabled_snapshot.payload == {
+        "workflow_code": "BPP_PURCHASING",
+        "outcome": "disabled",
+        "approval_level": "none",
+        "approval_reason": "Approval policies are disabled.",
+        "required_permission": None,
+        "matched_policy_codes": [],
+    }
 
 
 def test_policy_evaluation_snapshot_payload_is_correct(db: Session) -> None:
@@ -166,6 +178,7 @@ def test_policy_evaluation_snapshot_payload_is_correct(db: Session) -> None:
     assert snapshot.actor == "requester@example.com"
     assert snapshot.payload == {
         "workflow_code": "BPP_PURCHASING",
+        "outcome": "matched",
         "approval_level": "executive",
         "approval_reason": result.approval_reason,
         "required_permission": "workflow.bpp.executive_approve",
@@ -175,6 +188,26 @@ def test_policy_evaluation_snapshot_payload_is_correct(db: Session) -> None:
             "department_default",
         ],
     }
+
+
+def test_no_match_configuration_error_retains_audit_evidence(
+    db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seed_bpp_approval_defaults(db, actor="admin@example.com")
+    monkeypatch.setattr(
+        "app.services.approval_policy_service.return_highest_required_approval",
+        lambda _matches: None,
+    )
+
+    with pytest.raises(ApprovalPolicyConfigurationError, match="No approval policy matched"):
+        evaluate_approval_policy(db, policy_input("100"))
+
+    snapshot = db.scalar(
+        select(EventSnapshot).where(EventSnapshot.event_type == "approval.policy.no_match")
+    )
+    assert snapshot is not None
+    assert snapshot.payload["outcome"] == "no_match"
+    assert snapshot.payload["matched_policy_codes"] == []
 
 
 def test_missing_required_configuration_fails_safely(db: Session) -> None:

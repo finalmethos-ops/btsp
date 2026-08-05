@@ -69,7 +69,7 @@ export function OrderRequestLifecycleWorkspace({
   useEffect(() => {
     void load().catch((caught: unknown) =>
       setError(
-        caught instanceof Error ? caught.message : "Unable to load requests",
+        caught instanceof Error ? caught.message : "Unable to load requests.",
       ),
     );
   }, [load]);
@@ -124,7 +124,7 @@ export function OrderRequestLifecycleWorkspace({
     try {
       await operation();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Operation failed");
+      setError(caught instanceof Error ? caught.message : "Operation failed.");
     } finally {
       setBusy(false);
     }

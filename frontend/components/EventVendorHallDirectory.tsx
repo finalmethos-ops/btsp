@@ -243,7 +243,9 @@ export function EventVendorHallDirectory({
       setContact(null);
     } catch (caught) {
       setContactMessage(
-        caught instanceof Error ? caught.message : "Inquiry could not be sent.",
+        caught instanceof Error
+          ? caught.message
+          : "Unable to send the inquiry.",
       );
     } finally {
       setContactBusy(false);
@@ -253,7 +255,7 @@ export function EventVendorHallDirectory({
   return (
     <section className="event-ui mb-6 rounded-2xl border bg-white p-4 sm:p-5">
       <p className="brand-eyebrow">Show directory</p>
-      <h2 className="text-2xl font-bold">Vendor Hall map</h2>
+      <h2 className="text-2xl font-bold">Vendor hall map</h2>
       <p className="mb-4 text-sm text-slate-600">
         Tap a booth to view its vendor and location. Operational inventory and
         exception details remain private.

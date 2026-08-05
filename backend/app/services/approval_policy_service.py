@@ -206,6 +206,36 @@ def return_highest_required_approval(
     return max(matches, key=lambda match: APPROVAL_LEVEL_RANK[match.approval_level])
 
 
+def _append_policy_evidence(
+    db: Session,
+    payload: ApprovalPolicyInput,
+    *,
+    event_type: str,
+    outcome: str,
+    approval_level: ApprovalLevel = ApprovalLevel.NONE,
+    approval_reason: str,
+    required_permission: str | None = None,
+    matched_policy_codes: list[str] | None = None,
+) -> None:
+    append_snapshot(
+        db,
+        EventSnapshotCreate(
+            event_type=event_type,
+            entity_type=payload.entity_type,
+            entity_id=payload.entity_id,
+            actor=payload.submitted_by,
+            payload={
+                "workflow_code": payload.workflow_code,
+                "outcome": outcome,
+                "approval_level": approval_level,
+                "approval_reason": approval_reason,
+                "required_permission": required_permission,
+                "matched_policy_codes": matched_policy_codes or [],
+            },
+        ),
+    )
+
+
 def match_independent_policies(
     payload: ApprovalPolicyInput,
     config: dict[str, dict[str, Any]],
@@ -304,7 +334,7 @@ def evaluate_approval_policy(
 ) -> ApprovalPolicyResult:
     config = load_workflow_approval_config(db, payload.workflow_code)
     if not config["approval.enabled"]["enabled"]:
-        return ApprovalPolicyResult(
+        result = ApprovalPolicyResult(
             requires_approval=False,
             approval_level=ApprovalLevel.NONE,
             approval_reason="Approval policies are disabled.",
@@ -312,6 +342,14 @@ def evaluate_approval_policy(
             routing_group=None,
             matched_policy_codes=[],
         )
+        _append_policy_evidence(
+            db,
+            payload,
+            event_type="approval.policy.disabled",
+            outcome="disabled",
+            approval_reason=result.approval_reason,
+        )
+        return result
 
     if payload.workflow_code == "BPP_PURCHASING":
         matches = [
@@ -328,6 +366,13 @@ def evaluate_approval_policy(
         matches = match_independent_policies(payload, config)
     highest = return_highest_required_approval(matches)
     if highest is None:
+        _append_policy_evidence(
+            db,
+            payload,
+            event_type="approval.policy.no_match",
+            outcome="no_match",
+            approval_reason="No configured approval policy matched.",
+        )
         raise ApprovalPolicyConfigurationError("No approval policy matched")
 
     ordered_matches = sorted(
@@ -343,21 +388,15 @@ def evaluate_approval_policy(
         routing_group=highest.routing_group,
         matched_policy_codes=[match.policy_code for match in ordered_matches],
     )
-    append_snapshot(
+    _append_policy_evidence(
         db,
-        EventSnapshotCreate(
-            event_type="approval.policy.matched",
-            entity_type=payload.entity_type,
-            entity_id=payload.entity_id,
-            actor=payload.submitted_by,
-            payload={
-                "workflow_code": payload.workflow_code,
-                "approval_level": result.approval_level,
-                "approval_reason": result.approval_reason,
-                "required_permission": result.required_permission,
-                "matched_policy_codes": result.matched_policy_codes,
-            },
-        ),
+        payload,
+        event_type="approval.policy.matched",
+        outcome="matched",
+        approval_level=result.approval_level,
+        approval_reason=result.approval_reason,
+        required_permission=result.required_permission,
+        matched_policy_codes=result.matched_policy_codes,
     )
     return result
 

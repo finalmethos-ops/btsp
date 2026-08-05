@@ -159,7 +159,10 @@ or file-sharing rules are not unintentionally interrupted.
 Generate the private certificate authority and server certificate:
 
 ```bash
-./scripts/generate-btsp-intranet-certificates.sh 192.168.0.146
+./scripts/generate-btsp-intranet-certificates.sh \
+  192.168.0.146 \
+  .runtime/tls \
+  btsp-origin
 ```
 
 Install `.runtime/tls/authority/btsp-intranet-ca.crt` in the trusted-root store

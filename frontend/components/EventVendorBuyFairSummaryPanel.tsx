@@ -37,7 +37,7 @@ export function EventVendorBuyFairSummaryPanel({
         setError(
           caught instanceof Error
             ? caught.message
-            : "Buy fair totals could not load",
+            : "Unable to load buy fair totals.",
         ),
       );
   }, [eventId, subEventId]);

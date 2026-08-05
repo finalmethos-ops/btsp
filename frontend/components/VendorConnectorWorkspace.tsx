@@ -43,7 +43,7 @@ export function VendorConnectorWorkspace() {
   useEffect(() => {
     void load().catch((error: unknown) =>
       setMessage(
-        error instanceof Error ? error.message : "Unable to load connectors",
+        error instanceof Error ? error.message : "Unable to load connectors.",
       ),
     );
   }, [load]);
@@ -66,7 +66,7 @@ export function VendorConnectorWorkspace() {
       setMessage(success);
     } catch (error) {
       setMessage(
-        error instanceof Error ? error.message : "Connector operation failed",
+        error instanceof Error ? error.message : "Connector operation failed.",
       );
     } finally {
       setBusy(false);

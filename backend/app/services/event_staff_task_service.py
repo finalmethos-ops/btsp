@@ -472,6 +472,7 @@ def my_tasks(db: Session, user: User) -> list[EventStaffTaskResponse]:
         .where(
             EventStaffTask.assigned_membership_id.in_([item.id for item in memberships]),
             ManagedEvent.status.in_(("draft", "published")),
+            ManagedEvent.ends_at > datetime.now(UTC),
         )
         .order_by(EventStaffTask.status, EventStaffTask.due_at, EventStaffTask.created_at.desc())
     ).all()
@@ -491,6 +492,7 @@ def enqueue_due_task_reminders(
             EventStaffTask.due_at.is_not(None),
             EventStaffTask.due_at <= current + timedelta(hours=24),
             ManagedEvent.status.in_(("draft", "published")),
+            ManagedEvent.ends_at > current,
         )
         .with_for_update(skip_locked=True)
     ).all()

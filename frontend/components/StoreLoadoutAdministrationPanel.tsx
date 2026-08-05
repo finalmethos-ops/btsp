@@ -197,7 +197,7 @@ export function StoreLoadoutAdministrationPanel({
           setError(
             caught instanceof Error
               ? caught.message
-              : "Store loadout could not load",
+              : "Unable to load store loadout.",
           );
         }
       });
@@ -344,7 +344,7 @@ export function StoreLoadoutAdministrationPanel({
           : "Store assignment created.",
       );
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Assignment failed");
+      setError(caught instanceof Error ? caught.message : "Assignment failed.");
     } finally {
       setBusy(false);
     }
@@ -379,7 +379,9 @@ export function StoreLoadoutAdministrationPanel({
       );
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Packing list export failed",
+        caught instanceof Error
+          ? caught.message
+          : "Packing list export failed.",
       );
     } finally {
       setBusy(false);
@@ -414,7 +416,7 @@ export function StoreLoadoutAdministrationPanel({
       await exportStoreLoadoutReport(event.id, reportType);
       setMessage("Store loadout export downloaded.");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Export failed");
+      setError(caught instanceof Error ? caught.message : "Export failed.");
     } finally {
       setBusy(false);
     }
@@ -579,12 +581,12 @@ export function StoreLoadoutAdministrationPanel({
         <Metric label="In progress" value={summary?.in_progress ?? 0} />
         <Metric label="Exceptions" value={summary?.exceptions_present ?? 0} />
         <Metric
-          label="Ready review"
+          label="Ready for review"
           value={summary?.ready_for_final_review ?? 0}
         />
         <Metric label="Released" value={summary?.released_from_venue ?? 0} />
         <Metric
-          label="Loadout complete %"
+          label="Loadout complete"
           value={summary?.completion_percentage ?? 0}
         />
       </div>
@@ -1019,7 +1021,7 @@ export function StoreLoadoutAdministrationPanel({
                   setMessage("Batch packing-list PDF downloaded.");
                 } catch (caught) {
                   setError(
-                    caught instanceof Error ? caught.message : "Export failed",
+                    caught instanceof Error ? caught.message : "Export failed.",
                   );
                 } finally {
                   setBusy(false);
@@ -1469,7 +1471,7 @@ function StoreLoadoutLiveDashboard({
       onMessage(`${label} added for Store ${assignment.store_number}.`);
     } catch (caught) {
       onError(
-        caught instanceof Error ? caught.message : "Vehicle could not be added",
+        caught instanceof Error ? caught.message : "Unable to add the vehicle.",
       );
     } finally {
       setVehicleBusy(false);
@@ -1504,7 +1506,7 @@ function StoreLoadoutLiveDashboard({
       onError(
         caught instanceof Error
           ? caught.message
-          : "Vehicle status could not be updated",
+          : "Unable to update the vehicle status.",
       );
     } finally {
       setVehicleBusy(false);
@@ -1522,7 +1524,7 @@ function StoreLoadoutLiveDashboard({
       onError(
         caught instanceof Error
           ? caught.message
-          : "Store release could not be completed",
+          : "Unable to complete the store release.",
       );
     } finally {
       setVehicleBusy(false);
@@ -1549,7 +1551,7 @@ function StoreLoadoutLiveDashboard({
             tone="red"
           />
           <LiveQueue
-            label="Ready depart"
+            label="Ready to depart"
             value={readyForDeparture.length}
             tone="green"
           />

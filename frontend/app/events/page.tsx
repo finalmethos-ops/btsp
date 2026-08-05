@@ -180,7 +180,7 @@ function MyEventsWorkspace() {
   useEffect(() => {
     void load().catch((caught: unknown) =>
       setError(
-        caught instanceof Error ? caught.message : "Events could not load",
+        caught instanceof Error ? caught.message : "Unable to load events.",
       ),
     );
   }, [load]);

@@ -41,18 +41,18 @@ const textFields: {
   label: string;
   required?: boolean;
 }[] = [
-  { key: "store_number", label: "Store Number", required: true },
-  { key: "name", label: "Store Name", required: true },
-  { key: "operating_company", label: "Operating Company" },
-  { key: "regional_manager_name", label: "Regional Manager" },
-  { key: "owner_operator_name", label: "Owner / Operator" },
-  { key: "general_manager_name", label: "General Manager" },
-  { key: "manager_email", label: "Manager Email" },
-  { key: "address_line1", label: "Street Address" },
+  { key: "store_number", label: "Store number", required: true },
+  { key: "name", label: "Store name", required: true },
+  { key: "operating_company", label: "Operating company" },
+  { key: "regional_manager_name", label: "Regional manager" },
+  { key: "owner_operator_name", label: "Owner / operator" },
+  { key: "general_manager_name", label: "General manager" },
+  { key: "manager_email", label: "Manager email" },
+  { key: "address_line1", label: "Street address" },
   { key: "city", label: "City" },
   { key: "state_code", label: "State" },
-  { key: "postal_code", label: "ZIP Code" },
-  { key: "timezone", label: "Time Zone" },
+  { key: "postal_code", label: "ZIP code" },
+  { key: "timezone", label: "Time zone" },
 ];
 
 function toWrite(store: StoreRecord): StoreWrite {
@@ -100,14 +100,14 @@ export function StoreManagementWorkspace() {
   useEffect(() => {
     void load().catch((caught: unknown) =>
       setError(
-        caught instanceof Error ? caught.message : "Unable to load stores",
+        caught instanceof Error ? caught.message : "Unable to load stores.",
       ),
     );
   }, [load]);
   useEffect(() => {
     void getStoreDirectoryOptions()
       .then(setDirectoryOptions)
-      .catch(() => setError("Unable to load store directory options"));
+      .catch(() => setError("Unable to load store directory options."));
   }, []);
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -148,7 +148,7 @@ export function StoreManagementWorkspace() {
     try {
       await operation();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Operation failed");
+      setError(caught instanceof Error ? caught.message : "Operation failed.");
     } finally {
       setBusy(false);
     }
@@ -196,7 +196,7 @@ export function StoreManagementWorkspace() {
         ← Command center
       </Link>
       <p className="brand-eyebrow mt-4">Purchasing</p>
-      <h1 className="mt-2 text-3xl font-bold">Store Database</h1>
+      <h1 className="mt-2 text-3xl font-bold">Store database</h1>
       <p className="mt-2 text-slate-600">
         {canManage
           ? "Maintain store authority records. Inactive stores are retained for history but removed from order creation."
@@ -216,11 +216,11 @@ export function StoreManagementWorkspace() {
           className="mt-5 flex flex-wrap items-center gap-3 rounded-2xl bg-white p-4"
           onSubmit={upload}
         >
-          <strong>Import Current Store Workbook</strong>
+          <strong>Import current store workbook</strong>
           <input accept=".xlsx" name="workbook" required type="file" />
           <label className="flex items-center gap-2 text-sm">
             <input name="authoritative" type="checkbox" />
-            Disable Stores Absent From Workbook
+            Disable stores absent from workbook
           </label>
           <button
             className="rounded-xl bg-blue-900 px-4 py-2 font-bold text-white"
@@ -245,14 +245,14 @@ export function StoreManagementWorkspace() {
                 }}
                 type="button"
               >
-                {option === "active" ? "Active Stores" : "Inactive History"}
+                {option === "active" ? "Active stores" : "Inactive history"}
               </button>
             ))}
           </div>
           <input
             className="mt-3 w-full rounded-xl border p-3"
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search Store, Entity, Region, City…"
+            placeholder="Search store, entity, region, or city…"
             value={search}
           />
           {canManage ? (
@@ -261,7 +261,7 @@ export function StoreManagementWorkspace() {
               onClick={startNew}
               type="button"
             >
-              Add New Store
+              Add new store
             </button>
           ) : null}
           <p className="mt-3 text-xs text-slate-500">
@@ -294,7 +294,7 @@ export function StoreManagementWorkspace() {
                 ? canManage
                   ? `Edit Store ${selected.store_number}`
                   : `Store ${selected.store_number} Details`
-                : "Select A Store"}
+                : "Select a store"}
             </h2>
             {selected && canManage ? (
               <button
@@ -318,7 +318,7 @@ export function StoreManagementWorkspace() {
                 }
                 type="button"
               >
-                {selected.is_active ? "Disable Store" : "Reactivate Store"}
+                {selected.is_active ? "Disable store" : "Reactivate store"}
               </button>
             ) : null}
           </div>
@@ -337,7 +337,7 @@ export function StoreManagementWorkspace() {
                 }
                 value={draft.entity_code ?? ""}
               >
-                <option value="">Select Entity</option>
+                <option value="">Select entity</option>
                 {directoryOptions.entities.map((entity) => (
                   <option key={entity} value={entity}>
                     {entity}
@@ -355,7 +355,7 @@ export function StoreManagementWorkspace() {
                 value={draft.region_code ?? ""}
               >
                 <option value="">
-                  {draft.entity_code ? "Select Region" : "Select Entity First"}
+                  {draft.entity_code ? "Select region" : "Select entity first"}
                 </option>
                 {(
                   directoryOptions.entity_regions[draft.entity_code ?? ""] ?? []
@@ -376,7 +376,7 @@ export function StoreManagementWorkspace() {
                 }
                 value={draft.purchasing_program ?? ""}
               >
-                <option value="">Select Purchasing Program</option>
+                <option value="">Select purchasing program</option>
                 {directoryOptions.purchasing_programs.map((program) => (
                   <option key={program} value={program}>
                     {program}
@@ -412,14 +412,14 @@ export function StoreManagementWorkspace() {
               }
               type="checkbox"
             />
-            Enabled For Ordering
+            Enabled for ordering
           </label>
           {canManage ? (
             <button
               className="mt-6 rounded-xl bg-blue-900 px-6 py-3 font-bold text-white"
               disabled={busy}
             >
-              {selected ? "Save Changes" : "Create Store"}
+              {selected ? "Save changes" : "Create store"}
             </button>
           ) : null}
         </form>

@@ -38,7 +38,7 @@ function AttendeeVendorHallMap({ eventId }: { eventId: string }) {
       <EventScopeProvider eventId={eventId}>
         <main className="event-ui mx-auto min-h-screen max-w-7xl p-4 sm:p-8">
           <p className="brand-eyebrow">Attendee event map</p>
-          <h1 className="text-3xl font-bold">Vendor Hall Map</h1>
+          <h1 className="text-3xl font-bold">Vendor hall map</h1>
           <p className="mt-2 text-slate-300">
             Browse booths, save vendors to your visit list, and send meeting
             inquiries. Inventory and booth operations remain restricted to

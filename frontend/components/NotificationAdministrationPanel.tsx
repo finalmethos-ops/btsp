@@ -246,7 +246,7 @@ export function NotificationAdministrationPanel() {
                 }
                 value={form.channel}
               >
-                <option value="in_app">In app</option>
+                <option value="in_app">In-app</option>
                 <option value="email">Email</option>
                 <option value="webhook">Webhook</option>
               </select>

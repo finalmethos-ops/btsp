@@ -210,14 +210,30 @@ export function DashboardShell() {
             {user.roles.join(" · ") || "No role assigned"}
           </div>
           <button
-            className="brand-button"
+            aria-label="Sign out"
+            className="brand-button brand-button-signout"
             onClick={() => {
               signOut();
               router.replace("/");
             }}
+            title="Sign out"
             type="button"
           >
-            Sign out
+            <svg
+              aria-hidden="true"
+              className="nav-action-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M10 17l5-5-5-5" />
+              <path d="M15 12H3" />
+              <path d="M21 3v18" />
+            </svg>
+            <span className="nav-action-label">Sign out</span>
           </button>
         </div>
       </header>

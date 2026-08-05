@@ -47,7 +47,7 @@ function ArchivedEventsWorkspace() {
       setError(
         caught instanceof Error
           ? caught.message
-          : "Archived events could not load",
+          : "Unable to load archived events.",
       ),
     );
   }, [load]);
@@ -87,7 +87,7 @@ function ArchivedEventsWorkspace() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="brand-eyebrow">Read-only reference</p>
-          <h1 className="text-3xl font-bold">Archived Events</h1>
+          <h1 className="text-3xl font-bold">Archived events</h1>
           <p className="mt-2 text-slate-600">
             Completed and cancelled events are retained here without crowding
             active event workspaces.

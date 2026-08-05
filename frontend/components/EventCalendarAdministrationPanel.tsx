@@ -96,7 +96,7 @@ export function EventCalendarAdministrationPanel({
       setError(
         caught instanceof Error
           ? caught.message
-          : "Calendar entry could not be created",
+          : "Unable to create the calendar entry.",
       );
     } finally {
       setBusy(false);
@@ -307,7 +307,7 @@ export function EventCalendarAdministrationPanel({
                           setError(
                             caught instanceof Error
                               ? caught.message
-                              : "Calendar item could not be removed",
+                              : "Unable to remove the calendar item.",
                           ),
                         )
                         .finally(() => setBusy(false));

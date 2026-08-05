@@ -87,7 +87,13 @@ When approval is enabled, missing or malformed required configuration stops eval
 
 ## Snapshots
 
-Every positive evaluation appends `approval.policy.matched` with the evaluated entity, trusted actor, selected level, reason, permission, and all matched policy codes.
+Every positive evaluation appends `approval.policy.matched` with the evaluated
+entity, trusted actor, outcome, selected level, reason, permission, and all
+matched policy codes. Deliberately disabled evaluation records
+`approval.policy.disabled`; an invalid configuration that produces no match
+records `approval.policy.no_match` before failing safely. These outcomes retain
+the same entity and actor fields so reviewers can reconstruct every policy
+decision path.
 
 ## API Reference
 

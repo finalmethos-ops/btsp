@@ -34,7 +34,7 @@ export function ReconciliationPurchaseOrderWorkspace() {
       setError(
         caught instanceof Error
           ? caught.message
-          : "Unable to load reconciliation POs",
+          : "Unable to load reconciliation POs.",
       ),
     );
   }, [load]);
@@ -120,7 +120,7 @@ export function ReconciliationPurchaseOrderWorkspace() {
         ← Command center
       </Link>
       <p className="brand-eyebrow mt-4">Reconciliation custody</p>
-      <h1 className="mt-2 text-3xl font-bold">Reconciliation PO Database</h1>
+      <h1 className="mt-2 text-3xl font-bold">Reconciliation PO database</h1>
       <p className="mt-2 text-slate-600">
         Delivered POs transferred out of Purchasing and awaiting reconciliation
         work.

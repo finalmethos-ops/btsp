@@ -5,7 +5,13 @@ from app.auth.permissions import require_permission
 from app.db.session import get_db
 from app.models.identity import User
 from app.schemas.user_admin import UserAdminResponse, UserCreate, UserUpdate
-from app.services.user_admin_service import create_user, get_user_by_email, list_users, update_user
+from app.services.user_admin_service import (
+    create_user,
+    get_user_by_email,
+    list_users,
+    remove_user,
+    update_user,
+)
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -22,10 +28,10 @@ def read_users(
 def write_user(
     payload: UserCreate,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(require_permission("system.admin")),
+    current_user: User = Depends(require_permission("system.admin")),
 ) -> UserAdminResponse:
     try:
-        return create_user(db, payload)
+        return create_user(db, payload, current_user.email)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
@@ -35,10 +41,10 @@ def patch_user(
     email: str,
     payload: UserUpdate,
     db: Session = Depends(get_db),
-    _current_user: User = Depends(require_permission("system.admin")),
+    current_user: User = Depends(require_permission("system.admin")),
 ) -> UserAdminResponse:
     try:
-        user = update_user(db, email, payload)
+        user = update_user(db, email, payload, current_user.email)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     if user is None:
@@ -59,5 +65,4 @@ def delete_user(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="You cannot delete your own account"
         )
-    db.delete(user)
-    db.commit()
+    remove_user(db, user, current_user.email)

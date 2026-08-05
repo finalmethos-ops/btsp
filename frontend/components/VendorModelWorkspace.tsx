@@ -67,7 +67,7 @@ export function VendorModelWorkspace() {
   useEffect(() => {
     void load().catch((caught: unknown) =>
       setError(
-        caught instanceof Error ? caught.message : "Unable to load models",
+        caught instanceof Error ? caught.message : "Unable to load models.",
       ),
     );
   }, [load]);
@@ -129,7 +129,7 @@ export function VendorModelWorkspace() {
       );
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Model could not be saved",
+        caught instanceof Error ? caught.message : "Unable to save the model.",
       );
     } finally {
       setBusy(false);
@@ -149,7 +149,7 @@ export function VendorModelWorkspace() {
       );
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Model import failed",
+        caught instanceof Error ? caught.message : "Model import failed.",
       );
     } finally {
       setBusy(false);
@@ -163,7 +163,7 @@ export function VendorModelWorkspace() {
       await exportVendorModels();
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Model export failed",
+        caught instanceof Error ? caught.message : "Model export failed.",
       );
     } finally {
       setBusy(false);
@@ -178,7 +178,7 @@ export function VendorModelWorkspace() {
             ← Command center
           </Link>
           <p className="brand-eyebrow mt-4">Vendor catalog</p>
-          <h1 className="mt-2 text-3xl font-bold">Model Management</h1>
+          <h1 className="mt-2 text-3xl font-bold">Model management</h1>
           <p className="mt-2 max-w-3xl text-slate-600">
             Maintain models for {user?.vendor_code}. Export the current catalog,
             edit it in Excel, and import only new or changed records. Imports
@@ -241,8 +241,8 @@ export function VendorModelWorkspace() {
                 [
                   ["all", "All"],
                   ["clump", "Clumps"],
-                  ["part_of_clump", "Part of Clump"],
-                  ["single_item", "Single Items"],
+                  ["part_of_clump", "Part of clump"],
+                  ["single_item", "Single items"],
                 ] as Array<[VendorModelClassification, string]>
               ).map(([value, label]) => (
                 <button

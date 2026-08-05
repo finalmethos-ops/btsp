@@ -32,6 +32,13 @@ The Security Owner approves policy, exceptions, high-privilege access, and incid
 - Identify users exceeding the organization's inactivity threshold.
 - Confirm employment/contract status with the account owner.
 - Disable stale accounts; do not delete audit identity.
+- Record successful, failed, denied, and rate-limited authentication outcomes in
+  append-only audit evidence. Failed attempts retain only hashed submitted
+  identity and client-address values; never store submitted passwords, tokens,
+  or raw request payloads.
+- Record user-role, vendor-scope, and role-permission changes through the
+  canonical `permission.changed` event and correlate login evidence with the
+  gateway request ID.
 - Investigate activity after termination or unexpected region/store changes.
 
 ### Administrative Account Review

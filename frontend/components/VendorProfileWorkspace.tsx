@@ -125,7 +125,7 @@ export function VendorProfileWorkspace() {
       setError(
         caught instanceof Error
           ? caught.message
-          : "MOQ profile could not be saved",
+          : "Unable to save the MOQ profile.",
       );
     }
   }
@@ -143,7 +143,7 @@ export function VendorProfileWorkspace() {
       setError(
         caught instanceof Error
           ? caught.message
-          : "Exclusions could not be saved",
+          : "Unable to save the exclusions.",
       );
     }
   }
@@ -154,7 +154,7 @@ export function VendorProfileWorkspace() {
         ← Command center
       </Link>
       <p className="brand-eyebrow mt-4">Vendor settings</p>
-      <h1 className="mt-2 text-3xl font-bold">Vendor Profile & MOQ Rules</h1>
+      <h1 className="mt-2 text-3xl font-bold">Vendor profile and MOQ rules</h1>
       <p className="mt-2 text-slate-600">
         Create unit or dollar minimums. Contributions are directional: checking
         a source below means it counts toward this target rule only.

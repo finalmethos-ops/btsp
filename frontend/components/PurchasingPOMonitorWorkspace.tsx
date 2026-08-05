@@ -50,7 +50,9 @@ export function PurchasingPOMonitorWorkspace({
   }, [filters, queue]);
   useEffect(() => {
     void load().catch((caught: unknown) =>
-      setError(caught instanceof Error ? caught.message : "Unable to load POs"),
+      setError(
+        caught instanceof Error ? caught.message : "Unable to load POs.",
+      ),
     );
   }, [load]);
   return (
@@ -238,7 +240,7 @@ export function PurchasingPOMonitorWorkspace({
                                 setError(
                                   caught instanceof Error
                                     ? caught.message
-                                    : "Model could not be removed",
+                                    : "Unable to remove the model.",
                                 ),
                               );
                           }}

@@ -57,7 +57,7 @@ export function VendorManagementPanel() {
 
   return (
     <section className="mt-10">
-      <h2 className="text-2xl font-bold">Vendor Directory</h2>
+      <h2 className="text-2xl font-bold">Vendor directory</h2>
       <p className="mt-2 text-sm text-slate-600">
         Add vendors or control whether they appear in active purchasing lists.
         Inactive vendors remain available for historical records.

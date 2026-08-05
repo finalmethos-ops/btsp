@@ -31,7 +31,7 @@ export function EventOrderReviewPanel({
         setError(
           caught instanceof Error
             ? caught.message
-            : "Review queue could not load",
+            : "Unable to load the review queue.",
         ),
       );
   }, [eventId]);
@@ -55,7 +55,9 @@ export function EventOrderReviewPanel({
       setMessage(`Order ${decision} decision recorded.`);
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Decision could not save",
+        caught instanceof Error
+          ? caught.message
+          : "Unable to save the decision.",
       );
     } finally {
       setBusy(false);
@@ -75,7 +77,7 @@ export function EventOrderReviewPanel({
       setError(
         caught instanceof Error
           ? caught.message
-          : "Release could not be created",
+          : "Unable to create the release.",
       );
     } finally {
       setBusy(false);
@@ -88,7 +90,7 @@ export function EventOrderReviewPanel({
         <div>
           <p className="brand-eyebrow">020F · Purchasing handoff</p>
           <h3 className="text-xl font-bold">Event order review</h3>
-          <p className="text-sm text-slate-600">
+          <p className="event-command-muted text-sm">
             Review live demand, then release model-level lines directly into
             standard purchasing.
           </p>
@@ -125,33 +127,35 @@ export function EventOrderReviewPanel({
         </div>
       </div>
       {message ? (
-        <p className="mt-3 rounded-lg bg-green-50 p-3 text-green-800">
+        <p className="event-order-feedback is-success mt-3 rounded-lg border p-3">
           {message}
         </p>
       ) : null}
       {error ? (
-        <p className="mt-3 rounded-lg bg-red-50 p-3 text-red-800">{error}</p>
+        <p className="event-order-feedback is-error mt-3 rounded-lg border p-3">
+          {error}
+        </p>
       ) : null}
       <div className="mt-4 grid gap-3 sm:grid-cols-4">
-        <div className="rounded-xl bg-slate-50 p-3">
+        <div className="event-order-status-card is-pending rounded-xl border p-3">
           <span className="text-xs">PENDING</span>
           <strong className="block text-2xl">{summary?.pending ?? 0}</strong>
         </div>
-        <div className="rounded-xl bg-green-50 p-3">
+        <div className="event-order-status-card is-approved rounded-xl border p-3">
           <span className="text-xs">APPROVED</span>
           <strong className="block text-2xl">{summary?.approved ?? 0}</strong>
         </div>
-        <div className="rounded-xl bg-red-50 p-3">
+        <div className="event-order-status-card is-rejected rounded-xl border p-3">
           <span className="text-xs">REJECTED</span>
           <strong className="block text-2xl">{summary?.rejected ?? 0}</strong>
         </div>
-        <div className="rounded-xl bg-blue-50 p-3">
+        <div className="event-order-status-card is-released rounded-xl border p-3">
           <span className="text-xs">RELEASED</span>
           <strong className="block text-2xl">{summary?.released ?? 0}</strong>
         </div>
       </div>
       <div className="mt-4 overflow-x-auto">
-        <table className="w-full min-w-[1050px] text-left text-sm">
+        <table className="event-order-review-table w-full min-w-[1240px] text-left text-sm">
           <thead>
             <tr className="border-b">
               <th className="p-2">Entity</th>

@@ -1,4 +1,15 @@
-FROM python:3.12-slim
+FROM python:3.12-slim@sha256:57cd7c3a7a273101a6485ba99423ee568157882804b1124b4dd04266317710de
+
+ARG BUILD_VERSION=development
+ARG BUILD_REVISION=unknown
+ARG BUILD_CREATED=unknown
+
+LABEL org.opencontainers.image.title="BTSP Backend" \
+    org.opencontainers.image.description="Buddy's Technology Services Platform API" \
+    org.opencontainers.image.source="https://github.com/finalmethos-ops/btsp" \
+    org.opencontainers.image.version="$BUILD_VERSION" \
+    org.opencontainers.image.revision="$BUILD_REVISION" \
+    org.opencontainers.image.created="$BUILD_CREATED"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1

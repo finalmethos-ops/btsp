@@ -41,7 +41,7 @@ export function InvoiceWorkspace() {
   useEffect(() => {
     void load().catch((error: unknown) =>
       setMessage(
-        error instanceof Error ? error.message : "Unable to load invoices",
+        error instanceof Error ? error.message : "Unable to load invoices.",
       ),
     );
   }, [load]);
@@ -90,7 +90,7 @@ export function InvoiceWorkspace() {
       setMessage(
         error instanceof Error
           ? error.message
-          : "Invoice could not be imported",
+          : "Unable to import the invoice.",
       );
     } finally {
       setBusy(false);
@@ -108,7 +108,7 @@ export function InvoiceWorkspace() {
       setMessage(
         error instanceof Error
           ? error.message
-          : "Reconciliation operation failed",
+          : "Reconciliation operation failed.",
       );
     } finally {
       setBusy(false);
@@ -142,7 +142,7 @@ export function InvoiceWorkspace() {
         <Link className="text-sm text-blue-700" href="/">
           ← Dashboard
         </Link>
-        <h1 className="mt-2 text-3xl font-bold">Vendor Invoices</h1>
+        <h1 className="mt-2 text-3xl font-bold">Vendor invoices</h1>
         <p className="mt-1 text-slate-600">
           Import invoices and compare vendor claims with ordered and accepted
           quantities.

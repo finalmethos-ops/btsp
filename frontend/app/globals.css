@@ -271,6 +271,13 @@ td {
 }
 
 .brand-button {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  overflow: hidden;
   border: 1px solid rgba(255, 212, 0, 0.55);
   border-radius: 12px;
   padding: 0.65rem 1rem;
@@ -278,6 +285,20 @@ td {
   background: linear-gradient(135deg, var(--yellow), #ffb700);
   box-shadow: 0 10px 26px rgba(255, 196, 0, 0.14);
   font-weight: 800;
+  white-space: nowrap;
+}
+
+.nav-action-icon {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+}
+
+.nav-action-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dashboard-layout {
@@ -476,6 +497,31 @@ td {
     font-size: 0.7rem;
   }
 
+  /* Keep navigation controls compact on phones while retaining a spoken
+     label and a desktop text label. The title provides a native tooltip for
+     users who need to identify an icon before activating it. */
+  .module-home-link {
+    width: 2.75rem;
+    min-width: 2.75rem;
+    height: 2.75rem;
+    padding: 0.55rem;
+  }
+
+  .module-home-link .nav-action-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .module-home-link .nav-action-icon {
+    width: 1.15rem;
+    height: 1.15rem;
+  }
+
   .event-attendee-brand-bar .module-home-link,
   .event-attendee-brand-bar .message-notification-link,
   .event-attendee-brand-bar .event-alert-toggle {
@@ -483,10 +529,16 @@ td {
     justify-content: center;
     text-align: center;
   }
+
+  .event-attendee-brand-bar .module-home-link {
+    flex: 0 0 2.75rem;
+  }
 }
 
 .module-home-link {
   display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
   align-items: center;
   justify-content: center;
   gap: 0.35rem;
@@ -496,6 +548,10 @@ td {
   color: var(--yellow-soft);
   font-size: 0.78rem;
   font-weight: 800;
+}
+
+.module-home-link .nav-action-label {
+  max-width: 14rem;
 }
 
 .message-notification-link {
@@ -612,6 +668,48 @@ td {
 
 .event-ui :where(label, legend, h1, h2, h3, h4, strong) {
   color: var(--ink);
+}
+
+/* Grid children otherwise keep the intrinsic width of native date controls
+   (especially Chromium's datetime-local picker), allowing them to protrude
+   past a two-column event form. */
+.event-ui :where(label, .event-glass-pane) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.event-ui :where(input, select, textarea) {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.event-ui :where(input[type="date"], input[type="datetime-local"]) {
+  display: block;
+  inline-size: 100%;
+  min-inline-size: 0;
+}
+
+/* Explicitly cover the named start/end fields used by event setup, calendar,
+   presentation, and task editors. The !important width is intentional: a few
+   Tailwind utility combinations otherwise leave the native picker at its
+   intrinsic desktop width inside a narrow grid column. */
+.event-ui
+  :where(
+    input[name="starts_at"],
+    input[name="ends_at"],
+    input[name="delivery_window_start"],
+    input[name="delivery_window_end"],
+    input[name="publishes_at"],
+    input[name="expires_at"],
+    input[name="due_at"]
+  ) {
+  display: block;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  min-inline-size: 0 !important;
+  box-sizing: border-box;
 }
 
 .event-ui .event-cancellation-panel h3,
@@ -1609,15 +1707,25 @@ td {
   z-index: 2;
   top: 0;
   display: grid;
-  grid-template-columns: minmax(12rem, 1.5fr) repeat(3, minmax(8rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(9.5rem, 100%), 1fr));
   gap: 0.55rem;
-  padding-bottom: 0.25rem;
-  background: #fff;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+  border: 1px solid rgba(96, 165, 250, 0.22);
+  border-radius: 12px;
+  padding: 0.55rem;
+  background: #071a3b;
 }
 
 .event-task-admin-filters :where(input, select) {
+  display: block;
   width: 100%;
   min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   border: 1px solid #25466f;
   border-radius: 10px;
   padding: 0.7rem;
@@ -1804,12 +1912,16 @@ td {
 
 .event-vendor-hall-fields,
 .event-vendor-hall-checkin {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 0;
+  max-width: 100%;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
 }
 
 .event-vendor-hall-form
   :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea),
 .event-vendor-hall-checkin :where(input, select, textarea) {
+  min-width: 0;
+  max-width: 100%;
   width: 100%;
   min-height: 44px;
   border: 1px solid rgba(96, 165, 250, 0.24);
@@ -1817,6 +1929,28 @@ td {
   padding: 0.8rem 0.9rem;
   color: var(--ink);
   background: rgba(1, 10, 29, 0.78);
+}
+
+.event-vendor-hall-form,
+.event-vendor-hall-checkin {
+  overflow: hidden;
+}
+
+.event-vendor-hall-checkin > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.event-vendor-hall-fields > *,
+.event-vendor-hall-checkin > * {
+  min-width: 0;
+}
+
+.event-vendor-hall-checkin .brand-button {
+  justify-self: start;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .event-vendor-hall-form textarea {
@@ -2134,11 +2268,15 @@ td {
 }
 
 .vendor-hall-live-map {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   margin-top: 1rem;
   overflow: hidden;
-  border: 1px solid rgba(15, 23, 42, 0.1);
+  border: 1px solid #31537f;
   border-radius: 20px;
-  background: #ffffff;
+  background: #071a3b;
 }
 
 .vendor-hall-live-map-header {
@@ -2147,7 +2285,9 @@ td {
   justify-content: space-between;
   gap: 1rem;
   padding: 1rem;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  border-bottom: 1px solid rgba(96, 165, 250, 0.24);
+  color: #f8fbff;
+  background: #071a3b;
 }
 
 .vendor-hall-live-map-header h3 {
@@ -2156,7 +2296,7 @@ td {
 }
 
 .vendor-hall-live-map-header p {
-  color: #64748b;
+  color: #b9c9e3;
   font-size: 0.9rem;
 }
 
@@ -2172,11 +2312,11 @@ td {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid #31537f;
   border-radius: 999px;
   padding: 0.32rem 0.55rem;
-  color: #334155;
-  background: #f8fafc;
+  color: #f8fbff;
+  background: #0a244c;
   font-size: 0.72rem;
   font-weight: 800;
 }
@@ -2191,8 +2331,11 @@ td {
   display: grid;
   gap: 0.5rem;
   padding: 1rem;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-  background: #f8fafc;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  border-bottom: 1px solid rgba(96, 165, 250, 0.24);
+  background: #071a3b;
 }
 
 .vendor-hall-directory-search-header {
@@ -2200,10 +2343,13 @@ td {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
 .vendor-hall-directory-search label {
-  color: #0f172a;
+  min-width: 0;
+  color: #f8fbff;
   font-size: 0.8rem;
   font-weight: 850;
 }
@@ -2212,16 +2358,16 @@ td {
   display: inline-flex;
   overflow: hidden;
   flex: 0 0 auto;
-  border: 1px solid #bfdbfe;
+  border: 1px solid #d9ad00;
   border-radius: 999px;
-  background: #ffffff;
+  background: #03132e;
 }
 
 .vendor-hall-directory-view-toggle button {
   min-height: 38px;
   border: 0;
   padding: 0.42rem 0.75rem;
-  color: #1e3a8a;
+  color: #ffd100;
   background: transparent;
   font-size: 0.75rem;
   font-weight: 900;
@@ -2229,8 +2375,8 @@ td {
 }
 
 .vendor-hall-directory-view-toggle button.is-active {
-  color: #ffffff;
-  background: #1d4ed8;
+  color: #07142c;
+  background: #ffd100;
 }
 
 .vendor-hall-directory-search input {
@@ -2239,25 +2385,26 @@ td {
   border: 1px solid #94a3b8;
   border-radius: 12px;
   padding: 0.75rem 0.9rem;
-  color: #0f172a;
-  background: #ffffff;
+  color: #f8fbff;
+  background: #03132e;
   font: inherit;
 }
 
 .vendor-hall-saved-filter {
   width: fit-content;
-  border: 1px solid #1d4ed8;
+  max-width: 100%;
+  border: 1px solid #d9ad00;
   border-radius: 999px;
   padding: 0.5rem 0.75rem;
-  color: #1e3a8a;
-  background: #ffffff;
+  color: #ffd100;
+  background: #03132e;
   font-weight: 800;
   cursor: pointer;
 }
 
 .vendor-hall-saved-filter.is-active {
-  color: #ffffff;
-  background: #1d4ed8;
+  color: #07142c;
+  background: #ffd100;
 }
 
 .vendor-hall-directory-results {
@@ -2270,11 +2417,11 @@ td {
 .vendor-hall-directory-results button,
 .vendor-hall-directory-results > span {
   flex: 0 0 auto;
-  border: 1px solid #bfdbfe;
+  border: 1px solid #31537f;
   border-radius: 10px;
   padding: 0.55rem 0.7rem;
-  color: #172554;
-  background: #eff6ff;
+  color: #f8fbff;
+  background: #0a244c;
   text-align: left;
 }
 
@@ -2288,7 +2435,7 @@ td {
 
 .vendor-hall-directory-results button span {
   margin-top: 0.1rem;
-  color: #475569;
+  color: #b9c9e3;
   font-size: 0.72rem;
 }
 
@@ -2296,17 +2443,17 @@ td {
   display: grid;
   gap: 0.75rem;
   padding: 1rem;
-  color: #0f172a;
-  background: #ffffff;
+  color: #f8fbff;
+  background: #06142e;
 }
 
 .vendor-hall-directory-card {
   display: grid;
   gap: 0.65rem;
-  border: 1px solid #dbeafe;
+  border: 1px solid #31537f;
   border-radius: 14px;
   padding: 0.85rem;
-  background: #f8fafc;
+  background: #0a244c;
 }
 
 .vendor-hall-directory-card.is-selected {
@@ -2322,7 +2469,7 @@ td {
   width: 100%;
   border: 0;
   padding: 0;
-  color: #0f172a;
+  color: #f8fbff;
   background: transparent;
   text-align: left;
 }
@@ -2334,7 +2481,7 @@ td {
 
 .vendor-hall-directory-card > button small,
 .vendor-hall-directory-card p {
-  color: #475569;
+  color: #b9c9e3;
   font-size: 0.78rem;
 }
 
@@ -2361,11 +2508,11 @@ td {
 
 .vendor-hall-directory-empty {
   margin: 0;
-  border: 1px dashed #bfdbfe;
+  border: 1px dashed #5577a4;
   border-radius: 14px;
   padding: 1rem;
-  color: #475569;
-  background: #f8fafc;
+  color: #b9c9e3;
+  background: #0a244c;
   text-align: center;
 }
 
@@ -2378,9 +2525,9 @@ td {
   display: grid;
   gap: 0.75rem;
   padding: 1rem;
-  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-  color: #172554;
-  background: #fffbeb;
+  border-bottom: 1px solid #8c721d;
+  color: #fff8d6;
+  background: #29240f;
 }
 
 .vendor-hall-visit-route > div :where(strong, span) {
@@ -2389,7 +2536,7 @@ td {
 
 .vendor-hall-visit-route > div span {
   margin-top: 0.15rem;
-  color: #64748b;
+  color: #d9cfa0;
   font-size: 0.78rem;
 }
 
@@ -2404,21 +2551,16 @@ td {
 .vendor-hall-visit-route li {
   flex: 0 0 auto;
   padding-left: 0.1rem;
-  color: #92400e;
+  color: #ffd100;
   font-weight: 900;
 }
 
-.vendor-hall-visit-route li.is-visited {
-  opacity: 0.58;
-  text-decoration: line-through;
-}
-
 .vendor-hall-visit-route button {
-  border: 1px solid #fde68a;
+  border: 1px solid #8c721d;
   border-radius: 9px;
   padding: 0.45rem 0.6rem;
-  color: #172554;
-  background: #ffffff;
+  color: #f8fbff;
+  background: #071a3b;
   text-align: left;
   cursor: pointer;
 }
@@ -2428,7 +2570,7 @@ td {
 }
 
 .vendor-hall-visit-route button span {
-  color: #64748b;
+  color: #d9cfa0;
   font-size: 0.7rem;
 }
 
@@ -2460,7 +2602,8 @@ td {
 .vendor-hall-map-scroll {
   overflow-x: auto;
   overscroll-behavior-inline: contain;
-  scrollbar-color: #64748b #e2e8f0;
+  background: #071a3b;
+  scrollbar-color: #d9ad00 #03132e;
 }
 
 .vendor-hall-map-zoom {
@@ -2469,18 +2612,21 @@ td {
   justify-content: flex-end;
   gap: 0.4rem;
   padding: 0.65rem 1rem 0;
-  color: #334155;
-  background: #ffffff;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  color: #f8fbff;
+  background: #071a3b;
 }
 
 .vendor-hall-map-zoom button {
   min-width: 42px;
   min-height: 42px;
-  border: 1px solid #94a3b8;
+  border: 1px solid #d9ad00;
   border-radius: 9px;
   padding: 0.4rem 0.65rem;
-  color: #0f172a;
-  background: #f8fafc;
+  color: #ffd100;
+  background: #03132e;
   font-weight: 900;
   cursor: pointer;
 }
@@ -2594,8 +2740,15 @@ td {
 }
 
 .vendor-hall-map-booth.is-visited {
-  filter: saturate(0.35);
-  opacity: 0.48;
+  z-index: 3;
+  border-color: #15803d;
+  outline: 4px solid #22c55e;
+  outline-offset: 2px;
+  color: #14532d;
+  background: #bbf7d0;
+  filter: none;
+  opacity: 1;
+  box-shadow: 0 0 0 2px rgba(20, 83, 45, 0.22);
 }
 
 .vendor-hall-loadout-legend {
@@ -2603,8 +2756,8 @@ td {
   flex-wrap: wrap;
   gap: 0.75rem;
   padding: 0.65rem 1rem 0;
-  color: #334155;
-  background: #ffffff;
+  color: #f8fbff;
+  background: #071a3b;
   font-size: 0.75rem;
   font-weight: 850;
 }
@@ -2648,11 +2801,21 @@ td {
     0 12px 28px rgba(15, 23, 42, 0.35);
 }
 
+.vendor-hall-map-booth.is-route-stop {
+  z-index: 6;
+}
+
+.vendor-hall-map-booth.is-route-stop:hover,
+.vendor-hall-map-booth.is-route-stop:focus-visible,
+.vendor-hall-map-booth.is-route-stop.is-detail-open {
+  z-index: 7;
+}
+
 .vendor-hall-route-number {
   position: absolute;
   top: -0.65rem;
   left: -0.65rem;
-  z-index: 3;
+  z-index: 12;
   display: grid;
   width: 1.35rem;
   height: 1.35rem;
@@ -2664,6 +2827,8 @@ td {
   box-shadow: 0 2px 6px rgba(15, 23, 42, 0.28);
   font-size: 0.68rem;
   font-weight: 900;
+  isolation: isolate;
+  pointer-events: none;
 }
 
 .vendor-hall-map-booth strong,
@@ -2694,11 +2859,11 @@ td {
   max-width: 260px;
   gap: 0.12rem;
   transform: translateX(-50%);
-  border: 1px solid #475569;
+  border: 1px solid #d9ad00;
   border-radius: 10px;
   padding: 0.55rem 0.65rem;
-  color: #0f172a;
-  background: rgba(255, 255, 255, 0.98);
+  color: #f8fbff;
+  background: rgba(7, 26, 59, 0.98);
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.3);
   font-size: 0.72rem;
   text-align: left;
@@ -2725,11 +2890,11 @@ td {
   width: 1.65rem;
   min-height: 1.65rem;
   place-items: center;
-  border: 1px solid #94a3b8;
+  border: 1px solid #5577a4;
   border-radius: 999px;
   padding: 0;
-  color: #0f172a;
-  background: #f8fafc;
+  color: #f8fbff;
+  background: #03132e;
   font-size: 1rem;
   font-weight: 900;
   line-height: 1;
@@ -2738,6 +2903,11 @@ td {
 
 .vendor-hall-booth-popover-floating > b {
   padding-right: 1.8rem;
+  color: #ffd100;
+}
+
+.vendor-hall-booth-popover-floating :where(span, small) {
+  color: #dbe8fa;
 }
 
 .vendor-hall-booth-popover-floating.is-above {
@@ -2829,11 +2999,14 @@ td {
   display: grid;
   gap: 0.9rem;
   margin-top: 1rem;
-  border: 1px solid #c4b5fd;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #7043a8;
   border-radius: 16px;
   padding: 1rem;
-  color: #0f172a;
-  background: #faf5ff;
+  color: #f8fbff;
+  background: #101b3f;
 }
 
 .vendor-hall-contact-form label {
@@ -2848,8 +3021,11 @@ td {
   border: 1px solid #a78bfa;
   border-radius: 10px;
   padding: 0.75rem;
-  color: #0f172a;
-  background: #ffffff;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  color: #f8fbff;
+  background: #03132e;
   font: inherit;
 }
 
@@ -2903,10 +3079,11 @@ td {
 }
 
 .vendor-hall-zone-fallback section {
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid #31537f;
   border-radius: 16px;
   padding: 0.85rem;
-  background: #f8fafc;
+  color: #f8fbff;
+  background: #0a244c;
 }
 
 .vendor-hall-zone-fallback h4 {
@@ -4017,6 +4194,28 @@ td {
     min-height: 44px;
   }
 
+  .brand-button-signout {
+    width: 2.75rem;
+    min-width: 2.75rem;
+    height: 2.75rem;
+    padding: 0.55rem;
+  }
+
+  .brand-button-signout .nav-action-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .brand-button-signout .nav-action-icon {
+    width: 1.15rem;
+    height: 1.15rem;
+  }
+
   .brand-user {
     display: none;
   }
@@ -4400,6 +4599,11 @@ td {
     text-align: center;
   }
 
+  .brand-ribbon-actions .brand-button-signout {
+    align-self: center;
+    width: 2.75rem;
+  }
+
   .brand-nav {
     grid-template-columns: 1fr;
   }
@@ -4686,6 +4890,368 @@ td {
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
     0 14px 34px rgba(0, 0, 0, 0.2) !important;
   backdrop-filter: blur(14px);
+}
+
+.system-health-metric-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid rgba(96, 165, 250, 0.34);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  color: #f8fbff;
+  background: linear-gradient(
+    145deg,
+    rgba(10, 35, 77, 0.94),
+    rgba(3, 15, 38, 0.96)
+  );
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.system-health-metric-card.system-health-metric-warning {
+  border-color: rgba(250, 204, 21, 0.72);
+  background: linear-gradient(
+    145deg,
+    rgba(101, 70, 8, 0.78),
+    rgba(51, 35, 5, 0.96)
+  );
+}
+
+.system-health-metric-card.system-health-metric-critical {
+  border-color: rgba(248, 113, 113, 0.8);
+  background: linear-gradient(
+    145deg,
+    rgba(92, 25, 38, 0.86),
+    rgba(45, 13, 25, 0.97)
+  );
+}
+
+.system-health-metric-label {
+  overflow-wrap: anywhere;
+  color: #dbeafe !important;
+}
+
+.system-health-metric-count {
+  color: #f8fbff !important;
+}
+
+.system-health-metric-threshold {
+  color: #bcd2ee !important;
+}
+
+.system-health-metric-card a {
+  color: #ffe866 !important;
+}
+
+/* Event command-center panels use the same high-contrast severity language as
+   System Health. This keeps warning/critical work visible without the pale
+   browser-default panels that previously reduced contrast on mobile. */
+.event-command-center-shell {
+  color: #f8fbff;
+  border-color: rgba(96, 165, 250, 0.34);
+  background: linear-gradient(
+    145deg,
+    rgba(5, 24, 55, 0.96),
+    rgba(3, 15, 38, 0.98)
+  );
+}
+
+.event-command-panel {
+  color: #f8fbff;
+  border-color: rgba(96, 165, 250, 0.34);
+  background: linear-gradient(
+    145deg,
+    rgba(10, 35, 77, 0.78),
+    rgba(3, 15, 38, 0.9)
+  );
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.event-command-metric,
+.event-command-subcard {
+  color: #f8fbff;
+  border-color: rgba(96, 165, 250, 0.3);
+  background: rgba(4, 20, 48, 0.72);
+}
+
+.event-command-muted {
+  color: #bcd2ee !important;
+}
+
+.event-command-pill {
+  color: #ffe866;
+  border: 1px solid rgba(255, 212, 0, 0.28);
+  background: rgba(255, 212, 0, 0.1);
+}
+
+.event-command-filter {
+  border: 1px solid rgba(96, 165, 250, 0.32);
+  color: #c5d9f2;
+  background: rgba(4, 20, 48, 0.72);
+}
+
+.event-command-filter:hover,
+.event-command-filter.is-active {
+  border-color: rgba(255, 212, 0, 0.74);
+  color: #07142c;
+  background: #ffd400;
+}
+
+.event-command-action {
+  border-color: rgba(255, 212, 0, 0.7);
+  color: #ffe866;
+  background: rgba(4, 20, 48, 0.82);
+}
+
+.event-command-action:hover:not(:disabled) {
+  color: #07142c;
+  background: #ffd400;
+}
+
+.event-command-error {
+  color: #fecaca;
+  border: 1px solid rgba(248, 113, 113, 0.72);
+  background: linear-gradient(
+    145deg,
+    rgba(92, 25, 38, 0.86),
+    rgba(45, 13, 25, 0.97)
+  );
+}
+
+.event-command-empty {
+  color: #bcd2ee;
+  border-color: rgba(96, 165, 250, 0.36);
+  background: rgba(4, 20, 48, 0.5);
+}
+
+.event-command-progress-track {
+  background: rgba(148, 163, 184, 0.28);
+}
+
+.floor-plan-review-warning {
+  border-color: rgba(250, 204, 21, 0.72) !important;
+  color: #fff4b8 !important;
+  background: linear-gradient(
+    145deg,
+    rgba(101, 70, 8, 0.78),
+    rgba(51, 35, 5, 0.96)
+  ) !important;
+  box-shadow:
+    inset 3px 0 0 #ffd400,
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.floor-plan-review-warning strong {
+  color: #ffe866 !important;
+}
+
+.floor-plan-review-warning :where(span, li) {
+  color: #f8fbff !important;
+}
+
+.event-order-status-card {
+  min-width: 0;
+  color: #f8fbff;
+  border-color: rgba(96, 165, 250, 0.34);
+  background: linear-gradient(
+    145deg,
+    rgba(10, 35, 77, 0.94),
+    rgba(3, 15, 38, 0.96)
+  );
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.event-order-status-card.is-pending {
+  border-color: rgba(250, 204, 21, 0.72);
+  background: linear-gradient(
+    145deg,
+    rgba(101, 70, 8, 0.78),
+    rgba(51, 35, 5, 0.96)
+  );
+}
+
+.event-order-status-card.is-approved {
+  border-color: rgba(74, 222, 128, 0.68);
+  background: linear-gradient(
+    145deg,
+    rgba(20, 83, 45, 0.86),
+    rgba(5, 46, 22, 0.96)
+  );
+}
+
+.event-order-status-card.is-rejected {
+  border-color: rgba(248, 113, 113, 0.8);
+  background: linear-gradient(
+    145deg,
+    rgba(92, 25, 38, 0.86),
+    rgba(45, 13, 25, 0.97)
+  );
+}
+
+.event-order-status-card.is-released {
+  border-color: rgba(96, 165, 250, 0.72);
+  background: linear-gradient(
+    145deg,
+    rgba(30, 64, 175, 0.7),
+    rgba(8, 30, 70, 0.96)
+  );
+}
+
+.event-order-status-card span {
+  color: #dbeafe !important;
+  font-weight: 700;
+}
+
+.event-order-feedback.is-success {
+  color: #bbf7d0;
+  border-color: rgba(74, 222, 128, 0.68);
+  background: rgba(5, 46, 22, 0.92);
+}
+
+.event-order-feedback.is-error {
+  color: #fecaca;
+  border-color: rgba(248, 113, 113, 0.78);
+  background: rgba(69, 10, 25, 0.94);
+}
+
+.event-order-review-table {
+  table-layout: fixed;
+}
+
+.event-order-review-table :where(th, td) {
+  min-width: 0;
+  padding: 0.75rem 0.5rem;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.event-order-review-table th:nth-child(1) {
+  width: 5%;
+}
+.event-order-review-table th:nth-child(2) {
+  width: 21%;
+}
+.event-order-review-table th:nth-child(3) {
+  width: 17%;
+}
+.event-order-review-table th:nth-child(4) {
+  width: 5%;
+}
+.event-order-review-table th:nth-child(5) {
+  width: 8%;
+}
+.event-order-review-table th:nth-child(6) {
+  width: 11%;
+}
+.event-order-review-table th:nth-child(7) {
+  width: 7%;
+}
+.event-order-review-table th:nth-child(8) {
+  width: 8%;
+}
+.event-order-review-table th:nth-child(9) {
+  width: 18%;
+}
+
+.event-reconciliation-exception {
+  border-color: #8c721d !important;
+  background: #29240f !important;
+  color: #fff8d6 !important;
+  box-shadow: inset 4px 0 0 #ffd100;
+}
+
+.event-reconciliation-exception-title {
+  display: block;
+  color: #ffd100 !important;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.event-reconciliation-exception-description {
+  color: #fffdf0 !important;
+}
+
+.event-reconciliation-exception-reference {
+  color: #d9cfa0 !important;
+}
+
+/* Semantic feedback inside event workspaces must remain legible against the
+   platform's dark surfaces. These selectors intentionally target feedback
+   paragraphs rather than badges and inventory-state chips. */
+.event-ui p.bg-green-50,
+.event-semantic-success {
+  border: 1px solid #2c8060 !important;
+  background: #10372d !important;
+  color: #e4fff3 !important;
+  box-shadow: inset 4px 0 0 #55d99a;
+}
+
+.event-ui p.bg-green-50 :where(*),
+.event-semantic-success :where(*) {
+  color: #e4fff3 !important;
+}
+
+.event-ui p.bg-red-50 {
+  border: 1px solid #a94242 !important;
+  background: #421b22 !important;
+  color: #fff0f1 !important;
+  box-shadow: inset 4px 0 0 #ff6b6b;
+}
+
+.event-ui p.bg-red-50 :where(*) {
+  color: #fff0f1 !important;
+}
+
+.event-ui p.bg-amber-50 {
+  border: 1px solid #8c721d !important;
+  background: #29240f !important;
+  color: #fff8d6 !important;
+  box-shadow: inset 4px 0 0 #ffd100;
+}
+
+.event-ui p.bg-amber-50 :where(*) {
+  color: #fff8d6 !important;
+}
+
+/* Event Management's date controls are native replaced elements. Keep the
+   form, field, and input all shrinkable so the picker cannot force a grid
+   track wider than its panel. */
+.event-details-form,
+.event-sub-event-form {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.event-form-field,
+.event-form-input {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.event-form-field {
+  display: block;
+  overflow: hidden;
+}
+
+.event-date-input {
+  display: block;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  min-inline-size: 0 !important;
+  max-inline-size: 100% !important;
+  box-sizing: border-box !important;
+  padding-inline: 0.65rem !important;
+  font-size: clamp(0.75rem, 1.25vw, 0.95rem);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 760px) {
+  .event-details-form,
+  .event-sub-event-form {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
 }
 .vendor-selection-page {
   min-height: calc(100vh - 76px);

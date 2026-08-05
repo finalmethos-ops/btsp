@@ -111,7 +111,7 @@ export function EventAttendancePanel({
     setRoster(null);
     void refresh().catch((caught: unknown) =>
       setError(
-        caught instanceof Error ? caught.message : "Attendance could not load",
+        caught instanceof Error ? caught.message : "Unable to load attendance.",
       ),
     );
     if (!subEventId) return;
@@ -153,7 +153,7 @@ export function EventAttendancePanel({
       setError(
         caught instanceof Error
           ? caught.message
-          : "Attendance could not be updated",
+          : "Unable to update attendance.",
       );
     } finally {
       setBusyId(null);
@@ -178,7 +178,7 @@ export function EventAttendancePanel({
       setError(
         caught instanceof Error
           ? caught.message
-          : "Pass could not be processed",
+          : "Unable to process the pass.",
       );
     } finally {
       setScanBusy(false);
@@ -188,7 +188,7 @@ export function EventAttendancePanel({
   return (
     <section className="event-ui rounded-2xl border bg-white p-5">
       <p className="brand-eyebrow">Onsite operations</p>
-      <h3 className="text-xl font-bold">Registration &amp; check-in</h3>
+      <h3 className="text-xl font-bold">Registration and check-in</h3>
       {!subEvents.length ? (
         <p className="mt-3 text-slate-500">
           Add a sub-event to open its roster.

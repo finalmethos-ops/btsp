@@ -55,11 +55,13 @@ def test_custom_role_lifecycle_is_audited(db: Session) -> None:
     assert updated.name == "Report Manager"
     assert updated.permission_codes == ["analytics.read", "roles.manage"]
     assert delete_role(db, created.code, "admin@example.com") is True
-    assert [item.event_type for item in db.scalars(select(EventSnapshot)).all()] == [
-        "admin.role.created",
-        "admin.role.updated",
-        "admin.role.deleted",
-    ]
+    snapshots = list(db.scalars(select(EventSnapshot)).all())
+    assert [
+        item.payload["action"] for item in snapshots if item.event_type == "administrative.action"
+    ] == ["role.created", "role.updated", "role.deleted"]
+    assert [
+        item.payload["action"] for item in snapshots if item.event_type == "permission.changed"
+    ] == ["role.created", "role.updated", "role.deleted"]
 
 
 def test_system_and_assigned_roles_are_protected(db: Session) -> None:

@@ -59,7 +59,7 @@ export function EventPresentationDisplay({
             setError(
               caught instanceof Error
                 ? caught.message
-                : "Presentation could not load",
+                : "Unable to load the presentation.",
             );
         });
     refresh();

@@ -27,7 +27,7 @@ In the Cloudflare dashboard:
 4. Set the origin service to `https://nginx:4443`. Port `4443` is an
    unpublished Docker-internal listener reserved for the Tunnel connector.
 5. Under TLS origin settings, set:
-   - **Origin Server Name:** `192.168.0.146`
+   - **Origin Server Name:** `btsp-origin`
    - **Certificate Authority Pool:**
      `/etc/cloudflared/btsp-intranet-ca.crt`
    - **No TLS Verify:** disabled
@@ -94,8 +94,29 @@ docker compose \
 The connector publishes no host ports. It maintains outbound connections to
 Cloudflare and validates the private certificate presented by Nginx.
 
+`btsp-origin` is a stable certificate identity used only for origin TLS
+validation. It is independent of the Windows host's LAN or hotspot address.
+The certificate may retain the current LAN address as an additional SAN so
+trusted local clients can continue to use the intranet URL.
+
 ## Public security checks
 
+- Run `scripts/check-btsp-public-health.sh` from an external monitoring host or
+  uptime-monitor worker. It checks the public health and readiness endpoints,
+  Cloudflare routing, and the required security headers.
+- Run `scripts/check-btsp-production-readiness.sh` before inviting users or
+  after a Docker/Windows restart. It combines the public checks with container
+  health, duplicate-connector detection, live tunnel metrics, and the nightly
+  backup-task result.
+- Nginx applies a defense-in-depth limit of 20 login requests per minute per
+  client, with a burst of five. FastAPI separately enforces the Redis-backed
+  email and client limits plus account lockout.
+- The public compose profile binds the optional host fallback listeners to
+  loopback only. The origin is therefore reachable through the outbound Tunnel,
+  not through a host/LAN port. Keep `BTSP_BIND_ADDRESS=127.0.0.1` unless a
+  separately firewalled private-network fallback is intentionally required.
+- The Nginx edge rejects common CMS and secret-file probes (`wp-admin`,
+  `xmlrpc.php`, `.env`, `.git`, and similar paths) before they reach Next.js.
 - Confirm standard login and event login over the public hostname.
 - Confirm invalid login throttling and account lockout.
 - Confirm vendor, staff, franchise, executive, and administrator role scopes.
@@ -103,6 +124,11 @@ Cloudflare and validates the private certificate presented by Nginx.
 - Confirm uploads, downloads, exports, and live event updates.
 - Confirm Cloudflare does not cache authenticated HTML or API responses.
 - Add a Cloudflare WAF rate-limit rule for authentication endpoints.
+- Enable the Cloudflare Managed Ruleset and Bot Fight Mode. Add a custom WAF
+  block rule for the same CMS/secret probe paths and a Managed Challenge rule
+  for likely automated clients on `/api/v1/auth/login` and password-reset
+  endpoints. Rate limiting rules are evaluated before origin delivery and can
+  reduce credential stuffing and API abuse.
 - Confirm origin audit logs and login throttling distinguish separate client
   IP addresses. Nginx trusts `CF-Connecting-IP` only on the unpublished
   Tunnel listener and overwrites client-supplied forwarding headers.
@@ -114,6 +140,8 @@ Cloudflare and validates the private certificate presented by Nginx.
 - Disable Windows sleep and hibernation while the host is serving production.
 - Start Docker Desktop automatically after reboot.
 - Keep the computer on a UPS.
-- Upload encrypted daily PostgreSQL and durable-file backups offsite.
+- Run `scripts/backup-and-upload-btsp-production.sh` daily to create, restore
+  test, and upload encrypted PostgreSQL and durable-file recovery bundles.
+- Store the archive passphrase offline and separately from Cloudflare R2.
 - Test a restore at least quarterly.
 - Monitor the public health endpoint and tunnel status from outside the site.

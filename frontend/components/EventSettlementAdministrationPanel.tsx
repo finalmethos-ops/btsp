@@ -113,7 +113,7 @@ export function EventSettlementAdministrationPanel({
           setError(
             caught instanceof Error
               ? caught.message
-              : "Event settlement could not load",
+              : "Unable to load event settlement.",
           );
         }
       });
@@ -157,7 +157,7 @@ export function EventSettlementAdministrationPanel({
       if (nextSummary.status === "closed") await onCompleted?.();
       setMessage("Event settlement settings saved.");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Settlement failed");
+      setError(caught instanceof Error ? caught.message : "Settlement failed.");
     } finally {
       setBusy(false);
     }
@@ -171,7 +171,7 @@ export function EventSettlementAdministrationPanel({
       await exportEventSettlementReport(event.id, reportType);
       setMessage("Event settlement export downloaded.");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Export failed");
+      setError(caught instanceof Error ? caught.message : "Export failed.");
     } finally {
       setBusy(false);
     }
@@ -186,7 +186,9 @@ export function EventSettlementAdministrationPanel({
       setMessage("Complete event order backup downloaded.");
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Order backup export failed",
+        caught instanceof Error
+          ? caught.message
+          : "Order backup export failed.",
       );
     } finally {
       setBusy(false);
@@ -204,7 +206,7 @@ export function EventSettlementAdministrationPanel({
       setError(
         caught instanceof Error
           ? caught.message
-          : "Archived backup download failed",
+          : "Archived backup download failed.",
       );
     } finally {
       setBusy(false);
@@ -232,7 +234,7 @@ export function EventSettlementAdministrationPanel({
       setError(
         caught instanceof Error
           ? caught.message
-          : "Exception could not be added",
+          : "Unable to add the exception.",
       );
     } finally {
       setBusy(false);
@@ -250,7 +252,7 @@ export function EventSettlementAdministrationPanel({
       setSummary(nextSummary);
       setMessage("Settlement exception resolved.");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Resolve failed");
+      setError(caught instanceof Error ? caught.message : "Resolve failed.");
     } finally {
       setBusy(false);
     }
@@ -265,7 +267,7 @@ export function EventSettlementAdministrationPanel({
       setSummary(nextSummary);
       setMessage("Settlement exception reopened.");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Reopen failed");
+      setError(caught instanceof Error ? caught.message : "Reopen failed.");
     } finally {
       setBusy(false);
     }
@@ -418,14 +420,16 @@ export function EventSettlementAdministrationPanel({
           <div className="mt-4 space-y-2">
             {reconciliationExceptions.slice(0, 5).map((exception) => (
               <article
-                className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950"
+                className="event-reconciliation-exception rounded-xl border p-3 text-sm"
                 key={exception.id}
               >
-                <strong className="capitalize">
+                <strong className="event-reconciliation-exception-title capitalize">
                   {statusLabel(exception.exception_type)}
                 </strong>
-                <p className="mt-1">{exception.description}</p>
-                <span className="mt-1 block text-xs">
+                <p className="event-reconciliation-exception-description mt-1">
+                  {exception.description}
+                </p>
+                <span className="event-reconciliation-exception-reference mt-1 block text-xs">
                   Reference {exception.reference_id ?? "N/A"}
                 </span>
               </article>
@@ -544,7 +548,7 @@ export function EventSettlementAdministrationPanel({
           exceptions, and audit activity.
         </p>
         {archivedBackup ? (
-          <div className="mt-4 rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-950">
+          <div className="event-semantic-success mt-4 rounded-xl border p-3 text-sm">
             <strong className="block">Immutable closeout archive</strong>
             <span className="block">
               {archivedBackup.filename} ·{" "}

@@ -63,6 +63,30 @@ docker compose -f docker-compose.yml -f docker-compose.production.yml build
 
 Review the rendered configuration for accidental secret exposure before sharing output.
 
+Build release images only from a clean reviewed revision. The guarded builder
+pins source revision, release version, and build time into OCI labels and writes
+a non-sensitive local manifest; it never publishes or deploys images:
+
+```bash
+BTSP_RELEASE_VERSION=v1.0.0-rc.23 \
+  ./scripts/build-btsp-release-images.sh
+```
+
+Inspect `.runtime/releases/v1.0.0-rc.23-manifest.json`, complete the release
+checks, then publish and promote the resulting images through separately
+approved steps.
+
+The production readiness gate also verifies that all six configured images are
+SHA-256 digest-pinned and that each running container matches its configured
+digest:
+
+```bash
+python3 scripts/audit-btsp-deployment-integrity.py
+```
+
+Its non-sensitive report is stored at
+`.runtime/security/deployment-integrity.json`.
+
 ## Start and Migrate
 
 ```bash

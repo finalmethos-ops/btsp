@@ -57,7 +57,7 @@ export function EventLiveInsightsLanding({
     <section className="event-ui mb-6 space-y-4 rounded-2xl border border-blue-400/30 bg-slate-950 p-5 text-white">
       <div>
         <p className="brand-eyebrow">Live buying intelligence</p>
-        <h2 className="text-2xl font-bold">Live Event Summary</h2>
+        <h2 className="text-2xl font-bold">Live event summary</h2>
       </div>
       {insights.map((item) => (
         <article

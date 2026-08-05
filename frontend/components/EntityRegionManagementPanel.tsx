@@ -23,7 +23,7 @@ export function EntityRegionManagementPanel() {
   }
   return (
     <section className="mt-10">
-      <h2 className="text-2xl font-bold">Entities & regions</h2>
+      <h2 className="text-2xl font-bold">Entities and regions</h2>
       <p className="mt-2 text-sm text-slate-600">
         Maintain approved internal organization and regional assignments.
       </p>

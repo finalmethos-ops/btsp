@@ -58,7 +58,7 @@ export function ArchivedEventCloseoutPanel({ event }: { event: ManagedEvent }) {
         setError(
           caught instanceof Error
             ? caught.message
-            : "Closeout reference could not load",
+            : "Unable to load the closeout reference.",
         ),
       );
   }, [canRead, event.id]);
@@ -71,7 +71,7 @@ export function ArchivedEventCloseoutPanel({ event }: { event: ManagedEvent }) {
       await work();
       setMessage(success);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Download failed");
+      setError(caught instanceof Error ? caught.message : "Download failed.");
     } finally {
       setBusy(false);
     }

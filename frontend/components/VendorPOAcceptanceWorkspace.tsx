@@ -36,7 +36,9 @@ export function VendorPOAcceptanceWorkspace() {
   }, [filters, queue]);
   useEffect(() => {
     void load().catch((caught: unknown) =>
-      setError(caught instanceof Error ? caught.message : "Unable to load POs"),
+      setError(
+        caught instanceof Error ? caught.message : "Unable to load POs.",
+      ),
     );
   }, [load]);
   async function printPO() {

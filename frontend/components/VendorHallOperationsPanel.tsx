@@ -247,7 +247,7 @@ export function VendorHallOperationsPanel({
           setError(
             caught instanceof Error
               ? caught.message
-              : "Vendor hall could not load",
+              : "Unable to load the vendor hall.",
           );
       });
     return () => {
@@ -267,7 +267,7 @@ export function VendorHallOperationsPanel({
           setError(
             caught instanceof Error
               ? caught.message
-              : "Inventory could not load",
+              : "Unable to load inventory.",
           );
       });
     return () => {
@@ -307,7 +307,7 @@ export function VendorHallOperationsPanel({
       setError(
         caught instanceof Error
           ? caught.message
-          : "Selected booth inventory could not load",
+          : "Unable to load the selected booth inventory.",
       );
     }
   }
@@ -390,7 +390,7 @@ export function VendorHallOperationsPanel({
       setError(
         caught instanceof Error
           ? caught.message
-          : "Attachment could not be downloaded",
+          : "Unable to download the attachment.",
       );
     } finally {
       setBusy(false);

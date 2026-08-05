@@ -42,7 +42,9 @@ export function VendorActivePOWorkspace({
   }, [filters, queue]);
   useEffect(() => {
     void load().catch((caught: unknown) =>
-      setError(caught instanceof Error ? caught.message : "Unable to load POs"),
+      setError(
+        caught instanceof Error ? caught.message : "Unable to load POs.",
+      ),
     );
   }, [load]);
   useEffect(() => {
@@ -66,7 +68,7 @@ export function VendorActivePOWorkspace({
       await operation();
       await load();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Operation failed");
+      setError(caught instanceof Error ? caught.message : "Operation failed.");
     }
   }
   return (

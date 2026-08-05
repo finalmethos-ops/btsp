@@ -57,7 +57,7 @@ export function ModelCatalogWorkspace() {
       setError(
         caught instanceof Error
           ? caught.message
-          : "Unable to load model catalog",
+          : "Unable to load the model catalog.",
       );
     }
   }, [classification, department, productCategoryCode, search, vendor]);
@@ -120,8 +120,8 @@ export function ModelCatalogWorkspace() {
                   [
                     ["all", "All"],
                     ["clump", "Clumps"],
-                    ["part_of_clump", "Part of Clump"],
-                    ["single_item", "Single Items"],
+                    ["part_of_clump", "Part of clump"],
+                    ["single_item", "Single items"],
                   ] as Array<[VendorModelClassification, string]>
                 ).map(([value, label]) => (
                   <button

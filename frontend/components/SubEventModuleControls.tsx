@@ -63,7 +63,9 @@ export function SubEventModuleControls({
       await onUpdated(eventId);
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Modules could not be saved",
+        caught instanceof Error
+          ? caught.message
+          : "Unable to save the modules.",
       );
     } finally {
       setBusyId(null);

@@ -5,6 +5,10 @@ from app.auth.security import hash_password
 from app.models.catalog import CatalogVendor
 from app.models.identity import Role, User, user_vendor_access
 from app.schemas.user_admin import UserAdminResponse, UserCreate, UserUpdate
+from app.services.security_audit_service import (
+    record_administrative_action,
+    record_permission_change,
+)
 from app.services.vendor_access_service import vendor_codes_for_user
 
 
@@ -90,7 +94,7 @@ def get_user_by_email(db: Session, email: str) -> User | None:
     return db.scalar(select(User).where(User.email == email))
 
 
-def create_user(db: Session, payload: UserCreate) -> UserAdminResponse:
+def create_user(db: Session, payload: UserCreate, actor: str = "system") -> UserAdminResponse:
     existing = get_user_by_email(db, payload.email)
     if existing is not None:
         raise ValueError("User already exists")
@@ -113,16 +117,48 @@ def create_user(db: Session, payload: UserCreate) -> UserAdminResponse:
     db.add(user)
     db.flush()
     set_vendor_access(db, user, vendor_codes)
+    permissions = sorted({permission.code for role in roles for permission in role.permissions})
+    record_administrative_action(
+        db,
+        actor=actor,
+        action="user.created",
+        entity_type="user",
+        entity_id=str(user.id),
+        details={
+            "is_active": user.is_active,
+            "role_codes": sorted(role.code for role in roles),
+            "target_email": user.email,
+            "vendor_codes": vendor_codes,
+        },
+    )
+    record_permission_change(
+        db,
+        actor=actor,
+        action="user.created",
+        entity_type="user",
+        entity_id=str(user.id),
+        new_roles=[role.code for role in roles],
+        new_permissions=permissions,
+        new_vendor_codes=vendor_codes,
+    )
     db.commit()
     db.refresh(user)
     return user_to_admin_response(db, user)
 
 
-def update_user(db: Session, email: str, payload: UserUpdate) -> UserAdminResponse | None:
+def update_user(
+    db: Session, email: str, payload: UserUpdate, actor: str = "system"
+) -> UserAdminResponse | None:
     user = get_user_by_email(db, email)
     if user is None:
         return None
 
+    changed_fields = sorted(payload.model_fields_set)
+    previous_roles = sorted(role.code for role in user.roles)
+    previous_permissions = sorted(
+        {permission.code for role in user.roles for permission in role.permissions}
+    )
+    previous_vendor_codes = vendor_codes_for_user(db, user)
     values = payload.model_dump(exclude_unset=True)
     password = values.pop("password", None)
     role_codes = values.pop("role_codes", None)
@@ -147,6 +183,66 @@ def update_user(db: Session, email: str, payload: UserUpdate) -> UserAdminRespon
         user.roles = roles
     set_vendor_access(db, user, candidate_vendor_codes)
 
+    new_roles = sorted(role.code for role in roles)
+    new_permissions = sorted({permission.code for role in roles for permission in role.permissions})
+    record_administrative_action(
+        db,
+        actor=actor,
+        action="user.updated",
+        entity_type="user",
+        entity_id=str(user.id),
+        details={
+            "changed_fields": changed_fields,
+            "target_email": user.email,
+        },
+    )
+    if (
+        previous_roles != new_roles
+        or previous_permissions != new_permissions
+        or previous_vendor_codes != candidate_vendor_codes
+    ):
+        record_permission_change(
+            db,
+            actor=actor,
+            action="user.updated",
+            entity_type="user",
+            entity_id=str(user.id),
+            previous_roles=previous_roles,
+            new_roles=new_roles,
+            previous_permissions=previous_permissions,
+            new_permissions=new_permissions,
+            previous_vendor_codes=previous_vendor_codes,
+            new_vendor_codes=candidate_vendor_codes,
+        )
+
     db.commit()
     db.refresh(user)
     return user_to_admin_response(db, user)
+
+
+def remove_user(db: Session, user: User, actor: str) -> None:
+    role_codes = sorted(role.code for role in user.roles)
+    permission_codes = sorted(
+        {permission.code for role in user.roles for permission in role.permissions}
+    )
+    vendor_codes = vendor_codes_for_user(db, user)
+    record_administrative_action(
+        db,
+        actor=actor,
+        action="user.deleted",
+        entity_type="user",
+        entity_id=str(user.id),
+        details={"target_email": user.email},
+    )
+    record_permission_change(
+        db,
+        actor=actor,
+        action="user.deleted",
+        entity_type="user",
+        entity_id=str(user.id),
+        previous_roles=role_codes,
+        previous_permissions=permission_codes,
+        previous_vendor_codes=vendor_codes,
+    )
+    db.delete(user)
+    db.commit()

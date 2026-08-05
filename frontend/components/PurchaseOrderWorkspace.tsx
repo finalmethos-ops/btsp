@@ -41,7 +41,7 @@ export function PurchaseOrderWorkspace() {
     try {
       await operation();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Operation failed");
+      setError(caught instanceof Error ? caught.message : "Operation failed.");
     } finally {
       setBusy(false);
     }
@@ -100,7 +100,7 @@ export function PurchaseOrderWorkspace() {
         <Link className="text-sm text-slate-600" href="/">
           ← Dashboard
         </Link>
-        <h1 className="mt-4 text-3xl font-bold">Purchase Orders</h1>
+        <h1 className="mt-4 text-3xl font-bold">Purchase orders</h1>
         <p className="mt-2 text-slate-600">
           Generated BPP and Independent purchasing artifacts.
         </p>

@@ -35,7 +35,9 @@ export function VendorHallFloorPlanUploadPanel({
   useEffect(() => {
     void load().catch((caught: unknown) =>
       setError(
-        caught instanceof Error ? caught.message : "Floor plan could not load",
+        caught instanceof Error
+          ? caught.message
+          : "Unable to load the floor plan.",
       ),
     );
   }, [load]);
@@ -202,7 +204,7 @@ export function VendorHallFloorPlanUploadPanel({
         </div>
       ) : null}
       {Array.isArray(layout.review_reasons) && layout.review_reasons.length ? (
-        <div className="mt-4 rounded-xl border border-yellow-400/70 bg-yellow-50 p-4 text-sm text-slate-900">
+        <div className="floor-plan-review-warning mt-4 rounded-xl border p-4 text-sm">
           <strong className="block">Automatic analysis needs review</strong>
           <ul className="mt-2 list-disc space-y-1 pl-5">
             {layout.review_reasons.map((reason, index) => (
@@ -212,7 +214,7 @@ export function VendorHallFloorPlanUploadPanel({
         </div>
       ) : null}
       {hasUploadedMap && !hasBooths ? (
-        <div className="mt-4 rounded-xl border border-yellow-400/70 bg-yellow-50 p-4 text-sm text-slate-900">
+        <div className="floor-plan-review-warning mt-4 rounded-xl border p-4 text-sm">
           <strong className="block">
             No vendor hall booths are available to place yet.
           </strong>
@@ -232,7 +234,7 @@ export function VendorHallFloorPlanUploadPanel({
         </div>
       ) : null}
       {hasUploadedMap && hasBooths && detectedCount === 0 ? (
-        <div className="mt-4 rounded-xl border border-yellow-400/70 bg-yellow-50 p-4 text-sm text-slate-900">
+        <div className="floor-plan-review-warning mt-4 rounded-xl border p-4 text-sm">
           <strong className="block">
             The PDF uploaded, but no booth labels matched.
           </strong>

@@ -1,3 +1,10 @@
+x-btsp-tunnel-log-rotation: &btsp-tunnel-log-rotation
+  driver: local
+  options:
+    max-size: "${BTSP_CONTAINER_LOG_MAX_SIZE:-20m}"
+    max-file: "${BTSP_CONTAINER_LOG_MAX_FILES:-10}"
+    compress: "true"
+
 services:
   backend:
     command:
@@ -10,6 +17,7 @@ services:
       - --forwarded-allow-ips=*
 
   cloudflared:
+    logging: *btsp-tunnel-log-rotation
     image: >-
       cloudflare/cloudflared:2026.7.2@sha256:4f6655284ab3d252b7f28fedb19fe6c8fc82ee5b1295c20ac74d475e5398a52d
     restart: unless-stopped

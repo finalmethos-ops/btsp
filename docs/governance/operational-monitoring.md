@@ -56,7 +56,17 @@ Every alert has severity, owner, runbook, acknowledgment target, escalation path
 - Tracebacks, migration failures, authentication anomalies, notification failures, database recovery, and proxy upstream errors are searchable.
 - Retention and access follow security and regulatory policy.
 
-Current BTSP logging is framework/container oriented and lacks structured request correlation. Central aggregation, request IDs, and metrics instrumentation are platform follow-up work and must be tracked as observability debt.
+Nginx now assigns a request ID at ingress, forwards it to FastAPI, returns it in
+`X-Request-ID`, and emits JSON access records containing timing, status, route,
+client, and upstream fields. FastAPI preserves safe direct-client request IDs,
+generates replacements for invalid values, and emits a matching structured
+request record without query strings or request payloads. Production containers
+use bounded compressed log rotation, while the host watchdog consolidates
+health, dependency, restart, capacity, backup-freshness, and gateway-error
+results into a protected rotating JSON Lines ledger with optional transition
+webhooks. Off-host aggregation, long-term searchable retention, and full metrics
+instrumentation remain platform follow-up work and must be tracked as
+observability debt.
 
 ## Audit Event Standard
 
@@ -67,13 +77,13 @@ Current BTSP logging is framework/container oriented and lacks structured reques
 | Workflow cancelled | `workflow.cancelled` or terminal `workflow.advanced` | Terminal transition currently evidenced by `workflow.advanced`; dedicated producer recommended |
 | Workflow rejected | `workflow.rejected` or terminal `workflow.advanced` | Terminal transition currently evidenced by `workflow.advanced`; dedicated producer recommended |
 | Workflow completed | `workflow.completed` or terminal `workflow.advanced` | Terminal transition currently evidenced by `workflow.advanced`; dedicated producer recommended |
-| Approval evaluated | `approval.policy.matched` | Positive match implemented; disabled/no-match decision audit is future policy |
+| Approval evaluated | `approval.policy.matched`, `approval.policy.disabled`, `approval.policy.no_match` | Implemented for matched, deliberately disabled, and invalid no-match outcomes |
 | Configuration changed | `configuration.changed` | Implemented snapshot |
-| Permission changed | `permission.changed` | Required; dedicated producer not yet implemented |
+| Permission changed | `permission.changed` | Implemented for user role/vendor scope and role permission lifecycle changes |
 | Notification emitted | `notification.emitted` | Implemented snapshot |
 | Notification failed | `notification.failed` | Implemented snapshot |
-| User login | `user.login` | Required; dedicated producer not yet implemented |
-| Administrative action | `administrative.action` | Required; specific user/config actions partially evidenced, unified producer pending |
+| User login | `user.login` | Implemented for success, invalid credentials, portal denial, and rate limiting with request correlation |
+| Administrative action | `administrative.action` | Implemented for user and role administration; domain-specific configuration actions retain their existing event types |
 
 Audit gaps are not silently treated as implemented. Release risk assessments identify them, and future packages add dedicated producers without rewriting historical snapshots.
 
@@ -109,7 +119,7 @@ Periodically reconcile:
 
 - Instance starts against `workflow.started` snapshots
 - Terminal instances against terminal transition snapshots
-- Positive approval results against `approval.policy.matched`
+- Approval results against matched, disabled, and no-match policy evidence
 - Notification events against emitted/failed snapshots
 - Configuration updated timestamps against change snapshots
 

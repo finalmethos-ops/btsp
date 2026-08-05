@@ -210,7 +210,7 @@ export function EventPresenterConsole({
             {presentation?.ordering_status ?? "closed"}
           </strong>
           {presentation?.ordering_status === "open" ? (
-            <small className="block">Controller controlled</small>
+            <small className="block">Controlled by the presenter</small>
           ) : null}
         </div>
       </div>

@@ -24,7 +24,7 @@ export function InvoiceIntakeWorkspace() {
       setError(
         caught instanceof Error
           ? caught.message
-          : "Unable to load invoice intake",
+          : "Unable to load invoice intake.",
       ),
     );
   }, [load]);
@@ -46,7 +46,7 @@ export function InvoiceIntakeWorkspace() {
       setError(
         caught instanceof Error
           ? caught.message
-          : "Invoice PDFs could not be processed",
+          : "Unable to process the invoice PDFs.",
       );
     } finally {
       setBusy(false);
@@ -64,7 +64,7 @@ export function InvoiceIntakeWorkspace() {
         ← Command center
       </Link>
       <p className="brand-eyebrow mt-4">Vendor & Reconciliation</p>
-      <h1 className="mt-2 text-3xl font-bold">Submit Invoices</h1>
+      <h1 className="mt-2 text-3xl font-bold">Submit invoices</h1>
       <p className="mt-2 text-slate-600">
         Upload one or several PDF files. Multi-invoice PDFs are separated into
         unique stored invoices and analyzed for vendor, store, invoice number,

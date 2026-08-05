@@ -5,6 +5,10 @@ from sqlalchemy.orm import Session
 from app.models.event_snapshot import EventSnapshot
 from app.models.identity import Permission, Role, user_roles
 from app.schemas.role_admin import RoleAdminCreate, RoleAdminResponse, RoleAdminUpdate
+from app.services.security_audit_service import (
+    record_administrative_action,
+    record_permission_change,
+)
 
 
 class RoleAdminError(ValueError):
@@ -71,6 +75,22 @@ def create_role(db: Session, payload: RoleAdminCreate, actor: str) -> RoleAdminR
                 payload={"permission_codes": sorted(payload.permission_codes)},
             )
         )
+        record_administrative_action(
+            db,
+            actor=actor,
+            action="role.created",
+            entity_type="role",
+            entity_id=role.code,
+            details={"permission_codes": sorted(payload.permission_codes)},
+        )
+        record_permission_change(
+            db,
+            actor=actor,
+            action="role.created",
+            entity_type="role",
+            entity_id=role.code,
+            new_permissions=payload.permission_codes,
+        )
         db.commit()
     except IntegrityError as exc:
         db.rollback()
@@ -88,6 +108,7 @@ def update_role(
     if role.is_system_role:
         raise RoleAdminError("System roles cannot be modified")
     values = payload.model_dump(exclude_unset=True)
+    previous_permissions = sorted(permission.code for permission in role.permissions)
     permission_codes = values.pop("permission_codes", None)
     if permission_codes is not None:
         permissions = _permission_map(db, permission_codes)
@@ -106,6 +127,24 @@ def update_role(
             },
         )
     )
+    record_administrative_action(
+        db,
+        actor=actor,
+        action="role.updated",
+        entity_type="role",
+        entity_id=role.code,
+        details={"changed_fields": sorted(payload.model_fields_set)},
+    )
+    if permission_codes is not None:
+        record_permission_change(
+            db,
+            actor=actor,
+            action="role.updated",
+            entity_type="role",
+            entity_id=role.code,
+            previous_permissions=previous_permissions,
+            new_permissions=[permission.code for permission in role.permissions],
+        )
     db.commit()
     db.refresh(role)
     return _response(role)
@@ -133,6 +172,21 @@ def delete_role(db: Session, code: str, actor: str) -> bool:
             actor=actor,
             payload={"permission_codes": sorted(item.code for item in role.permissions)},
         )
+    )
+    record_administrative_action(
+        db,
+        actor=actor,
+        action="role.deleted",
+        entity_type="role",
+        entity_id=role.code,
+    )
+    record_permission_change(
+        db,
+        actor=actor,
+        action="role.deleted",
+        entity_type="role",
+        entity_id=role.code,
+        previous_permissions=[item.code for item in role.permissions],
     )
     db.delete(role)
     db.commit()

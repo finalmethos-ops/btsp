@@ -66,7 +66,7 @@ function EventEntry() {
           setError(
             caught instanceof Error
               ? caught.message
-              : "Event registrations could not be loaded",
+              : "Unable to load event registrations.",
           );
         }
       })

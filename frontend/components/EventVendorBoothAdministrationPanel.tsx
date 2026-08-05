@@ -75,7 +75,7 @@ export function EventVendorBoothAdministrationPanel({
       setError(
         caught instanceof Error
           ? caught.message
-          : "Vendor booth could not save",
+          : "Unable to save the vendor booth.",
       );
     } finally {
       setBusy(false);
@@ -100,7 +100,7 @@ export function EventVendorBoothAdministrationPanel({
       setError(
         caught instanceof Error
           ? caught.message
-          : "Event-only vendor could not be added",
+          : "Unable to add the event-only vendor.",
       );
     } finally {
       setBusy(false);

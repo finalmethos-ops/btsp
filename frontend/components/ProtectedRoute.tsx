@@ -117,20 +117,51 @@ export function ProtectedRoute({
             aria-label={home.ariaLabel}
             className="module-home-link"
             href={home.href}
+            title={home.ariaLabel}
           >
-            <span aria-hidden="true">⌂</span> {home.label}
+            <svg
+              aria-hidden="true"
+              className="nav-action-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="m3 10 9-7 9 7" />
+              <path d="M5 9.5V21h14V9.5" />
+              <path d="M9 21v-7h6v7" />
+            </svg>
+            <span className="nav-action-label">{home.label}</span>
           </Link>
           <button
-            className="module-home-link"
+            aria-label="Sign out"
+            className="module-home-link nav-signout-action"
             onClick={() => {
               const destination =
                 user.login_context === "event" ? "/event-login" : "/";
               signOut();
               router.replace(destination);
             }}
+            title="Sign out"
             type="button"
           >
-            Sign out
+            <svg
+              aria-hidden="true"
+              className="nav-action-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M10 17l5-5-5-5" />
+              <path d="M15 12H3" />
+              <path d="M21 3v18" />
+            </svg>
+            <span className="nav-action-label">Sign out</span>
           </button>
         </div>
       </header>

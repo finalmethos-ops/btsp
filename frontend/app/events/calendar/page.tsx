@@ -56,7 +56,7 @@ function EventCalendarHome() {
         setError(
           caught instanceof Error
             ? caught.message
-            : "Your event workspace could not be loaded",
+            : "Unable to load your event workspace.",
         );
       })
       .finally(() => {
@@ -161,7 +161,9 @@ function EventCalendarHome() {
               <EventCalendarLanding primary />
               <aside className="event-ui event-calendar-announcements rounded-2xl border bg-white p-5">
                 <p className="brand-eyebrow">Stay informed</p>
-                <h2 className="text-2xl font-bold">Announcements & updates</h2>
+                <h2 className="text-2xl font-bold">
+                  Announcements and updates
+                </h2>
                 <div className="mt-4">
                   <EventAnnouncementLanding />
                 </div>

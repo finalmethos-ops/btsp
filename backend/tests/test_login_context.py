@@ -141,6 +141,17 @@ def test_login_context_separates_event_only_and_standard_accounts(
                 headers={"Authorization": f"Bearer {event_only_event.json()['access_token']}"},
             )
             assert event_only_me.json()["login_context"] == "event"
+            original_refresh_token = event_only_event.json()["refresh_token"]
+            rotated_event_token = client.post(
+                "/api/v1/auth/refresh",
+                json={"refresh_token": original_refresh_token},
+            )
+            assert rotated_event_token.status_code == 200
+            replayed_refresh_token = client.post(
+                "/api/v1/auth/refresh",
+                json={"refresh_token": original_refresh_token},
+            )
+            assert replayed_refresh_token.status_code == 401
 
             registered_admin_event = client.post(
                 "/api/v1/auth/login",

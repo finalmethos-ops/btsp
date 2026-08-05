@@ -29,3 +29,8 @@ effect after the backend process reloads.
 
 The health endpoint is read-only and does not automatically retry notifications
 or change task state.
+
+Host and public-route alerts are recorded by the production watchdog described
+in `production-monitoring.md`. Its optional webhook fires only when an alert
+changes or recovers, preventing an unchanged five-minute failure from repeatedly
+notifying operators.

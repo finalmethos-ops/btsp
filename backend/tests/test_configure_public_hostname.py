@@ -27,18 +27,12 @@ def test_public_hostname_rejects_non_public_name(hostname: str) -> None:
 
 
 def test_update_environment_preserves_private_origin_and_secrets() -> None:
-    source = (
-        "SECRET_KEY=do-not-change\n"
-        "CORS_ORIGINS=https://192.168.0.146:18443\n"
-    )
+    source = "SECRET_KEY=do-not-change\n" "CORS_ORIGINS=https://192.168.0.146:18443\n"
 
     result = update_environment(source, "app.example.com")
 
     assert "SECRET_KEY=do-not-change" in result
-    assert (
-        "CORS_ORIGINS=https://app.example.com,https://192.168.0.146:18443"
-        in result
-    )
+    assert "CORS_ORIGINS=https://app.example.com,https://192.168.0.146:18443" in result
     assert "BTSP_PUBLIC_HOSTNAME=app.example.com" in result
 
 

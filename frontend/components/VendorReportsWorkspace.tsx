@@ -25,7 +25,7 @@ export function VendorReportsWorkspace() {
       setError(null);
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Unable to load reports",
+        caught instanceof Error ? caught.message : "Unable to load reports.",
       );
     }
   }, [year]);

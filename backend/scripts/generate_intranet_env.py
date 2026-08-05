@@ -7,8 +7,7 @@ import secrets
 from pathlib import Path
 
 PRIVATE_NETWORKS = tuple(
-    ipaddress.IPv4Network(network)
-    for network in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")
+    ipaddress.IPv4Network(network) for network in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")
 )
 
 
@@ -78,7 +77,7 @@ POSTGRES_PASSWORD={database_password}
 DATABASE_URL=postgresql+psycopg://btsp:{database_password}@postgres:5432/btsp
 REDIS_URL=redis://redis:6379/0
 
-BTSP_BIND_ADDRESS=0.0.0.0
+BTSP_BIND_ADDRESS=127.0.0.1
 NGINX_PORT={port}
 NGINX_TLS_PORT={tls_port}
 """

@@ -81,7 +81,9 @@ export function EventProductSlideBuilder({
       .then(setSlides)
       .catch((caught: unknown) =>
         setError(
-          caught instanceof Error ? caught.message : "Lineup could not load",
+          caught instanceof Error
+            ? caught.message
+            : "Unable to load the lineup.",
         ),
       );
   }, [subEventId]);
@@ -193,7 +195,7 @@ export function EventProductSlideBuilder({
       setError(
         caught instanceof Error
           ? caught.message
-          : "Product slide could not save",
+          : "Unable to save the product slide.",
       );
     } finally {
       setBusy(false);
@@ -213,7 +215,9 @@ export function EventProductSlideBuilder({
       setMessage("Presentation order updated.");
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Lineup could not reorder",
+        caught instanceof Error
+          ? caught.message
+          : "Unable to reorder the lineup.",
       );
     } finally {
       setBusy(false);
@@ -246,7 +250,9 @@ export function EventProductSlideBuilder({
       setMessage("Slide removed.");
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Slide could not be removed",
+        caught instanceof Error
+          ? caught.message
+          : "Unable to remove the slide.",
       );
     } finally {
       setBusy(false);
@@ -266,7 +272,9 @@ export function EventProductSlideBuilder({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="brand-eyebrow">020B · Live buying</p>
-          <h3 className="text-xl font-bold">Product lineup & slide builder</h3>
+          <h3 className="text-xl font-bold">
+            Product lineup and slide builder
+          </h3>
           <p className="text-sm text-slate-600">
             Drag slides or use the position controls. This lineup is the
             presenter’s live order.

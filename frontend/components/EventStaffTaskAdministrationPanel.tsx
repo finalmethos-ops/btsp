@@ -84,7 +84,7 @@ export function EventStaffTaskAdministrationPanel({
           setError(
             caught instanceof Error
               ? caught.message
-              : "Staff tasks could not be loaded",
+              : "Unable to load staff tasks.",
           );
         }),
     [event.id],
@@ -128,7 +128,7 @@ export function EventStaffTaskAdministrationPanel({
       await load();
     } catch (caught) {
       setError(
-        caught instanceof Error ? caught.message : "Task could not be saved",
+        caught instanceof Error ? caught.message : "Unable to save the task.",
       );
     } finally {
       setBusy(false);
@@ -155,9 +155,7 @@ export function EventStaffTaskAdministrationPanel({
       await load();
     } catch (caught) {
       setError(
-        caught instanceof Error
-          ? caught.message
-          : "Task could not be cancelled",
+        caught instanceof Error ? caught.message : "Unable to cancel the task.",
       );
     } finally {
       setBusy(false);
@@ -180,7 +178,7 @@ export function EventStaffTaskAdministrationPanel({
       setError(
         caught instanceof Error
           ? caught.message
-          : "Task evidence could not be downloaded",
+          : "Unable to download task evidence.",
       );
     }
   }
@@ -199,7 +197,7 @@ export function EventStaffTaskAdministrationPanel({
       setError(
         caught instanceof Error
           ? caught.message
-          : "Staff task report could not be exported",
+          : "Unable to export the staff task report.",
       );
     } finally {
       setBusy(false);
