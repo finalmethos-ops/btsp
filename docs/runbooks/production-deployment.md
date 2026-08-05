@@ -172,6 +172,9 @@ Look for tracebacks, restart loops, authentication failures, migration errors, d
 
 ## Ongoing Operations
 
+- Run only the named production Compose project on the production host. Stop any development
+  project using the same repository; reload-mode source polling and failed development gateway
+  restart loops consume resources without serving production traffic.
 - Monitor PostgreSQL volume capacity and backup success.
 - Monitor snapshot table growth and establish retention/archive policy.
 - Review queued, skipped, and failed notification events.

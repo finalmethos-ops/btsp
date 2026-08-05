@@ -5,6 +5,7 @@ import {
   apiFetch,
   clearToken,
   getStoredToken,
+  storeRefreshToken,
   storeToken,
 } from "./api";
 
@@ -52,6 +53,90 @@ function downloadResponse(contentDisposition: string) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("BTSP API error handling", () => {
+  it("coalesces concurrent identical reads without retaining stale data", async () => {
+    let resolveResponse: ((response: Response) => void) | undefined;
+    const fetchMock = vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveResponse = resolve;
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const first = apiFetch<{ value: number }>("/events/mine");
+    const second = apiFetch<{ value: number }>("/events/mine");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    resolveResponse?.(
+      new Response(JSON.stringify({ value: 1 }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      { value: 1 },
+      { value: 1 },
+    ]);
+
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ value: 2 }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    await expect(apiFetch<{ value: number }>("/events/mine")).resolves.toEqual({
+      value: 2,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("shares one refresh operation across concurrent expired requests", async () => {
+    const localStorage = new MemoryStorage();
+    const sessionStorage = new MemoryStorage();
+    vi.stubGlobal("window", {
+      localStorage,
+      sessionStorage,
+      location: { hostname: "localhost", port: "", protocol: "http:" },
+    });
+    storeToken("expired-access");
+    storeRefreshToken("rotating-refresh");
+
+    let refreshCalls = 0;
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith("/auth/refresh")) {
+        refreshCalls += 1;
+        await Promise.resolve();
+        return new Response(
+          JSON.stringify({
+            access_token: "renewed-access",
+            refresh_token: "renewed-refresh",
+            token_type: "bearer",
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      const callsForUrl = fetchMock.mock.calls.filter(
+        ([candidate]) => String(candidate) === url,
+      ).length;
+      if (callsForUrl === 1) {
+        return new Response(JSON.stringify({ detail: "expired" }), {
+          status: 401,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ url }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      Promise.all([apiFetch("/events/mine"), apiFetch("/event-calendar/mine")]),
+    ).resolves.toHaveLength(2);
+    expect(refreshCalls).toBe(1);
+  });
+
   it("surfaces FastAPI detail messages from JSON responses", async () => {
     vi.stubGlobal(
       "fetch",

@@ -2,6 +2,8 @@ import { getApiBaseUrl } from "./api-origin";
 
 const TOKEN_STORAGE_KEY = "btsp.access_token";
 const REFRESH_TOKEN_STORAGE_KEY = "btsp.refresh_token";
+const inFlightGetRequests = new Map<string, Promise<unknown>>();
+let inFlightRefresh: Promise<LoginResponse> | null = null;
 
 export type LoginResponse = {
   access_token: string;
@@ -312,6 +314,34 @@ export async function apiFetch<T>(
   options: RequestInit = {},
   allowRefresh = true,
 ): Promise<T> {
+  const method = (options.method ?? "GET").toUpperCase();
+  const canCoalesce =
+    method === "GET" &&
+    options.body === undefined &&
+    options.headers === undefined &&
+    options.signal === undefined;
+  if (!canCoalesce) {
+    return apiFetchOnce<T>(path, options, allowRefresh);
+  }
+
+  const requestKey = `${getStoredToken() ?? "anonymous"}:${path}`;
+  const existing = inFlightGetRequests.get(requestKey);
+  if (existing) return existing as Promise<T>;
+
+  const request = apiFetchOnce<T>(path, options, allowRefresh).finally(() => {
+    if (inFlightGetRequests.get(requestKey) === request) {
+      inFlightGetRequests.delete(requestKey);
+    }
+  });
+  inFlightGetRequests.set(requestKey, request);
+  return request;
+}
+
+async function apiFetchOnce<T>(
+  path: string,
+  options: RequestInit,
+  allowRefresh: boolean,
+): Promise<T> {
   const token = getStoredToken();
   const usesFormData =
     typeof FormData !== "undefined" && options.body instanceof FormData;
@@ -340,6 +370,15 @@ export async function apiFetch<T>(
 }
 
 async function refreshAccessToken(): Promise<LoginResponse> {
+  if (inFlightRefresh) return inFlightRefresh;
+  const request = performRefreshAccessToken().finally(() => {
+    if (inFlightRefresh === request) inFlightRefresh = null;
+  });
+  inFlightRefresh = request;
+  return request;
+}
+
+async function performRefreshAccessToken(): Promise<LoginResponse> {
   const refreshToken = getStoredRefreshToken();
   if (!refreshToken) throw new Error("No refresh token available");
   const response = await fetch(`${getApiBaseUrl()}/api/v1/auth/refresh`, {
