@@ -61,3 +61,10 @@ Do not put old or current secret values in this file. Rotation itself requires
 an approved change window: JWT-key rotation ends active sessions, PostgreSQL
 rotation requires synchronized database and application updates, and tunnel or
 R2 credential rotation requires provider-side replacement and verification.
+
+If exact dates for already-deployed credentials are unavailable, do not invent
+them. Set `CURRENT_SECRET_BASELINE_AT` to the timestamp when the current secret
+inventory was verified, retain empty individual `*_ROTATED_AT` fields, and set
+`HISTORICAL_ROTATION_DATES_KNOWN=false`. This establishes a conservative age
+baseline while explicitly preserving the historical evidence gap. Populate an
+individual rotation field only after that credential is actually replaced.

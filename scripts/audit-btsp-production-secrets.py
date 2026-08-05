@@ -317,7 +317,24 @@ def main() -> int:
             if rotation_values.get(key, "")
             and parse_utc_timestamp(rotation_values[key]) is None
         ]
-        if missing_rotation_dates:
+        baseline_at = parse_utc_timestamp(
+            rotation_values.get("CURRENT_SECRET_BASELINE_AT", "")
+        )
+        historical_dates_known = rotation_values.get(
+            "HISTORICAL_ROTATION_DATES_KNOWN", ""
+        ).casefold()
+        managed_unknown_history = (
+            baseline_at is not None
+            and baseline_at <= now + timedelta(minutes=5)
+            and historical_dates_known == "false"
+        )
+        if missing_rotation_dates and managed_unknown_history:
+            add(
+                "rotation.record",
+                "pass",
+                "Current credentials have a managed age baseline; pre-baseline rotation history is explicitly recorded as unknown.",
+            )
+        elif missing_rotation_dates:
             add(
                 "rotation.record",
                 "warning",
@@ -329,6 +346,21 @@ def main() -> int:
                 "rotation.record",
                 "pass",
                 "All required secret rotation dates are recorded.",
+            )
+        if (
+            rotation_values.get("CURRENT_SECRET_BASELINE_AT", "")
+            and baseline_at is None
+        ):
+            add(
+                "rotation.baseline",
+                "warning",
+                "The current-secret baseline is not a timezone-aware ISO 8601 timestamp.",
+            )
+        elif baseline_at is not None and baseline_at > now + timedelta(minutes=5):
+            add(
+                "rotation.baseline",
+                "warning",
+                "The current-secret baseline is unexpectedly in the future.",
             )
         if invalid_rotation_dates:
             add(
