@@ -67,6 +67,7 @@ for header in "${required_headers[@]}"; do
 done
 
 csp="$(sed -n 's/^content-security-policy:[[:space:]]*//Ip' "$temporary_directory/headers.txt" | tr -d '\r')"
+csp="$(sed -E 's/[[:space:]]*;[[:space:]]*/;/g; s/^[[:space:]]+//; s/[[:space:]]+$//' <<<"$csp")"
 required_csp_directives=(
   "default-src 'self'"
   "script-src 'self' 'unsafe-inline'"
@@ -89,7 +90,7 @@ if [[ -z "$csp" ]]; then
   echo "FAIL security header: content-security-policy"
 else
   for directive in "${required_csp_directives[@]}"; do
-    if [[ ";$csp;" != *";$directive;"* && "$csp" != "$directive;"* ]]; then
+    if [[ ";$csp;" != *";$directive;"* ]]; then
       failures+=("content-security-policy is missing directive: $directive")
       echo "FAIL CSP directive: $directive"
     fi
