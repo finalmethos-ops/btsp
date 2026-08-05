@@ -4,16 +4,16 @@
 
 | Area | Limitation | Operational treatment |
 |---|---|---|
-| Email | Events queue, but no production email worker is included | Keep email disabled unless a supported worker is deployed; monitor queued events |
-| Webhooks | Adapter is a stub and disabled by default | Leave `notification.webhook_enabled` false |
-| Authentication | JWTs use browser local storage and there are no refresh tokens | Use HTTPS, short expirations, restricted origins, and controlled workstations |
-| Identity lifecycle | No SSO, password reset, or account lockout | Use administrator-managed accounts and local access procedures |
-| Bootstrap | Endpoint remains deployed after first use | Rotate `BOOTSTRAP_ADMIN_TOKEN` and restrict network access |
+| Email | SMTP delivery is synchronous and production SMTP is not configured | Keep email disabled until an approved SMTP service is configured; monitor queued events and failed deliveries |
+| Webhooks | HTTPS delivery is implemented but disabled in production and no approved destination is configured | Leave `notification.webhook_enabled` false until destinations and retry/incident procedures are approved |
+| Authentication | Access and refresh tokens use per-tab browser session storage rather than HttpOnly cookies | Continue enforcing HTTPS, short access-token lifetimes, refresh-session revocation, a restrictive CSP, explicit origins, and reviewed frontend dependencies |
+| Identity lifecycle | Password reset, login throttling, and timed account lockout are available, but SSO is not implemented | Use administrator-managed accounts and the audited password-reset flow; evaluate corporate SSO before broader external rollout |
+| Bootstrap | Endpoint remains deployed after first use, but refuses provisioning once a system administrator exists | Keep the rotated `BOOTSTRAP_ADMIN_TOKEN` protected and retain the production network restrictions |
 | Registry | Workflow registrations are code-owned | Deliver additions through reviewed release packages |
-| Backups | No bundled scheduler or off-host target | Configure operator-owned encrypted, monitored backups |
-| Observability | Application logs are container stdout/stderr without centralized aggregation | Collect Docker logs with the site's approved logging platform |
+| Backups | Encrypted scheduled backups and verified Cloudflare R2 copies are configured on the current production host, but recovery still depends on that host's operator-owned task and credentials | Monitor the scheduled task, R2 verification, archive age, and periodic disposable restore results |
+| Observability | A scheduled production watchdog, bounded local event log, container log rotation, and optional alert webhook are available; centralized log aggregation is not configured | Keep the watchdog task healthy and connect its webhook and Docker logs to the site's approved monitoring platform when available |
 | Compose modes | Base Compose runs development servers and bind mounts | Production must include `docker-compose.production.yml` |
-| Secrets | Compose consumes a local `.env` file | Protect host permissions; never commit `.env`; prefer a secret manager when available |
+| Secrets | Compose consumes protected local environment and runtime-secret files | Preserve the audited Windows ACLs and rotation ledger; never commit secret files; prefer a managed secret store when available |
 
 ## Accepted Design Constraints
 
