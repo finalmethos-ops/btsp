@@ -56,7 +56,6 @@ required_headers=(
   'x-frame-options: DENY'
   'referrer-policy: same-origin'
   'permissions-policy: camera=\(\), microphone=\(\), geolocation=\(\)'
-  'content-security-policy: frame-ancestors '\''none'\''; base-uri '\''self'\''; object-src '\''none'\'''
 )
 for header in "${required_headers[@]}"; do
   header_name="${header%%:*}"
@@ -66,6 +65,36 @@ for header in "${required_headers[@]}"; do
     echo "FAIL security header: $header_name"
   fi
 done
+
+csp="$(sed -n 's/^content-security-policy:[[:space:]]*//Ip' "$temporary_directory/headers.txt" | tr -d '\r')"
+required_csp_directives=(
+  "default-src 'self'"
+  "script-src 'self' 'unsafe-inline'"
+  "style-src 'self' 'unsafe-inline'"
+  "img-src 'self' data: blob:"
+  "font-src 'self' data:"
+  "connect-src 'self' wss:"
+  "frame-src 'self' blob:"
+  "worker-src 'self' blob:"
+  "media-src 'self' blob:"
+  "manifest-src 'self'"
+  "form-action 'self'"
+  "frame-ancestors 'none'"
+  "base-uri 'self'"
+  "object-src 'none'"
+  "upgrade-insecure-requests"
+)
+if [[ -z "$csp" ]]; then
+  failures+=("required security header missing or incorrect: content-security-policy")
+  echo "FAIL security header: content-security-policy"
+else
+  for directive in "${required_csp_directives[@]}"; do
+    if [[ ";$csp;" != *";$directive;"* && "$csp" != "$directive;"* ]]; then
+      failures+=("content-security-policy is missing directive: $directive")
+      echo "FAIL CSP directive: $directive"
+    fi
+  done
+fi
 
 if [[ "$require_cloudflare" == true ]]; then
   if ! grep -Eiq '^server:[[:space:]]*cloudflare[[:space:]]*$' "$temporary_directory/headers.txt"; then

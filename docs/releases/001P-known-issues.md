@@ -6,7 +6,7 @@
 |---|---|---|
 | Email | SMTP delivery is synchronous and production SMTP is not configured | Keep email disabled until an approved SMTP service is configured; monitor queued events and failed deliveries |
 | Webhooks | HTTPS delivery is implemented but disabled in production and no approved destination is configured | Leave `notification.webhook_enabled` false until destinations and retry/incident procedures are approved |
-| Authentication | Access and refresh tokens use per-tab browser session storage rather than HttpOnly cookies | Continue enforcing HTTPS, short access-token lifetimes, refresh-session revocation, a restrictive CSP, explicit origins, and reviewed frontend dependencies |
+| Authentication | Access and refresh tokens use per-tab browser session storage rather than HttpOnly cookies | Continue enforcing HTTPS, short access-token lifetimes, refresh-session revocation, the restrictive same-origin CSP, explicit origins, and reviewed frontend dependencies; preserve independent standard/event tabs in any future cookie design |
 | Identity lifecycle | Password reset, login throttling, and timed account lockout are available, but SSO is not implemented | Use administrator-managed accounts and the audited password-reset flow; evaluate corporate SSO before broader external rollout |
 | Registry | Workflow registrations are code-owned | Deliver additions through reviewed release packages |
 | Backups | Encrypted scheduled backups and verified Cloudflare R2 copies are configured on the current production host, but recovery still depends on that host's operator-owned task and credentials | Monitor the scheduled task, R2 verification, archive age, and periodic disposable restore results |
