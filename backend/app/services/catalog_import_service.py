@@ -15,6 +15,7 @@ from app.models.catalog import (
     VendorMOQRule,
 )
 from app.schemas.event_snapshot import EventSnapshotCreate
+from app.services.catalog_product_identity_service import allocate_product_code
 from app.services.snapshot_service import append_snapshot
 
 MAX_CATALOG_BYTES = 10 * 1024 * 1024
@@ -158,7 +159,7 @@ def _parse(content: bytes) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
             {"vendor_code": code, "name": name, "is_active": _boolean(row.get("is_active"))}
         )
     parsed_products: list[dict[str, Any]] = []
-    product_codes: set[str] = set()
+    product_identities: set[tuple[str, str]] = set()
     for number, row in enumerate(products, start=2):
         code = _text(row.get("model_number"))
         vendor_code = _text(row.get("vendor_code"))
@@ -169,14 +170,16 @@ def _parse(content: bytes) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
             )
         if len(code) > 64:
             raise CatalogImportError(f"Products row {number}: model_number exceeds 64 characters")
-        if code in product_codes:
-            raise CatalogImportError(f"Products row {number}: duplicate model_number {code}")
+        identity = (vendor_code, code)
+        if identity in product_identities:
+            raise CatalogImportError(
+                f"Products row {number}: duplicate model_number {code} for vendor {vendor_code}"
+            )
         if vendor_code not in vendor_codes:
             raise CatalogImportError(f"Products row {number}: unknown vendor_code {vendor_code}")
-        product_codes.add(code)
+        product_identities.add(identity)
         parsed_products.append(
             {
-                "product_code": code,
                 "vendor_code": vendor_code,
                 "name": name,
                 "model_number": code,
@@ -230,7 +233,10 @@ def import_catalog(db: Session, filename: str, content: bytes, actor: str) -> Ca
     db.flush()
     for values in products:
         item = db.scalar(
-            select(CatalogProduct).where(CatalogProduct.product_code == values["product_code"])
+            select(CatalogProduct).where(
+                CatalogProduct.vendor_code == values["vendor_code"],
+                CatalogProduct.model_number == values["model_number"],
+            )
         )
         if item is None:
             active_moqs = list(
@@ -249,7 +255,13 @@ def import_catalog(db: Session, filename: str, content: bytes, actor: str) -> Ca
                     None,
                 )
             )
-            item = CatalogProduct(**values, source_file=filename)
+            item = CatalogProduct(
+                **values,
+                product_code=allocate_product_code(
+                    db, values["vendor_code"], values["model_number"]
+                ),
+                source_file=filename,
+            )
             item.moq_rule_id = default_moq
             db.add(item)
             db.flush()

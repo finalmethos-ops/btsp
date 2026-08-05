@@ -175,6 +175,44 @@ def test_catalog_excel_import_is_idempotent_and_updates_current_price(db: Sessio
     assert costs[1].effective_to is None
 
 
+def test_catalog_import_allows_the_same_model_number_for_different_vendors(
+    db: Session,
+) -> None:
+    workbook = Workbook()
+    vendors = workbook.active
+    vendors.title = "Vendors"
+    vendors.append(["vendor_code", "name", "is_active"])
+    vendors.append(["V-ONE", "Vendor One", True])
+    vendors.append(["V-TWO", "Vendor Two", True])
+    products = workbook.create_sheet("Products")
+    products.append(
+        [
+            "model_number",
+            "vendor_code",
+            "name",
+            "department",
+            "product_category_code",
+            "unit_price",
+        ]
+    )
+    products.append(["SHARED-100", "V-ONE", "Vendor One Product", "APPL MISC", "MISC", 10])
+    products.append(["SHARED-100", "V-TWO", "Vendor Two Product", "APPL MISC", "MISC", 20])
+    stream = BytesIO()
+    workbook.save(stream)
+
+    import_catalog(db, "shared-models.xlsx", stream.getvalue(), "admin@example.com")
+
+    matches = list(
+        db.scalars(
+            select(CatalogProduct)
+            .where(CatalogProduct.model_number == "SHARED-100")
+            .order_by(CatalogProduct.vendor_code)
+        ).all()
+    )
+    assert [item.vendor_code for item in matches] == ["V-ONE", "V-TWO"]
+    assert len({item.product_code for item in matches}) == 2
+
+
 def test_delivered_po_moves_between_purchasing_and_reconciliation_queues(
     db: Session,
 ) -> None:

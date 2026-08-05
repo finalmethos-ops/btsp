@@ -1,5 +1,4 @@
 import csv
-import re
 from datetime import UTC, datetime
 from decimal import Decimal
 from io import StringIO
@@ -29,6 +28,7 @@ from app.schemas.event_order_review import (
     EventOrderReviewSummary,
     EventOrderVariantLine,
 )
+from app.services.catalog_product_identity_service import allocate_product_code
 from app.services.event_access_service import event_operations_are_locked
 from app.services.spreadsheet_security import spreadsheet_safe_row
 
@@ -103,25 +103,14 @@ def _release_product(
 ) -> CatalogProduct:
     product = db.scalar(
         select(CatalogProduct).where(
+            CatalogProduct.vendor_code == slide.vendor_code,
             CatalogProduct.model_number == model_number,
         )
     )
     if product:
-        if product.vendor_code != slide.vendor_code:
-            raise EventOrderReviewError(
-                f"Model {model_number} already belongs to vendor {product.vendor_code}"
-            )
         return product
-    stem = re.sub(r"[^A-Z0-9]+", "-", model_number.upper()).strip("-") or "MODEL"
-    base = f"EVT-{stem}"[:58]
-    product_code = base
-    sequence = 2
-    while db.scalar(select(CatalogProduct.id).where(CatalogProduct.product_code == product_code)):
-        suffix = f"-{sequence}"
-        product_code = f"{base[:64-len(suffix)]}{suffix}"
-        sequence += 1
     product = CatalogProduct(
-        product_code=product_code,
+        product_code=allocate_product_code(db, slide.vendor_code, model_number),
         model_number=model_number,
         vendor_code=slide.vendor_code,
         name=product_name,

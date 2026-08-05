@@ -5,7 +5,7 @@ from typing import Any
 
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill
-from sqlalchemy import MetaData, Table, case, inspect, or_, select, text, update
+from sqlalchemy import case, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -23,6 +23,7 @@ from app.services.catalog_import_service import (
     _currency,
     _text,
 )
+from app.services.catalog_product_identity_service import allocate_product_code
 from app.services.model_category_service import ModelCategoryError, validate_model_category
 from app.services.snapshot_service import append_snapshot
 from app.services.vendor_moq_service import sole_active_rule
@@ -183,7 +184,7 @@ def update_vendor_model(
     if product is None:
         return None
     values = payload.model_dump(exclude_unset=True)
-    previous_product_code = product.product_code
+    previous_model_number = product.model_number or product.product_code
     new_model_number = values.pop("model_number", None)
     if new_model_number is not None:
         new_model_number = _text(new_model_number)
@@ -191,7 +192,8 @@ def update_vendor_model(
             raise VendorModelError("Model number is required")
         conflict = db.scalar(
             select(CatalogProduct.id).where(
-                CatalogProduct.product_code == new_model_number,
+                CatalogProduct.vendor_code == vendor_code,
+                CatalogProduct.model_number == new_model_number,
                 CatalogProduct.id != product.id,
             )
         )
@@ -224,10 +226,12 @@ def update_vendor_model(
         values["currency"] = values["currency"].upper()
     previous_price = product.unit_price
     previous_currency = product.currency
-    identifier_changed = new_model_number is not None and new_model_number != previous_product_code
+    identifier_changed = new_model_number is not None and new_model_number != previous_model_number
     for field, value in values.items():
         if field != "model_number":
             setattr(product, field, value)
+    if new_model_number is not None:
+        product.model_number = new_model_number
     cost_changed = product.unit_price != previous_price or product.currency != previous_currency
     if cost_changed:
         _record_cost(
@@ -239,39 +243,6 @@ def update_vendor_model(
             previous_currency,
         )
     db.flush()
-    if identifier_changed:
-        db.execute(
-            text(
-                "UPDATE catalog_products "
-                "SET product_code = :new_code, model_number = :new_code "
-                "WHERE id = :product_id AND vendor_code = :vendor_code"
-            ),
-            {
-                "new_code": new_model_number,
-                "product_id": product.id,
-                "vendor_code": vendor_code,
-            },
-        )
-        connection = db.connection()
-        inspector = inspect(connection)
-        metadata = MetaData()
-        for table_name in (
-            "catalog_product_cost_history",
-            "purchase_request_line_items",
-            "purchase_order_lines",
-            "purchase_receipt_lines",
-            "purchase_backorders",
-            "vendor_advance_ship_notice_lines",
-            "vendor_invoice_lines",
-        ):
-            if inspector.has_table(table_name):
-                related_table = Table(table_name, metadata, autoload_with=connection)
-                db.execute(
-                    update(related_table)
-                    .where(related_table.c.product_code == previous_product_code)
-                    .values(product_code=new_model_number)
-                )
-        db.expire(product)
     try:
         db.commit()
     except IntegrityError as exc:
@@ -288,7 +259,7 @@ def update_vendor_model(
             payload={
                 "vendor_code": vendor_code,
                 "fields": sorted(values),
-                "previous_model_number": previous_product_code if identifier_changed else None,
+                "previous_model_number": previous_model_number if identifier_changed else None,
             },
         ),
     )
@@ -444,7 +415,6 @@ def _parsed_values(row: dict[str, Any], vendor: CatalogVendor, number: int) -> d
         raise VendorModelError(f"Products row {number}: Vendor does not match your account")
     try:
         return {
-            "product_code": model_number,
             "vendor_code": vendor.vendor_code,
             "name": name,
             "model_number": model_number,
@@ -525,22 +495,27 @@ def import_vendor_models(
             raise VendorModelError(f"Unknown MOQ code {moq_code}")
         else:
             values["moq_rule_id"] = rules[moq_code]
-    codes = [item["product_code"] for item in parsed]
-    if len(codes) != len(set(codes)):
+    model_numbers = [item["model_number"] for item in parsed]
+    if len(model_numbers) != len(set(model_numbers)):
         raise VendorModelError("Products sheet contains duplicate model_number values")
     existing = {
-        product.product_code: product
+        product.model_number: product
         for product in db.scalars(
-            select(CatalogProduct).where(CatalogProduct.product_code.in_(codes))
+            select(CatalogProduct).where(
+                CatalogProduct.vendor_code == vendor_code,
+                CatalogProduct.model_number.in_(model_numbers),
+            )
         ).all()
     }
     created = updated = unchanged = 0
     for values in parsed:
-        product = existing.get(values["product_code"])
-        if product is not None and product.vendor_code != vendor_code:
-            raise VendorModelError(f"Model number {product.product_code} belongs to another vendor")
+        product = existing.get(values["model_number"])
         if product is None:
-            product = CatalogProduct(**values, source_file=filename)
+            product = CatalogProduct(
+                **values,
+                product_code=allocate_product_code(db, vendor_code, values["model_number"]),
+                source_file=filename,
+            )
             db.add(product)
             db.flush()
             effective_date = values.get("cost_effective_start_date")

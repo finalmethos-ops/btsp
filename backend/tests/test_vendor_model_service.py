@@ -219,7 +219,7 @@ def test_cost_edit_creates_history_without_archiving_other_fields() -> None:
         assert db.scalar(select(func.count(CatalogProductCostHistory.id))) == 2
 
 
-def test_owning_vendor_can_replace_model_number_and_history_follows() -> None:
+def test_owning_vendor_can_replace_model_number_without_changing_internal_key() -> None:
     with _database() as db:
         _seed(db)
         update_vendor_model(
@@ -239,37 +239,68 @@ def test_owning_vendor_can_replace_model_number_and_history_follows() -> None:
         )
 
         assert updated is not None
-        assert updated.product_code == "ONE-REPLACED"
+        assert updated.product_code == "ONE-1"
         assert updated.model_number == "ONE-REPLACED"
-        assert (
-            db.scalar(select(CatalogProduct).where(CatalogProduct.product_code == "ONE-1")) is None
-        )
-        assert set(db.scalars(select(CatalogProductCostHistory.product_code))) == {"ONE-REPLACED"}
+        assert set(db.scalars(select(CatalogProductCostHistory.product_code))) == {"ONE-1"}
 
 
-def test_vendor_cannot_replace_model_number_with_an_existing_identifier() -> None:
+def test_different_vendors_can_use_the_same_model_number() -> None:
     with _database() as db:
         _seed(db)
+
+        updated = update_vendor_model(
+            db,
+            "V-ONE",
+            "ONE-1",
+            VendorModelUpdate(model_number="TWO-1"),
+            "vendor@example.com",
+        )
+
+        assert updated is not None
+        matches = list(
+            db.scalars(
+                select(CatalogProduct)
+                .where(CatalogProduct.model_number == "TWO-1")
+                .order_by(CatalogProduct.vendor_code)
+            ).all()
+        )
+        assert [(item.vendor_code, item.product_code) for item in matches] == [
+            ("V-ONE", "ONE-1"),
+            ("V-TWO", "TWO-1"),
+        ]
+
+
+def test_vendor_cannot_duplicate_a_model_number_inside_its_own_catalog() -> None:
+    with _database() as db:
+        _seed(db)
+        db.add(
+            CatalogProduct(
+                product_code="ONE-2",
+                model_number="ONE-2",
+                vendor_code="V-ONE",
+                name="Second model",
+                unit_price=Decimal("15.00"),
+                currency="USD",
+                minimum_order_quantity=1,
+                is_available=True,
+                is_active=True,
+                source_file="seed.xlsx",
+            )
+        )
+        db.commit()
 
         try:
             update_vendor_model(
                 db,
                 "V-ONE",
                 "ONE-1",
-                VendorModelUpdate(model_number="TWO-1"),
+                VendorModelUpdate(model_number="ONE-2"),
                 "vendor@example.com",
             )
         except VendorModelError as exc:
             assert str(exc) == "Model number already exists"
         else:
-            raise AssertionError("Expected duplicate model number to be rejected")
-
-        assert (
-            db.scalar(
-                select(CatalogProduct.vendor_code).where(CatalogProduct.product_code == "ONE-1")
-            )
-            == "V-ONE"
-        )
+            raise AssertionError("Expected same-vendor duplicate model number to be rejected")
 
 
 def test_excel_export_and_import_only_adds_or_changes_rows() -> None:
@@ -337,6 +368,52 @@ def test_excel_export_and_import_only_adds_or_changes_rows() -> None:
         assert created is not None
         assert created.model_number == "M-2"
         assert db.scalar(select(func.count(CatalogProductCostHistory.id))) == 3
+
+
+def test_vendor_import_allows_a_model_number_owned_by_another_vendor() -> None:
+    with _database() as db:
+        _seed(db)
+        incoming = Workbook()
+        sheet = incoming.active
+        sheet.title = "Products"
+        sheet.append(MODEL_COLUMNS)
+        sheet.append(
+            [
+                "ignored-external-code",
+                "V-ONE",
+                "Vendor One version",
+                "TWO-1",
+                "APPL MISC",
+                "MISC",
+                None,
+                19.5,
+                "USD",
+                "STANDARD",
+                True,
+                True,
+            ]
+        )
+        content = BytesIO()
+        incoming.save(content)
+
+        result = import_vendor_models(
+            db,
+            "V-ONE",
+            "models.xlsx",
+            content.getvalue(),
+            "vendor@example.com",
+        )
+
+        assert result == (1, 0, 0, 1)
+        matches = list(
+            db.scalars(
+                select(CatalogProduct)
+                .where(CatalogProduct.model_number == "TWO-1")
+                .order_by(CatalogProduct.vendor_code)
+            ).all()
+        )
+        assert [item.vendor_code for item in matches] == ["V-ONE", "V-TWO"]
+        assert len({item.product_code for item in matches}) == 2
 
 
 def test_vendor_model_import_accepts_vendor_product_export_layout() -> None:

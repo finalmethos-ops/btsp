@@ -79,12 +79,19 @@ class VendorStateExclusion(Base):
 
 class CatalogProduct(Base):
     __tablename__ = "catalog_products"
+    __table_args__ = (
+        UniqueConstraint(
+            "vendor_code",
+            "model_number",
+            name="uq_catalog_products_vendor_model_number",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     product_code: Mapped[str] = mapped_column(String(64), unique=True)
     vendor_code: Mapped[str] = mapped_column(ForeignKey("catalog_vendors.vendor_code"), index=True)
     name: Mapped[str] = mapped_column(String(255))
-    model_number: Mapped[str | None] = mapped_column(String(128), nullable=True, unique=True)
+    model_number: Mapped[str | None] = mapped_column(String(128), nullable=True)
     department: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     product_category_code: Mapped[str | None] = mapped_column(
         String(128), nullable=True, index=True
