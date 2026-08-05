@@ -10,7 +10,7 @@ from app.auth.security import hash_password
 from app.core.config import settings
 from app.db.session import Base, get_db
 from app.main import app
-from app.models.identity import Permission, Role, User
+from app.models.identity import AuthSession, Permission, Role, User
 from app.schemas.event_management import EventMembershipCreate, EventWrite
 from app.services.event_management_service import add_membership, create_event
 
@@ -142,11 +142,18 @@ def test_login_context_separates_event_only_and_standard_accounts(
             )
             assert event_only_me.json()["login_context"] == "event"
             original_refresh_token = event_only_event.json()["refresh_token"]
+            original_session = db.query(AuthSession).filter(AuthSession.revoked_at.is_(None)).one()
+            original_session_expiry = original_session.expires_at
             rotated_event_token = client.post(
                 "/api/v1/auth/refresh",
                 json={"refresh_token": original_refresh_token},
             )
             assert rotated_event_token.status_code == 200
+            replacement_session = (
+                db.query(AuthSession).filter(AuthSession.revoked_at.is_(None)).one()
+            )
+            assert replacement_session.id != original_session.id
+            assert replacement_session.expires_at == original_session_expiry
             replayed_refresh_token = client.post(
                 "/api/v1/auth/refresh",
                 json={"refresh_token": original_refresh_token},

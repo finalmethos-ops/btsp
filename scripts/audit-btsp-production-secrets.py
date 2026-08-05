@@ -201,7 +201,12 @@ def main() -> int:
     else:
         add("environment.mode", "pass", "Production mode is explicitly enabled.")
 
-    if environment.get("BOOTSTRAP_ENABLED", "").casefold() not in {"false", "0", "no", "off"}:
+    if environment.get("BOOTSTRAP_ENABLED", "").casefold() not in {
+        "false",
+        "0",
+        "no",
+        "off",
+    }:
         add(
             "bootstrap.disabled",
             "fail",
@@ -229,6 +234,23 @@ def main() -> int:
             "authentication.access_token_lifetime",
             "pass",
             f"Production access-token lifetime is bounded at {access_token_minutes} minutes.",
+        )
+
+    try:
+        refresh_token_days = int(environment.get("REFRESH_TOKEN_EXPIRE_DAYS", ""))
+    except ValueError:
+        refresh_token_days = 0
+    if not 1 <= refresh_token_days <= 14:
+        add(
+            "authentication.refresh_token_lifetime",
+            "fail",
+            "Production refresh-token lifetime must be between 1 and 14 days.",
+        )
+    else:
+        add(
+            "authentication.refresh_token_lifetime",
+            "pass",
+            f"Production refresh-token lifetime is bounded at {refresh_token_days} days.",
         )
 
     origins = [

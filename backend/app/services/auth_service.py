@@ -53,6 +53,7 @@ def create_session(
     user: User,
     login_context: str,
     active_vendor_code: str | None = None,
+    expires_at: datetime | None = None,
 ) -> tuple[AuthSession, str]:
     raw_refresh_token = token_urlsafe(48)
     session = AuthSession(
@@ -61,7 +62,9 @@ def create_session(
         refresh_token_hash=_hash_token(raw_refresh_token),
         login_context=login_context,
         active_vendor_code=active_vendor_code,
-        expires_at=datetime.now(UTC) + timedelta(days=settings.refresh_token_expire_days),
+        expires_at=expires_at
+        if expires_at is not None
+        else datetime.now(UTC) + timedelta(days=settings.refresh_token_expire_days),
     )
     db.add(session)
     db.commit()

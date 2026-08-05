@@ -11,6 +11,7 @@ def _production_settings(**overrides: str) -> Settings:
         "SECRET_KEY": "production-secret-key-with-32-bytes",
         "BOOTSTRAP_ADMIN_TOKEN": "production-bootstrap-token",
         "ACCESS_TOKEN_EXPIRE_MINUTES": "15",
+        "REFRESH_TOKEN_EXPIRE_DAYS": "14",
         "CORS_ORIGINS": "https://btsp.example.com",
     }
     values.update(overrides)
@@ -32,6 +33,10 @@ def test_production_settings_accept_explicit_safe_values() -> None:
         (
             {"ACCESS_TOKEN_EXPIRE_MINUTES": "31"},
             "ACCESS_TOKEN_EXPIRE_MINUTES must not exceed 30",
+        ),
+        (
+            {"REFRESH_TOKEN_EXPIRE_DAYS": "15"},
+            "REFRESH_TOKEN_EXPIRE_DAYS must not exceed 14",
         ),
         (
             {"BOOTSTRAP_ADMIN_TOKEN": "change-me-before-bootstrap"},

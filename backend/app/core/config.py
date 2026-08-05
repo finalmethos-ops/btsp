@@ -100,6 +100,8 @@ class Settings(BaseSettings):
                 raise ValueError("SECRET_KEY must be at least 32 bytes in production")
             if self.access_token_expire_minutes > 30:
                 raise ValueError("ACCESS_TOKEN_EXPIRE_MINUTES must not exceed 30 in production")
+            if self.refresh_token_expire_days > 14:
+                raise ValueError("REFRESH_TOKEN_EXPIRE_DAYS must not exceed 14 in production")
             if self.bootstrap_admin_token == "change-me-before-bootstrap":  # nosec B105
                 raise ValueError(
                     "BOOTSTRAP_ADMIN_TOKEN must be changed before production deployment"

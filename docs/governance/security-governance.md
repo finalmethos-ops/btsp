@@ -68,21 +68,24 @@ Rotations require a change record, coordinated container recreation, health chec
 - Initial administrator/user passwords are temporary and changed before normal use.
 - Use organizational minimum length and compromised-password controls; until centrally enforced, administrators apply policy operationally.
 - Passwords are hashed with salted PBKDF2; plaintext storage or transmission outside TLS is prohibited.
-- Password reset and lockout are known future capabilities and require compensating operational procedures.
+- Password reset, login throttling, and timed account lockout are implemented. Administrators
+  should monitor correlated authentication audit events and use the audited reset workflow;
+  corporate SSO remains a future integration.
 
 ## Session Expiration Policy
 
 - `ACCESS_TOKEN_EXPIRE_MINUTES` is 15 minutes and never exceeds the enforced 30-minute production maximum.
+- Refresh tokens rotate after use, preserve the original session deadline, and never extend an
+  authenticated session beyond the enforced 14-day production maximum.
 - Production uses HTTPS only.
 - Secret-key rotation invalidates outstanding JWTs and requires a communications plan.
 - Shared/public workstations are not approved for administrative sessions.
-- Refresh tokens are not currently supported.
 
 ## Production Security Checklist
 
 - [ ] Default `SECRET_KEY` removed.
 - [ ] Default `BOOTSTRAP_ADMIN_TOKEN` removed and post-bootstrap token rotated.
-- [ ] Bootstrap endpoint requires the secret header and is network-restricted.
+- [ ] Bootstrap is permanently disabled after initial provisioning.
 - [ ] Initial administrator password changed.
 - [ ] CORS restricted to approved HTTPS origins.
 - [ ] PostgreSQL password changed from local default.

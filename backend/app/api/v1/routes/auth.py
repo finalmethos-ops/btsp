@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -120,9 +122,20 @@ def _event_booth_code_for_vendor(
 
 
 def _token_response(
-    db: Session, user: User, login_context: str, active_vendor_code: str | None = None
+    db: Session,
+    user: User,
+    login_context: str,
+    active_vendor_code: str | None = None,
+    *,
+    session_expires_at: datetime | None = None,
 ) -> TokenResponse:
-    session, refresh_token = create_session(db, user, login_context, active_vendor_code)
+    session, refresh_token = create_session(
+        db,
+        user,
+        login_context,
+        active_vendor_code,
+        expires_at=session_expires_at,
+    )
     return TokenResponse(
         access_token=issue_access_token(
             user,
@@ -246,7 +259,13 @@ def refresh(payload: RefreshTokenRequest, db: Session = Depends(get_db)) -> Toke
     # successful refresh. The replacement session preserves the login context
     # and active vendor selection while the submitted token is revoked.
     revoke_session(db, payload.refresh_token)
-    return _token_response(db, user, session.login_context, session.active_vendor_code)
+    return _token_response(
+        db,
+        user,
+        session.login_context,
+        session.active_vendor_code,
+        session_expires_at=session.expires_at,
+    )
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
