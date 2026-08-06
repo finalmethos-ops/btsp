@@ -12,6 +12,31 @@ import { eventThemeStyle } from "@/components/EventBrandingProvider";
 
 const IMAGE_FIT_STORAGE_KEY = "btsp.presentation.image-fit";
 
+const formatMoney = (value: string | number) =>
+  Number(value).toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+const savingsDetails = (
+  standardCost: string | null | undefined,
+  eventCost: string | null | undefined,
+) => {
+  if (!standardCost || eventCost == null) return null;
+  const standard = Number(standardCost);
+  const event = Number(eventCost);
+  if (
+    !Number.isFinite(standard) ||
+    !Number.isFinite(event) ||
+    standard <= event
+  )
+    return null;
+  return {
+    amount: standard - event,
+    percent: Math.round(((standard - event) / standard) * 100),
+  };
+};
+
 export function EventPresentationDisplay({
   projectorToken,
   subEventId,
@@ -44,6 +69,10 @@ export function EventPresentationDisplay({
     offerLimit == null
       ? null
       : Math.max(offerLimit - (presentation?.total_units_ordered ?? 0), 0);
+  const primarySavings = savingsDetails(
+    slide?.standard_cost,
+    slide?.event_unit_cost,
+  );
 
   useEffect(() => {
     const apply = () => {
@@ -218,7 +247,7 @@ export function EventPresentationDisplay({
                   <span className="text-slate-400">
                     Category:{" "}
                     <strong className="text-blue-300">
-                      {slide.category ?? "General merchandise"}
+                      {slide.category || "Category not set"}
                     </strong>
                   </span>
                 </div>
@@ -234,28 +263,61 @@ export function EventPresentationDisplay({
                   </p>
                 ) : null}
                 <div className="mt-6">
+                  {slide.standard_cost ? (
+                    <p className="text-base font-bold text-slate-300">
+                      Standard Cost{" "}
+                      <span className="text-xl line-through">
+                        ${formatMoney(slide.standard_cost)}
+                      </span>
+                    </p>
+                  ) : null}
                   <p className="text-sm font-black uppercase tracking-widest text-red-400">
                     Event price
                   </p>
                   <strong className="text-4xl font-black text-red-400 xl:text-5xl">
-                    $
-                    {Number(slide.event_unit_cost).toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
+                    ${formatMoney(slide.event_unit_cost ?? 0)}
                     <small className="ml-2 text-xl">/ EA</small>
                   </strong>
                 </div>
+                {primarySavings ? (
+                  <div className="mt-4 rounded-2xl border-2 border-yellow-300 bg-yellow-300 px-5 py-4 text-slate-950 shadow-[0_0_28px_rgba(253,224,71,0.28)]">
+                    <p className="text-sm font-black uppercase tracking-[0.18em]">
+                      Your savings
+                    </p>
+                    <strong className="mt-1 block text-3xl font-black xl:text-4xl">
+                      ${formatMoney(primarySavings.amount)} / EA
+                    </strong>
+                    <span className="text-lg font-black">
+                      {primarySavings.percent}% below Standard Cost
+                    </span>
+                  </div>
+                ) : null}
                 {slide.product_variants.length ? (
-                  <div className="mt-5 flex flex-wrap gap-2">
-                    {slide.product_variants.map((variant) => (
-                      <span
-                        className="rounded-full border border-blue-400/40 bg-blue-950 px-3 py-1 text-sm"
-                        key={variant.model_number}
-                      >
-                        {variant.name} · ${variant.event_unit_cost}
-                      </span>
-                    ))}
+                  <div className="mt-5 grid gap-2 sm:grid-cols-2">
+                    {slide.product_variants.map((variant) => {
+                      const savings = savingsDetails(
+                        variant.standard_cost,
+                        variant.event_unit_cost,
+                      );
+                      return (
+                        <div
+                          className="rounded-xl border border-blue-400/40 bg-blue-950 px-3 py-2 text-sm"
+                          key={variant.model_number}
+                        >
+                          <strong className="block">{variant.name}</strong>
+                          <span className="text-slate-300">
+                            {variant.model_number} · Event $
+                            {formatMoney(variant.event_unit_cost)}
+                          </span>
+                          {savings ? (
+                            <strong className="mt-1 block text-yellow-300">
+                              Save ${formatMoney(savings.amount)} / EA ·{" "}
+                              {savings.percent}%
+                            </strong>
+                          ) : null}
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : null}
               </div>

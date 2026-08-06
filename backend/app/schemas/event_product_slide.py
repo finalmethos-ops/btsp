@@ -14,6 +14,7 @@ class EventProductVariant(BaseModel):
     model_number: str = Field(min_length=1, max_length=64)
     name: str = Field(min_length=1, max_length=255)
     event_unit_cost: Decimal = Field(ge=0, max_digits=14, decimal_places=2)
+    standard_cost: Decimal | None = Field(default=None, ge=0, max_digits=14, decimal_places=2)
     minimum_order_quantity: int = Field(default=1, ge=1)
 
 
@@ -26,6 +27,7 @@ class EventProductSlideWrite(BaseModel):
     model_number: str | None = Field(default=None, min_length=1, max_length=64)
     name: str = Field(min_length=1, max_length=255)
     vendor_code: str | None = Field(default=None, min_length=1, max_length=64)
+    category: str | None = Field(default=None, max_length=128)
     description: str | None = Field(default=None, max_length=10_000)
     specifications: str | None = Field(default=None, max_length=20_000)
     event_unit_cost: Decimal | None = Field(default=None, ge=0, max_digits=14, decimal_places=2)
@@ -68,6 +70,9 @@ class EventProductSlideWrite(BaseModel):
             and self.max_event_units > self.available_inventory
         ):
             raise ValueError("Maximum event units cannot exceed available inventory")
+        variant_models = [variant.model_number.casefold() for variant in self.product_variants]
+        if len(variant_models) != len(set(variant_models)):
+            raise ValueError("Each product on a combined slide must have a unique model number")
         return self
 
 
@@ -79,7 +84,6 @@ class EventProductSlideResponse(EventProductSlideWrite):
     sub_event_id: str
     position: int
     vendor_name: str | None = None
-    category: str | None = None
     has_image: bool = False
     created_by: str
     created_at: datetime

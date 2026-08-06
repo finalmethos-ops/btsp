@@ -1325,6 +1325,7 @@ def test_event_product_lineup_snapshots_catalog_controls_and_reorders() -> None:
                 model_number="MODEL-1",
                 name="Event snapshot name",
                 vendor_code="EXPO",
+                category="Appliances",
                 event_unit_cost=Decimal("89.00"),
                 standard_cost=Decimal("100.00"),
                 available_inventory=500,
@@ -1348,6 +1349,7 @@ def test_event_product_lineup_snapshots_catalog_controls_and_reorders() -> None:
                         "model_number": "SPECIAL-TWIN",
                         "name": "Twin",
                         "event_unit_cost": "50.00",
+                        "standard_cost": "65.00",
                         "minimum_order_quantity": 1,
                     },
                     {
@@ -1370,6 +1372,8 @@ def test_event_product_lineup_snapshots_catalog_controls_and_reorders() -> None:
         assert _order_capacity(first) == 100
         first.available_inventory = 500
         assert first.standard_cost == Decimal("100.00")
+        assert first.category == "Appliances"
+        assert second.product_variants[0].standard_cost == Decimal("65.00")
         reordered = reorder_slides(db, sub_event_id, [second.id, first.id])
         assert reordered is not None
         assert [slide.id for slide in reordered] == [second.id, first.id]

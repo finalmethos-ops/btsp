@@ -145,9 +145,8 @@ def get_presentation(
                 "has_image": current.image is not None,
                 "presenter_notes": None,
                 "vendor_name": vendor_name,
-                "category": (
-                    product.product_category_code or product.department if product else None
-                ),
+                "category": current.category
+                or (product.product_category_code or product.department if product else None),
             }
         )
     total_units = 0

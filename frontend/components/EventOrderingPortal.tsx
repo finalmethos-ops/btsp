@@ -258,6 +258,17 @@ export function EventOrderingPortal({ subEventId }: { subEventId: string }) {
                 <dd className="text-xl font-bold">
                   ${slide.standard_cost ?? "—"}
                 </dd>
+                {slide.standard_cost &&
+                Number(slide.standard_cost) > Number(slide.event_unit_cost) ? (
+                  <dd className="mt-1 font-black text-amber-700">
+                    You save ${" "}
+                    {(
+                      Number(slide.standard_cost) -
+                      Number(slide.event_unit_cost)
+                    ).toFixed(2)}{" "}
+                    per unit
+                  </dd>
+                ) : null}
               </div>
               <div>
                 <dt>MOQ</dt>
@@ -291,6 +302,18 @@ export function EventOrderingPortal({ subEventId }: { subEventId: string }) {
                           {variant.model_number} · ${variant.event_unit_cost} ·
                           MOQ {variant.minimum_order_quantity}
                         </small>
+                        {variant.standard_cost &&
+                        Number(variant.standard_cost) >
+                          Number(variant.event_unit_cost) ? (
+                          <small className="mt-1 block font-bold text-amber-700">
+                            Save ${" "}
+                            {(
+                              Number(variant.standard_cost) -
+                              Number(variant.event_unit_cost)
+                            ).toFixed(2)}{" "}
+                            each
+                          </small>
+                        ) : null}
                       </span>
                       <input
                         className="rounded-lg border p-3"

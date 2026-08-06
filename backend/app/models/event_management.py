@@ -150,6 +150,7 @@ class EventProductSlide(Base):
     vendor_code: Mapped[str | None] = mapped_column(
         ForeignKey("catalog_vendors.vendor_code", ondelete="RESTRICT"), nullable=True, index=True
     )
+    category: Mapped[str | None] = mapped_column(String(128), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     specifications: Mapped[str | None] = mapped_column(Text, nullable=True)
     event_unit_cost: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)

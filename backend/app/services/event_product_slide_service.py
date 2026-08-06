@@ -90,6 +90,7 @@ def _slide_values(payload: EventProductSlideWrite) -> dict:
             catalog_product_code=None,
             model_number=None,
             vendor_code=None,
+            category=None,
             event_unit_cost=None,
             standard_cost=None,
             minimum_order_quantity=1,

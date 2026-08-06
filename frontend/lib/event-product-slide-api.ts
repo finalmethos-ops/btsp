@@ -37,6 +37,7 @@ export type EventProductSlide = {
     model_number: string;
     name: string;
     event_unit_cost: string;
+    standard_cost: string | null;
     minimum_order_quantity: number;
   }>;
   status: "draft" | "ready" | "archived";
@@ -52,7 +53,6 @@ export type EventProductSlideWrite = Omit<
   | "sub_event_id"
   | "position"
   | "vendor_name"
-  | "category"
   | "has_image"
   | "created_by"
   | "created_at"
