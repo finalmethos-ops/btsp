@@ -483,7 +483,7 @@ def import_vendor_models(
             )
         ).all()
     )
-    rules = {rule.code: rule.id for rule in active_rules}
+    rules = {rule.code.casefold(): rule.id for rule in active_rules}
     automatic_rule_id = active_rules[0].id if len(active_rules) == 1 else None
     for values in parsed:
         moq_code = values.pop("moq_code")
@@ -491,10 +491,10 @@ def import_vendor_models(
             values["moq_rule_id"] = None
         elif automatic_rule_id is not None:
             values["moq_rule_id"] = automatic_rule_id
-        elif moq_code not in rules:
+        elif moq_code.casefold() not in rules:
             raise VendorModelError(f"Unknown MOQ code {moq_code}")
         else:
-            values["moq_rule_id"] = rules[moq_code]
+            values["moq_rule_id"] = rules[moq_code.casefold()]
     model_numbers = [item["model_number"] for item in parsed]
     if len(model_numbers) != len(set(model_numbers)):
         raise VendorModelError("Products sheet contains duplicate model_number values")

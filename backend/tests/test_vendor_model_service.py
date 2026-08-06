@@ -370,6 +370,66 @@ def test_excel_export_and_import_only_adds_or_changes_rows() -> None:
         assert db.scalar(select(func.count(CatalogProductCostHistory.id))) == 3
 
 
+def test_vendor_model_import_matches_moq_codes_case_insensitively() -> None:
+    with _database() as db:
+        _seed(db)
+        standard = db.scalar(
+            select(VendorMOQRule).where(
+                VendorMOQRule.vendor_code == "V-ONE",
+                VendorMOQRule.code == "STANDARD",
+            )
+        )
+        assert standard is not None
+        standard.code = "Standard"
+        db.add(
+            VendorMOQRule(
+                vendor_code="V-ONE",
+                code="Special",
+                name="Special MOQ",
+                threshold_type="unit_quantity",
+                threshold_value=5,
+                is_active=True,
+            )
+        )
+        db.commit()
+
+        incoming = Workbook()
+        sheet = incoming.active
+        sheet.title = "Products"
+        sheet.append(MODEL_COLUMNS)
+        sheet.append(
+            [
+                "ignored-external-code",
+                "V-ONE",
+                "New standard model",
+                "CASE-100",
+                "APPL MISC",
+                "MISC",
+                None,
+                25,
+                "USD",
+                "STANDARD",
+                True,
+                True,
+            ]
+        )
+        content = BytesIO()
+        incoming.save(content)
+
+        result = import_vendor_models(
+            db,
+            "V-ONE",
+            "models.xlsx",
+            content.getvalue(),
+            "vendor@example.com",
+        )
+
+        assert result == (1, 0, 0, 1)
+        created = db.scalar(select(CatalogProduct).where(CatalogProduct.model_number == "CASE-100"))
+        assert created is not None
+        assert created.moq_rule_id == standard.id
+
+
 def test_vendor_import_allows_a_model_number_owned_by_another_vendor() -> None:
     with _database() as db:
         _seed(db)
