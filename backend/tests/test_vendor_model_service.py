@@ -310,6 +310,12 @@ def test_excel_export_and_import_only_adds_or_changes_rows() -> None:
         workbook = load_workbook(BytesIO(exported), data_only=True)
         assert workbook["Products"].max_row == 2
         assert workbook["Products"]["A2"].value == "ONE-1"
+        assert workbook["Approved MOQ Codes"].sheet_state == "veryHidden"
+        assert workbook["Approved MOQ Codes"]["A1"].value == "STANDARD"
+        validations = workbook["Products"].data_validations.dataValidation
+        assert len(validations) == 1
+        assert validations[0].formula1 == "=ApprovedMOQCodes"
+        assert "J2:J50001" in str(validations[0].sqref)
 
         incoming = Workbook()
         sheet = incoming.active

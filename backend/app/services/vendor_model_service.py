@@ -5,6 +5,8 @@ from typing import Any
 
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill
+from openpyxl.workbook.defined_name import DefinedName
+from openpyxl.worksheet.datavalidation import DataValidation
 from sqlalchemy import case, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -299,12 +301,42 @@ def export_vendor_models(db: Session, vendor_code: str) -> bytes:
     for cell in sheet[1]:
         cell.font = Font(bold=True, color="FFFFFF")
         cell.fill = PatternFill("solid", fgColor="123A73")
-    rules = {
-        rule.id: rule.code
-        for rule in db.scalars(
-            select(VendorMOQRule).where(VendorMOQRule.vendor_code == vendor_code)
+    vendor_rules = list(
+        db.scalars(
+            select(VendorMOQRule)
+            .where(VendorMOQRule.vendor_code == vendor_code)
+            .order_by(VendorMOQRule.code)
         ).all()
-    }
+    )
+    rules = {rule.id: rule.code for rule in vendor_rules}
+    active_rule_codes = sorted(
+        (rule.code for rule in vendor_rules if rule.is_active), key=str.casefold
+    )
+    if active_rule_codes:
+        approved_values = workbook.create_sheet("Approved MOQ Codes")
+        for row, code in enumerate(active_rule_codes, start=1):
+            approved_values.cell(row=row, column=1, value=code)
+        approved_values.sheet_state = "veryHidden"
+        workbook.defined_names.add(
+            DefinedName(
+                "ApprovedMOQCodes",
+                attr_text=(f"'{approved_values.title}'!$A$1:$A${len(active_rule_codes)}"),
+            )
+        )
+        moq_validation = DataValidation(
+            type="list",
+            formula1="=ApprovedMOQCodes",
+            allow_blank=False,
+            errorStyle="stop",
+            errorTitle="Select an approved MOQ code",
+            error="Choose an MOQ code from the provided dropdown list.",
+            promptTitle="Approved MOQ codes",
+            prompt="Select the MOQ profile that applies to this model.",
+            showErrorMessage=True,
+            showInputMessage=True,
+        )
+        sheet.add_data_validation(moq_validation)
+        moq_validation.add(f"J2:J{MAX_MODEL_ROWS + 1}")
     for product in list_vendor_models(db, vendor_code):
         sheet.append(
             [
