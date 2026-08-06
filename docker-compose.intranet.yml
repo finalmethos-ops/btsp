@@ -11,7 +11,7 @@ services:
 
   backend:
     image: >-
-      ghcr.io/finalmethos-ops/btsp-backend:v1.0.0-rc.35@sha256:1d7ccc8229cbe9afb067f55f70c500d93745d9dbbee83b80780160cf38ca6261
+      ghcr.io/finalmethos-ops/btsp-backend:v1.0.0-rc.36@sha256:4cc97fcaa7b7d35f9a0fdd71a9a2eb88e7bf1d57279afe40c6197b3f4c1cf8d3
     build: !reset null
     pull_policy: always
     env_file: !override
@@ -19,7 +19,7 @@ services:
 
   frontend:
     image: >-
-      ghcr.io/finalmethos-ops/btsp-frontend:v1.0.0-rc.35@sha256:4e1d456216d4df83c08dfc24a9b5f90cf0754d425de3031db8962d03cdd79867
+      ghcr.io/finalmethos-ops/btsp-frontend:v1.0.0-rc.36@sha256:33c8f054358a682b8e033bb3e809ee9549c587571a7d6291404ff1d9ee29ea1f
     build: !reset null
     pull_policy: always
 
