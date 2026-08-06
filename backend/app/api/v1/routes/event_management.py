@@ -14,6 +14,7 @@ from app.schemas.event_management import (
     EventMembershipCreate,
     EventMembershipLoadoutRoleUpdate,
     EventMembershipRoleUpdate,
+    EventMembershipUpdate,
     EventModuleResponse,
     EventResponse,
     EventSubEventRegistrationWrite,
@@ -41,6 +42,7 @@ from app.services.event_management_service import (
     save_branding,
     save_venue_map,
     update_event,
+    update_membership,
     update_membership_loadout_role,
     update_membership_role,
     update_membership_vendors,
@@ -193,6 +195,26 @@ def post_sub_event(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     if event is None:
         raise HTTPException(status_code=404, detail="Event not found")
+    return event
+
+
+@router.put(
+    "/{event_id}/memberships/{membership_id}",
+    response_model=EventResponse,
+)
+def put_membership(
+    event_id: str,
+    membership_id: str,
+    payload: EventMembershipUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission("events.manage")),
+) -> EventResponse:
+    try:
+        event = update_membership(db, event_id, membership_id, payload, user.email)
+    except EventManagementError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if event is None:
+        raise HTTPException(status_code=404, detail="Event membership not found")
     return event
 
 

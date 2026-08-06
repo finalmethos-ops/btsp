@@ -81,6 +81,19 @@ export type EventAccountDirectoryEntry = {
   vendor_codes: string[];
 };
 
+export type EventMembershipWrite = {
+  email: string;
+  display_name: string;
+  password?: string | null;
+  membership_type: EventMembership["membership_type"];
+  vendor_code?: string | null;
+  vendor_codes?: string[];
+  entity_code?: string | null;
+  module_codes: string[];
+  task_scope?: string | null;
+  is_active: boolean;
+};
+
 export type EventWrite = Omit<
   ManagedEvent,
   | "id"
@@ -167,29 +180,20 @@ export const updateSubEventModules = (
 
 export const addEventMembership = (
   eventId: string,
-  payload: {
-    email: string;
-    display_name: string;
-    password?: string | null;
-    membership_type:
-      | "staff"
-      | "vendor"
-      | "franchise_representative"
-      | "executive"
-      | "admin"
-      | "team_lead"
-      | "dockmaster"
-      | "overseer";
-    vendor_code?: string | null;
-    vendor_codes?: string[];
-    entity_code?: string | null;
-    module_codes: string[];
-    task_scope?: string | null;
-    is_active: boolean;
-  },
+  payload: EventMembershipWrite,
 ) =>
   apiFetch<ManagedEvent>(`/events/${eventId}/memberships`, {
     method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const updateEventMembership = (
+  eventId: string,
+  membershipId: string,
+  payload: EventMembershipWrite,
+) =>
+  apiFetch<ManagedEvent>(`/events/${eventId}/memberships/${membershipId}`, {
+    method: "PUT",
     body: JSON.stringify(payload),
   });
 

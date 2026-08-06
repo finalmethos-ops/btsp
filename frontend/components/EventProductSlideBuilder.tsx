@@ -48,6 +48,9 @@ export function EventProductSlideBuilder({
   const [editing, setEditing] = useState<EventProductSlide | null>(null);
   const [slideProducts, setSlideProducts] = useState<SlideProduct[]>([]);
   const [slideType, setSlideType] = useState<"product" | "filler">("product");
+  const [productMode, setProductMode] = useState<"single" | "multiple">(
+    "single",
+  );
   const [draggingSlideId, setDraggingSlideId] = useState<string | null>(null);
   const [webFill, setWebFill] = useState<EventProductWebFill | null>(null);
   const [busy, setBusy] = useState(false);
@@ -119,15 +122,26 @@ export function EventProductSlideBuilder({
     if (!subEventId) return;
     const data = new FormData(event.currentTarget);
     const filler = slideType === "filler";
+    const multipleProducts = !filler && productMode === "multiple";
+    if (multipleProducts && slideProducts.length < 2) {
+      setError("A multiple-product slide requires at least two products.");
+      return;
+    }
+    const firstProduct = multipleProducts ? slideProducts[0] : null;
     const payload: EventProductSlideWrite = {
       slide_type: slideType,
       filler_category: filler
         ? (String(data.get("filler_category")) as EventFillerCategory)
         : null,
-      catalog_product_code: filler
+      catalog_product_code:
+        filler || multipleProducts
+          ? null
+          : String(data.get("catalog_product_code") || "") || null,
+      model_number: filler
         ? null
-        : String(data.get("catalog_product_code") || "") || null,
-      model_number: filler ? null : String(data.get("model_number")).trim(),
+        : multipleProducts
+          ? firstProduct!.model_number.trim()
+          : String(data.get("model_number")).trim(),
       name: String(data.get(filler ? "filler_name" : "name")).trim(),
       vendor_code: filler
         ? null
@@ -141,14 +155,24 @@ export function EventProductSlideBuilder({
       specifications: filler
         ? null
         : String(data.get("specifications") || "") || null,
-      event_unit_cost: filler ? null : String(data.get("event_unit_cost")),
+      event_unit_cost: filler
+        ? null
+        : multipleProducts
+          ? String(firstProduct!.event_unit_cost)
+          : String(data.get("event_unit_cost")),
       standard_cost: filler
         ? null
-        : String(data.get("standard_cost") || "") || null,
+        : multipleProducts
+          ? firstProduct!.standard_cost
+            ? String(firstProduct!.standard_cost)
+            : null
+          : String(data.get("standard_cost") || "") || null,
       currency: String(data.get("currency") || "USD").toUpperCase(),
       minimum_order_quantity: filler
         ? 1
-        : Number(data.get("minimum_order_quantity")),
+        : multipleProducts
+          ? 1
+          : Number(data.get("minimum_order_quantity")),
       available_inventory: filler
         ? null
         : optionalNumber(data.get("available_inventory")),
@@ -165,18 +189,19 @@ export function EventProductSlideBuilder({
       vendor_delivery_notes:
         String(data.get("vendor_delivery_notes") || "") || null,
       presenter_notes: String(data.get("presenter_notes") || "") || null,
-      product_variants: filler
-        ? []
-        : slideProducts.map((product) => ({
-            ...product,
-            model_number: product.model_number.trim(),
-            name: product.name.trim(),
-            event_unit_cost: String(product.event_unit_cost),
-            standard_cost: product.standard_cost
-              ? String(product.standard_cost)
-              : null,
-            minimum_order_quantity: Number(product.minimum_order_quantity),
-          })),
+      product_variants:
+        filler || !multipleProducts
+          ? []
+          : slideProducts.map((product) => ({
+              ...product,
+              model_number: product.model_number.trim(),
+              name: product.name.trim(),
+              event_unit_cost: String(product.event_unit_cost),
+              standard_cost: product.standard_cost
+                ? String(product.standard_cost)
+                : null,
+              minimum_order_quantity: Number(product.minimum_order_quantity),
+            })),
       status: String(data.get("status")) as "draft" | "ready" | "archived",
     };
     setBusy(true);
@@ -194,6 +219,7 @@ export function EventProductSlideBuilder({
       await refresh();
       setEditing(null);
       setSlideType("product");
+      setProductMode("single");
       setCatalogCode("");
       setSlideProducts([]);
       setWebFill(null);
@@ -255,6 +281,7 @@ export function EventProductSlideBuilder({
       await refresh();
       if (editing?.id === slide.id) {
         setEditing(null);
+        setProductMode("single");
         setSlideProducts([]);
       }
       setMessage("Slide removed.");
@@ -297,6 +324,7 @@ export function EventProductSlideBuilder({
             onChange={(event) => {
               setSubEventId(event.target.value);
               setEditing(null);
+              setProductMode("single");
               setSlideProducts([]);
             }}
             value={subEventId}
@@ -411,6 +439,9 @@ export function EventProductSlideBuilder({
                   onClick={() => {
                     setEditing(slide);
                     setSlideType(slide.slide_type);
+                    setProductMode(
+                      slide.product_variants.length ? "multiple" : "single",
+                    );
                     setCatalogCode(slide.catalog_product_code ?? "");
                     setSlideProducts(slide.product_variants);
                   }}
@@ -462,7 +493,7 @@ export function EventProductSlideBuilder({
 
         <form
           className="grid gap-3 rounded-xl bg-slate-50 p-4 sm:grid-cols-2"
-          key={`${editing?.id ?? "new"}-${slideType}-${catalogCode}-${webFill?.source_url ?? ""}`}
+          key={`${editing?.id ?? "new"}-${slideType}-${productMode}-${catalogCode}-${webFill?.source_url ?? ""}`}
           onSubmit={save}
         >
           <h4 className="font-bold sm:col-span-2">
@@ -474,6 +505,7 @@ export function EventProductSlideBuilder({
               className="mt-1 w-full rounded-lg border bg-white p-2"
               onChange={(event) => {
                 setSlideType(event.target.value as "product" | "filler");
+                setProductMode("single");
                 setCatalogCode("");
                 setSlideProducts([]);
                 setWebFill(null);
@@ -525,6 +557,48 @@ export function EventProductSlideBuilder({
             disabled={slideType === "filler"}
           >
             <label className="text-sm font-semibold sm:col-span-2">
+              Product layout
+              <select
+                className="mt-1 w-full rounded-lg border bg-white p-2"
+                onChange={(event) => {
+                  const nextMode = event.target.value as "single" | "multiple";
+                  if (nextMode === "multiple" && !slideProducts.length) {
+                    const form = event.currentTarget.form;
+                    const data = form ? new FormData(form) : null;
+                    setSlideProducts([
+                      {
+                        model_number: String(data?.get("model_number") ?? ""),
+                        name: String(data?.get("name") ?? ""),
+                        event_unit_cost: String(
+                          data?.get("event_unit_cost") ?? "",
+                        ),
+                        standard_cost:
+                          String(data?.get("standard_cost") ?? "") || null,
+                        minimum_order_quantity: Number(
+                          data?.get("minimum_order_quantity") ?? 1,
+                        ),
+                      },
+                      emptySlideProduct(),
+                    ]);
+                  }
+                  if (nextMode === "single") setSlideProducts([]);
+                  setProductMode(nextMode);
+                  setCatalogCode("");
+                  setWebFill(null);
+                }}
+                value={productMode}
+              >
+                <option value="single">Single product</option>
+                <option value="multiple">Multiple products</option>
+              </select>
+            </label>
+            <label
+              className={
+                productMode === "single"
+                  ? "text-sm font-semibold sm:col-span-2"
+                  : "hidden"
+              }
+            >
               Start from BTSP catalog
               <div className="mt-1 grid gap-2 sm:grid-cols-2">
                 <select
@@ -552,6 +626,7 @@ export function EventProductSlideBuilder({
               </div>
               <select
                 className="mt-1 w-full rounded-lg border bg-white p-2"
+                disabled={productMode === "multiple"}
                 name="catalog_product_code"
                 onChange={(event) => {
                   setCatalogCode(event.target.value);
@@ -569,11 +644,16 @@ export function EventProductSlideBuilder({
                 ))}
               </select>
             </label>
-            <label className="text-sm font-semibold">
+            <label
+              className={
+                productMode === "single" ? "text-sm font-semibold" : "hidden"
+              }
+            >
               Model number
               <input
                 className="mt-1 w-full rounded-lg border bg-white p-2"
                 defaultValue={defaults?.model_number ?? ""}
+                disabled={productMode === "multiple"}
                 name="model_number"
                 required
               />
@@ -587,15 +667,37 @@ export function EventProductSlideBuilder({
                 required
               />
             </label>
-            <label className="text-sm font-semibold sm:col-span-2">
+            <label
+              className={
+                productMode === "single"
+                  ? "text-sm font-semibold sm:col-span-2"
+                  : "hidden"
+              }
+            >
               Product name
               <input
                 className="mt-1 w-full rounded-lg border bg-white p-2"
                 defaultValue={defaults?.name ?? ""}
+                disabled={productMode === "multiple"}
                 name="name"
                 required
               />
             </label>
+            {productMode === "multiple" ? (
+              <label className="text-sm font-semibold sm:col-span-2">
+                Slide headline
+                <input
+                  className="mt-1 w-full rounded-lg border bg-white p-2"
+                  defaultValue={editing?.name ?? "Multiple-product offer"}
+                  name="name"
+                  required
+                />
+                <span className="mt-1 block font-normal text-slate-500">
+                  This shared title replaces the single-product name on the
+                  presentation.
+                </span>
+              </label>
+            ) : null}
             <label className="text-sm font-semibold sm:col-span-2">
               Product category
               <input
@@ -615,7 +717,13 @@ export function EventProductSlideBuilder({
                 edited for this event offer.
               </span>
             </label>
-            <div className="flex items-end sm:col-span-2">
+            <div
+              className={
+                productMode === "single"
+                  ? "flex items-end sm:col-span-2"
+                  : "hidden"
+              }
+            >
               <button
                 className="rounded-lg border border-blue-300 bg-white px-4 py-2 font-semibold text-blue-800"
                 disabled={busy}
@@ -653,7 +761,7 @@ export function EventProductSlideBuilder({
                 Search model on web & fill slide
               </button>
             </div>
-            {webFill ? (
+            {webFill && productMode === "single" ? (
               <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm sm:col-span-2">
                 <strong>{webFill.title}</strong>
                 <p className="mt-1">{webFill.summary}</p>
@@ -692,171 +800,171 @@ export function EventProductSlideBuilder({
                 name="specifications"
               />
             </label>
-            <div className="rounded-xl border bg-white p-3 sm:col-span-2">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <strong className="text-sm">Products on this slide</strong>
-                  <p className="mt-1 text-xs font-normal text-slate-500">
-                    The main product above is the slide headline. For a combined
-                    offer, every orderable product—including the headline
-                    product—is listed here.
-                  </p>
-                </div>
-                <button
-                  className="rounded-lg border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-900"
-                  disabled={slideProducts.length >= 50}
-                  onClick={(event) => {
-                    const form = event.currentTarget.form;
-                    const data = form ? new FormData(form) : null;
-                    setSlideProducts((current) => {
-                      if (current.length)
-                        return [...current, emptySlideProduct()];
-                      return [
-                        {
-                          model_number: String(data?.get("model_number") ?? ""),
-                          name: String(data?.get("name") ?? ""),
-                          event_unit_cost: String(
-                            data?.get("event_unit_cost") ?? "",
-                          ),
-                          standard_cost:
-                            String(data?.get("standard_cost") ?? "") || null,
-                          minimum_order_quantity: Number(
-                            data?.get("minimum_order_quantity") ?? 1,
-                          ),
-                        },
-                        emptySlideProduct(),
-                      ];
-                    });
-                  }}
-                  type="button"
-                >
-                  {slideProducts.length
-                    ? "+ Add another product"
-                    : "Build a multi-product slide"}
-                </button>
-              </div>
-              <div className="mt-3 grid gap-3">
-                {slideProducts.map((product, index) => (
-                  <fieldset
-                    className="grid gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:grid-cols-2"
-                    key={index}
-                  >
-                    <legend className="px-1 text-xs font-bold uppercase text-blue-900">
-                      Product {index + 1}
-                    </legend>
-                    <label className="text-xs font-semibold sm:col-span-2">
-                      Fill from catalog
-                      <select
-                        className="mt-1 w-full rounded-lg border bg-white p-2 font-normal"
-                        onChange={(event) => {
-                          const selected = catalog.find(
-                            (item) => item.product_code === event.target.value,
-                          );
-                          if (!selected) return;
-                          setSlideProducts((current) =>
-                            current.map((item, itemIndex) =>
-                              itemIndex === index
-                                ? {
-                                    model_number:
-                                      selected.model_number ??
-                                      selected.model_identifier,
-                                    name: selected.name,
-                                    event_unit_cost: selected.unit_price,
-                                    standard_cost: selected.unit_price,
-                                    minimum_order_quantity: Number(
-                                      selected.minimum_order_quantity ?? 1,
-                                    ),
-                                  }
-                                : item,
+            {productMode === "multiple" ? (
+              <div className="rounded-xl border bg-white p-3 sm:col-span-2">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <strong className="text-sm">Products on this slide</strong>
+                    <p className="mt-1 text-xs font-normal text-slate-500">
+                      Add every orderable model included in this combined offer.
+                    </p>
+                  </div>
+                  <button
+                    className="rounded-lg border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-900"
+                    disabled={slideProducts.length >= 50}
+                    onClick={(event) => {
+                      const form = event.currentTarget.form;
+                      const data = form ? new FormData(form) : null;
+                      setSlideProducts((current) => {
+                        if (current.length)
+                          return [...current, emptySlideProduct()];
+                        return [
+                          {
+                            model_number: String(
+                              data?.get("model_number") ?? "",
                             ),
-                          );
-                        }}
-                        value=""
-                      >
-                        <option value="">
-                          Select an optional catalog product
-                        </option>
-                        {filteredCatalog.map((item) => (
-                          <option
-                            key={item.product_code}
-                            value={item.product_code}
-                          >
-                            {item.model_identifier} — {item.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    {[
-                      ["Model number", "model_number", "text"],
-                      ["Product name", "name", "text"],
-                      ["Event price", "event_unit_cost", "number"],
-                      ["Standard Cost", "standard_cost", "number"],
-                      ["MOQ", "minimum_order_quantity", "number"],
-                    ].map(([label, field, type]) => (
-                      <label
-                        className={`text-xs font-semibold ${field === "name" ? "sm:col-span-2" : ""}`}
-                        key={field}
-                      >
-                        {label}
-                        <input
-                          className="mt-1 w-full rounded-lg border bg-white p-2"
-                          min={
-                            type === "number"
-                              ? field === "minimum_order_quantity"
-                                ? 1
-                                : 0
-                              : undefined
-                          }
-                          onChange={(event) =>
+                            name: String(data?.get("name") ?? ""),
+                            event_unit_cost: String(
+                              data?.get("event_unit_cost") ?? "",
+                            ),
+                            standard_cost:
+                              String(data?.get("standard_cost") ?? "") || null,
+                            minimum_order_quantity: Number(
+                              data?.get("minimum_order_quantity") ?? 1,
+                            ),
+                          },
+                          emptySlideProduct(),
+                        ];
+                      });
+                    }}
+                    type="button"
+                  >
+                    + Add another product
+                  </button>
+                </div>
+                <div className="mt-3 grid gap-3">
+                  {slideProducts.map((product, index) => (
+                    <fieldset
+                      className="grid gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:grid-cols-2"
+                      key={index}
+                    >
+                      <legend className="px-1 text-xs font-bold uppercase text-blue-900">
+                        Product {index + 1}
+                      </legend>
+                      <label className="text-xs font-semibold sm:col-span-2">
+                        Fill from catalog
+                        <select
+                          className="mt-1 w-full rounded-lg border bg-white p-2 font-normal"
+                          onChange={(event) => {
+                            const selected = catalog.find(
+                              (item) =>
+                                item.product_code === event.target.value,
+                            );
+                            if (!selected) return;
                             setSlideProducts((current) =>
                               current.map((item, itemIndex) =>
                                 itemIndex === index
                                   ? {
-                                      ...item,
-                                      [field]:
-                                        field === "minimum_order_quantity"
-                                          ? Number(event.target.value)
-                                          : event.target.value,
+                                      model_number:
+                                        selected.model_number ??
+                                        selected.model_identifier,
+                                      name: selected.name,
+                                      event_unit_cost: selected.unit_price,
+                                      standard_cost: selected.unit_price,
+                                      minimum_order_quantity: Number(
+                                        selected.minimum_order_quantity ?? 1,
+                                      ),
                                     }
                                   : item,
                               ),
-                            )
-                          }
-                          required
-                          step={
-                            type === "number" &&
-                            field !== "minimum_order_quantity"
-                              ? "0.01"
-                              : undefined
-                          }
-                          type={type}
-                          value={product[field as keyof SlideProduct] ?? ""}
-                        />
+                            );
+                          }}
+                          value=""
+                        >
+                          <option value="">
+                            Select an optional catalog product
+                          </option>
+                          {filteredCatalog.map((item) => (
+                            <option
+                              key={item.product_code}
+                              value={item.product_code}
+                            >
+                              {item.model_identifier} — {item.name}
+                            </option>
+                          ))}
+                        </select>
                       </label>
-                    ))}
-                    <button
-                      className="justify-self-start text-sm font-semibold text-red-700 sm:col-span-2"
-                      onClick={() =>
-                        setSlideProducts((current) =>
-                          current.filter((_, itemIndex) => itemIndex !== index),
-                        )
-                      }
-                      type="button"
-                    >
-                      Remove product
-                    </button>
-                  </fieldset>
-                ))}
-                {!slideProducts.length ? (
-                  <p className="rounded-lg border border-dashed p-3 text-sm text-slate-500">
-                    Single-product slide. Use “Build a multi-product slide” to
-                    add the headline product and another product to the same
-                    offer.
-                  </p>
-                ) : null}
+                      {[
+                        ["Model number", "model_number", "text"],
+                        ["Product name", "name", "text"],
+                        ["Event price", "event_unit_cost", "number"],
+                        ["Standard Cost", "standard_cost", "number"],
+                        ["MOQ", "minimum_order_quantity", "number"],
+                      ].map(([label, field, type]) => (
+                        <label
+                          className={`text-xs font-semibold ${field === "name" ? "sm:col-span-2" : ""}`}
+                          key={field}
+                        >
+                          {label}
+                          <input
+                            className="mt-1 w-full rounded-lg border bg-white p-2"
+                            min={
+                              type === "number"
+                                ? field === "minimum_order_quantity"
+                                  ? 1
+                                  : 0
+                                : undefined
+                            }
+                            onChange={(event) =>
+                              setSlideProducts((current) =>
+                                current.map((item, itemIndex) =>
+                                  itemIndex === index
+                                    ? {
+                                        ...item,
+                                        [field]:
+                                          field === "minimum_order_quantity"
+                                            ? Number(event.target.value)
+                                            : event.target.value,
+                                      }
+                                    : item,
+                                ),
+                              )
+                            }
+                            required
+                            step={
+                              type === "number" &&
+                              field !== "minimum_order_quantity"
+                                ? "0.01"
+                                : undefined
+                            }
+                            type={type}
+                            value={product[field as keyof SlideProduct] ?? ""}
+                          />
+                        </label>
+                      ))}
+                      <button
+                        className="justify-self-start text-sm font-semibold text-red-700 sm:col-span-2"
+                        onClick={() =>
+                          setSlideProducts((current) =>
+                            current.filter(
+                              (_, itemIndex) => itemIndex !== index,
+                            ),
+                          )
+                        }
+                        type="button"
+                      >
+                        Remove product
+                      </button>
+                    </fieldset>
+                  ))}
+                </div>
               </div>
-            </div>
-            <label className="text-sm font-semibold">
+            ) : null}
+            <label
+              className={
+                productMode === "single" ? "text-sm font-semibold" : "hidden"
+              }
+            >
               Event unit cost
               <input
                 className="mt-1 w-full rounded-lg border bg-white p-2"
@@ -865,12 +973,17 @@ export function EventProductSlideBuilder({
                 }
                 min="0"
                 name="event_unit_cost"
+                disabled={productMode === "multiple"}
                 required
                 step="0.01"
                 type="number"
               />
             </label>
-            <label className="text-sm font-semibold">
+            <label
+              className={
+                productMode === "single" ? "text-sm font-semibold" : "hidden"
+              }
+            >
               Standard Cost
               <input
                 className="mt-1 w-full rounded-lg border bg-white p-2"
@@ -879,6 +992,7 @@ export function EventProductSlideBuilder({
                 }
                 min="0"
                 name="standard_cost"
+                disabled={productMode === "multiple"}
                 step="0.01"
                 type="number"
               />
@@ -893,7 +1007,11 @@ export function EventProductSlideBuilder({
                 required
               />
             </label>
-            <label className="text-sm font-semibold">
+            <label
+              className={
+                productMode === "single" ? "text-sm font-semibold" : "hidden"
+              }
+            >
               MOQ
               <input
                 className="mt-1 w-full rounded-lg border bg-white p-2"
@@ -903,6 +1021,7 @@ export function EventProductSlideBuilder({
                 }
                 min="1"
                 name="minimum_order_quantity"
+                disabled={productMode === "multiple"}
                 required
                 type="number"
               />
@@ -1003,6 +1122,7 @@ export function EventProductSlideBuilder({
                 onClick={() => {
                   setEditing(null);
                   setSlideType("product");
+                  setProductMode("single");
                   setCatalogCode("");
                   setSlideProducts([]);
                 }}

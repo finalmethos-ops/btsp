@@ -28,6 +28,7 @@ from app.schemas.event_management import (
     EventMembershipLoadoutRoleUpdate,
     EventMembershipResponse,
     EventMembershipRoleUpdate,
+    EventMembershipUpdate,
     EventResponse,
     EventSubEventRegistrationWrite,
     EventVendorMembershipUpdate,
@@ -106,6 +107,125 @@ def update_membership_loadout_role(
         payload={"loadout_role": payload.loadout_role},
     )
     db.commit()
+    return event_response(get_event(db, event_id))  # type: ignore[arg-type]
+
+
+def update_membership(
+    db: Session,
+    event_id: str,
+    membership_id: str,
+    payload: EventMembershipUpdate,
+    actor: str,
+) -> EventResponse | None:
+    event = get_event(db, event_id)
+    membership = db.scalar(
+        select(EventMembership).where(
+            EventMembership.id == membership_id,
+            EventMembership.event_id == event_id,
+        )
+    )
+    if event is None or membership is None:
+        return None
+    _ensure_event_editable(db, event_id)
+    user = db.get(User, membership.user_id)
+    if user is None:
+        raise EventManagementError("Event attendee account was not found")
+
+    email = payload.email.strip().lower()
+    duplicate_user = db.scalar(select(User.id).where(User.email == email, User.id != user.id))
+    if duplicate_user is not None:
+        raise EventManagementError("Another account already uses this email address")
+
+    if payload.membership_type == "vendor":
+        event_only_source = f"event-only:{event_id}"
+        vendors = db.scalars(
+            select(CatalogVendor).where(CatalogVendor.vendor_code.in_(payload.vendor_codes))
+        ).all()
+        available = {
+            vendor.vendor_code
+            for vendor in vendors
+            if vendor.is_active or vendor.source_file == event_only_source
+        }
+        if set(payload.vendor_codes) != available:
+            raise EventManagementError(
+                "One or more selected vendor companies are unavailable for this event"
+            )
+        if not _vendor_codes_owned_or_alias(db, user, set(payload.vendor_codes)):
+            raise EventManagementError(
+                "The attendee can only represent vendor accounts assigned in the main portal"
+            )
+
+    if payload.membership_type == "franchise_representative":
+        from app.models.store import Store
+
+        entity_exists = db.scalar(
+            select(Store.id).where(
+                Store.entity_code == payload.entity_code,
+                Store.is_active.is_(True),
+                Store.is_ordering_enabled.is_(True),
+            )
+        )
+        if entity_exists is None:
+            raise EventManagementError("Entity is not active for ordering")
+
+    previous = {
+        "email": user.email,
+        "display_name": user.display_name,
+        "membership_type": membership.membership_type,
+        "vendor_codes": list(membership.vendor_codes or []),
+        "entity_code": membership.entity_code,
+        "module_codes": list(membership.module_codes or []),
+        "task_scope": membership.task_scope,
+        "is_active": membership.is_active,
+    }
+    user.email = email
+    user.display_name = payload.display_name.strip()
+    if payload.password:
+        user.password_hash = hash_password(payload.password)
+        user.password_change_required = True
+    membership.membership_type = payload.membership_type
+    membership.vendor_codes = (
+        list(payload.vendor_codes) if payload.membership_type == "vendor" else []
+    )
+    membership.vendor_code = (
+        payload.vendor_codes[0]
+        if payload.membership_type == "vendor" and payload.vendor_codes
+        else None
+    )
+    membership.entity_code = (
+        payload.entity_code if payload.membership_type == "franchise_representative" else None
+    )
+    membership.module_codes = sorted(set(payload.module_codes))
+    membership.task_scope = payload.task_scope
+    membership.is_active = payload.is_active
+    _lifecycle_snapshot(
+        db,
+        event_type="event.membership.updated",
+        entity_type="event_membership",
+        entity_id=membership.id,
+        actor=actor,
+        payload={
+            "event_id": event_id,
+            "user_id": user.id,
+            "previous": previous,
+            "current": {
+                "email": user.email,
+                "display_name": user.display_name,
+                "membership_type": membership.membership_type,
+                "vendor_codes": membership.vendor_codes,
+                "entity_code": membership.entity_code,
+                "module_codes": membership.module_codes,
+                "task_scope": membership.task_scope,
+                "is_active": membership.is_active,
+                "password_reset": bool(payload.password),
+            },
+        },
+    )
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise EventManagementError("The attendee update conflicts with an existing record") from exc
     return event_response(get_event(db, event_id))  # type: ignore[arg-type]
 
 
@@ -681,15 +801,6 @@ def add_membership(
         )
         if entity_exists is None:
             raise EventManagementError("Entity is not active for ordering")
-        entity_assigned = db.scalar(
-            select(EventMembership.id).where(
-                EventMembership.event_id == event_id,
-                EventMembership.entity_code == payload.entity_code,
-                EventMembership.is_active.is_(True),
-            )
-        )
-        if entity_assigned is not None:
-            raise EventManagementError("Entity already has an ordering account for this event")
     existing = db.scalar(
         select(EventMembership.id).where(
             EventMembership.event_id == event_id, EventMembership.user_id == user.id
@@ -703,6 +814,9 @@ def add_membership(
             user_id=user.id,
             membership_type=payload.membership_type,
             vendor_code=payload.vendor_code if payload.membership_type == "vendor" else None,
+            vendor_codes=(
+                list(payload.vendor_codes) if payload.membership_type == "vendor" else []
+            ),
             entity_code=(
                 payload.entity_code
                 if payload.membership_type == "franchise_representative"

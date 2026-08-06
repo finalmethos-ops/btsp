@@ -1980,12 +1980,32 @@ td {
   overflow-wrap: normal;
 }
 
+.event-vendor-hall-selector {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
 .event-vendor-hall-search-results {
   display: grid;
-  max-height: 14rem;
+  max-height: 24rem;
   gap: 0.4rem;
   overflow-y: auto;
   padding-right: 0.15rem;
+}
+
+@media (min-width: 1024px) {
+  .event-vendor-hall-selector {
+    height: 100%;
+    min-height: 32rem;
+  }
+
+  .event-vendor-hall-search-results {
+    min-height: 0;
+    max-height: none;
+    flex: 1 1 auto;
+    align-content: start;
+  }
 }
 
 .event-vendor-hall-search-result {

@@ -11,6 +11,7 @@ from sqlalchemy import event as sqlalchemy_event
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
+from app.api.v1.routes.vendor_hall import read_vendor_hall_directory
 from app.auth.dependencies import get_current_user
 from app.db.session import Base, get_db
 from app.main import app
@@ -21,7 +22,7 @@ from app.models import (  # noqa: F401
 )
 from app.models.catalog import CatalogVendor
 from app.models.event_management import EventMembership, EventStaffTask, VendorHallBooth
-from app.models.identity import User
+from app.models.identity import User, user_vendor_access
 from app.schemas.event_management import EVENT_MODULES, EventMembershipCreate, EventWrite
 from app.schemas.event_vendor_booth import EventVendorBoothWrite
 from app.schemas.vendor_hall import (
@@ -34,7 +35,7 @@ from app.schemas.vendor_hall import (
     VendorHallItemCheckinWrite,
 )
 from app.services.admin_bootstrap_service import ensure_core_permissions, ensure_core_roles
-from app.services.event_management_service import add_membership, create_event
+from app.services.event_management_service import add_membership, create_event, publish_event
 from app.services.event_vendor_booth_service import save_booth
 from app.services.identity_defaults import CORE_PERMISSION_DEFINITIONS
 from app.services.vendor_hall_service import (
@@ -42,6 +43,7 @@ from app.services.vendor_hall_service import (
     VendorHallAccessError,
     VendorHallError,
     _pdf_text_positions,
+    _user_is_booth_vendor,
     assign_booth_staff,
     attach_inventory_item_file,
     checkin_booth_inventory_item,
@@ -223,6 +225,82 @@ def test_vendor_hall_syncs_event_booths_and_scopes_vendor_access() -> None:
         my_booths = my_vendor_hall_booths(db, vendor_user)
         assert len(my_booths) == 1
         assert my_booths[0].booth_name == "Hall Vendor Booth"
+
+
+def test_multi_vendor_representative_appears_at_and_can_access_each_booth() -> None:
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        _seed_vendor(db)
+        db.add(
+            CatalogVendor(
+                vendor_code="SECOND",
+                name="Second Vendor",
+                is_active=True,
+                source_file="test",
+            )
+        )
+        db.commit()
+        event = create_event(
+            db,
+            _event().model_copy(
+                update={
+                    "starts_at": datetime(2020, 1, 1, 12, tzinfo=UTC),
+                    "ends_at": datetime(2030, 1, 1, 12, tzinfo=UTC),
+                }
+            ),
+            "admin@example.com",
+        )
+        representative = User(
+            email="multi-vendor@example.com",
+            display_name="Multi Vendor Representative",
+            password_hash="test",
+            vendor_code="HALL",
+            is_active=True,
+        )
+        db.add(representative)
+        db.flush()
+        db.execute(
+            user_vendor_access.insert().values(
+                user_id=representative.id,
+                vendor_code="SECOND",
+            )
+        )
+        db.commit()
+        add_membership(
+            db,
+            event.id,
+            EventMembershipCreate(
+                email=representative.email,
+                display_name=representative.display_name,
+                membership_type="vendor",
+                vendor_codes=["HALL", "SECOND"],
+            ),
+        )
+        for vendor_code, booth_number in (("HALL", "B-12"), ("SECOND", "B-13")):
+            save_booth(
+                db,
+                event.id,
+                EventVendorBoothWrite(
+                    vendor_code=vendor_code,
+                    booth_name=f"{vendor_code} booth",
+                    booth_number=booth_number,
+                    location="North hall",
+                    status="published",
+                ),
+                "admin@example.com",
+            )
+        configure_vendor_hall(
+            db, event.id, VendorHallEventWrite(status="open"), "admin@example.com"
+        )
+        publish_event(db, event.id, "admin@example.com")
+        booths = sync_vendor_hall_booths(db, event.id, "admin@example.com")
+        assert booths is not None and len(booths) == 2
+        assert len(my_vendor_hall_booths(db, representative)) == 2
+        assert all(_user_is_booth_vendor(db, representative, booth) for booth in booths)
+
+        directory = read_vendor_hall_directory(event.id, db, representative)
+        assert all(booth.attendees == ["Multi Vendor Representative"] for booth in directory.booths)
 
 
 def test_vendor_hall_directory_message_requires_event_membership() -> None:

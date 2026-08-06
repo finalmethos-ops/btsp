@@ -51,6 +51,7 @@ from app.schemas.event_management import (
     EventCancellationWrite,
     EventMembershipCreate,
     EventMembershipRoleUpdate,
+    EventMembershipUpdate,
     EventSubEventRegistrationWrite,
     EventWrite,
     SubEventModulesWrite,
@@ -95,6 +96,7 @@ from app.services.event_management_service import (
     remove_event,
     remove_sub_event,
     update_event,
+    update_membership,
     update_membership_role,
     update_sub_event,
     update_sub_event_modules,
@@ -226,6 +228,69 @@ def test_event_publication_opens_attendee_window_and_is_audited() -> None:
         assert len(snapshots) == 1
         assert snapshots[0].actor == "admin@example.com"
         assert snapshots[0].payload["sub_events_published"] == 1
+
+
+def test_multiple_franchise_representatives_share_an_entity_and_are_fully_editable() -> None:
+    engine = create_engine("sqlite+pysqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        event = create_event(db, _event(), "admin@example.com")
+        db.add(
+            Store(
+                store_number="101",
+                name="Shared Entity Store",
+                region_code="R1",
+                entity_code="ENTITY-1",
+                is_active=True,
+                is_ordering_enabled=True,
+            )
+        )
+        db.commit()
+
+        for index in (1, 2):
+            added = add_membership(
+                db,
+                event.id,
+                EventMembershipCreate(
+                    email=f"franchise-{index}@example.com",
+                    display_name=f"Franchise Representative {index}",
+                    password=f"Franchise-Password-{index}!",
+                    membership_type="franchise_representative",
+                    entity_code="entity-1",
+                ),
+            )
+            assert added is not None
+
+        memberships = db.scalars(
+            select(EventMembership).where(
+                EventMembership.event_id == event.id,
+                EventMembership.entity_code == "ENTITY-1",
+            )
+        ).all()
+        assert len(memberships) == 2
+
+        updated = update_membership(
+            db,
+            event.id,
+            memberships[0].id,
+            EventMembershipUpdate(
+                email="renamed-franchise@example.com",
+                display_name="Renamed Franchise Representative",
+                membership_type="franchise_representative",
+                entity_code="entity-1",
+                task_scope="Ordering and meeting support",
+                is_active=False,
+            ),
+            "admin@example.com",
+        )
+        assert updated is not None
+        edited = db.get(EventMembership, memberships[0].id)
+        assert edited is not None
+        assert edited.entity_code == "ENTITY-1"
+        assert edited.task_scope == "Ordering and meeting support"
+        assert not edited.is_active
+        assert edited.user.email == "renamed-franchise@example.com"
+        assert edited.user.display_name == "Renamed Franchise Representative"
 
 
 def test_event_cancellation_closes_access_and_permanent_removal_is_guarded() -> None:

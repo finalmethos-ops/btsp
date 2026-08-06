@@ -135,7 +135,13 @@ class EventMembershipCreate(BaseModel):
                 self.vendor_codes.insert(0, self.vendor_code)
         if self.membership_type == "franchise_representative" and not self.entity_code:
             raise ValueError("Franchise representative accounts require an entity code")
+        if self.entity_code:
+            self.entity_code = self.entity_code.strip().upper()
         return self
+
+
+class EventMembershipUpdate(EventMembershipCreate):
+    """Fully editable event registration details for an existing attendee."""
 
 
 class EventMembershipRoleUpdate(BaseModel):

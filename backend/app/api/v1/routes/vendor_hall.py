@@ -315,19 +315,20 @@ def read_vendor_hall_directory(
             select(VendorHallSavedBooth).where(VendorHallSavedBooth.membership_id == membership.id)
         ).all()
     }
-    for membership in db.scalars(
+    for vendor_membership in db.scalars(
         select(EventMembership)
         .options(selectinload(EventMembership.user))
         .where(
             EventMembership.event_id == event_id,
             EventMembership.membership_type == "vendor",
-            EventMembership.vendor_code.is_not(None),
             EventMembership.is_active.is_(True),
         )
     ).all():
-        vendor_attendees.setdefault(membership.vendor_code or "", []).append(
-            membership.user.display_name
-        )
+        vendor_codes = set(vendor_membership.vendor_codes or [])
+        if vendor_membership.vendor_code:
+            vendor_codes.add(vendor_membership.vendor_code)
+        for vendor_code in vendor_codes:
+            vendor_attendees.setdefault(vendor_code, []).append(vendor_membership.user.display_name)
     return VendorHallDirectoryResponse(
         event_id=floor_map.event_id,
         event_name=floor_map.event_name,
@@ -476,17 +477,25 @@ def message_vendor_hall_directory_booth(
     booth = db.get(VendorHallBooth, booth_id)
     if booth is None or booth.event_id != event_id:
         raise HTTPException(status_code=404, detail="Vendor Hall booth not found")
-    recipients = db.scalars(
+    candidates = db.scalars(
         select(EventMembership)
         .options(selectinload(EventMembership.user))
         .where(
             EventMembership.event_id == event_id,
             EventMembership.membership_type == "vendor",
-            EventMembership.vendor_code == booth.vendor_code,
             EventMembership.user_id != user.id,
             EventMembership.is_active.is_(True),
         )
     ).all()
+    recipients = [
+        recipient
+        for recipient in candidates
+        if booth.vendor_code
+        in (
+            set(recipient.vendor_codes or [])
+            | ({recipient.vendor_code} if recipient.vendor_code else set())
+        )
+    ]
     if not recipients:
         raise HTTPException(status_code=422, detail="No vendor representatives are available")
     for recipient in recipients:

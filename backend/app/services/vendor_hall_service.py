@@ -428,17 +428,21 @@ def _is_scoped_event_staff(db: Session, user: User, event_id: str) -> bool:
 def _user_is_booth_vendor(db: Session, user: User, booth: VendorHallBooth) -> bool:
     if user.vendor_code and user.vendor_code == booth.vendor_code:
         return True
-    return (
-        db.scalar(
-            select(EventMembership.id).where(
-                EventMembership.event_id == booth.event_id,
-                EventMembership.user_id == user.id,
-                EventMembership.vendor_code == booth.vendor_code,
-                EventMembership.membership_type == "vendor",
-                EventMembership.is_active.is_(True),
-            )
+    memberships = db.scalars(
+        select(EventMembership).where(
+            EventMembership.event_id == booth.event_id,
+            EventMembership.user_id == user.id,
+            EventMembership.membership_type == "vendor",
+            EventMembership.is_active.is_(True),
         )
-        is not None
+    ).all()
+    return any(
+        booth.vendor_code
+        in (
+            set(membership.vendor_codes or [])
+            | ({membership.vendor_code} if membership.vendor_code else set())
+        )
+        for membership in memberships
     )
 
 

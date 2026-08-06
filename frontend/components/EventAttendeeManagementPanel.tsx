@@ -13,9 +13,8 @@ import {
   EventMembership,
   listEventAccountDirectory,
   ManagedEvent,
-  updateEventMembershipVendors,
+  updateEventMembership,
   updateEventMembershipLoadoutRole,
-  updateEventMembershipRole,
 } from "@/lib/event-admin-api";
 
 type AttendeeCategory = EventMembership["membership_type"];
@@ -185,29 +184,17 @@ export function EventAttendeeManagementPanel({
               </button>
               {expandedMemberId === member.id ? (
                 <>
-                  {member.entity_code ? (
-                    <p className="mt-2 text-xs">Entity {member.entity_code}</p>
-                  ) : null}
-                  <label className="mt-3 block text-sm font-semibold">
-                    Event role
-                    <select
-                      className="mt-1 w-full rounded-lg border bg-white p-2"
-                      defaultValue={member.membership_type}
-                      onChange={(input) => {
-                        void updateEventMembershipRole(
-                          event.id,
-                          member.id,
-                          input.currentTarget.value as AttendeeCategory,
-                        ).then(() => onUpdated(event.id));
-                      }}
-                    >
-                      {attendeeCategories.map((item) => (
-                        <option key={item.value} value={item.value}>
-                          {item.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <AttendeeRegistrationEditor
+                    accountVendorCodes={
+                      directory.find((account) => account.id === member.user_id)
+                        ?.vendor_codes ?? []
+                    }
+                    event={event}
+                    member={member}
+                    onUpdated={onUpdated}
+                    registeredVendorCodes={registeredVendorCodes}
+                    vendorCompanies={vendorCompanies}
+                  />
                   <label className="mt-3 block text-sm font-semibold">
                     Loadout role (this event only)
                     <select
@@ -235,27 +222,6 @@ export function EventAttendeeManagementPanel({
                       sub-event.
                     </span>
                   </label>
-                  {member.vendor_codes.length ? (
-                    <p className="text-xs">
-                      Vendors {member.vendor_codes.join(", ")}
-                    </p>
-                  ) : member.vendor_code ? (
-                    <p className="text-xs">Vendor {member.vendor_code}</p>
-                  ) : null}
-                  {member.membership_type === "vendor" ? (
-                    <VendorRegistrationEditor
-                      event={event}
-                      member={member}
-                      vendorCompanies={vendorCompanies}
-                      registeredVendorCodes={registeredVendorCodes}
-                      accountVendorCodes={
-                        directory.find(
-                          (account) => account.id === member.user_id,
-                        )?.vendor_codes ?? []
-                      }
-                      onUpdated={onUpdated}
-                    />
-                  ) : null}
                   <SubEventAssignments
                     event={event}
                     member={member}
@@ -438,7 +404,7 @@ export function EventAttendeeManagementPanel({
   );
 }
 
-function VendorRegistrationEditor({
+function AttendeeRegistrationEditor({
   event,
   member,
   vendorCompanies,
@@ -453,7 +419,14 @@ function VendorRegistrationEditor({
   accountVendorCodes: string[];
   onUpdated: (eventId: string) => Promise<void>;
 }) {
+  const [displayName, setDisplayName] = useState(member.display_name);
+  const [email, setEmail] = useState(member.email);
+  const [category, setCategory] = useState(member.membership_type);
   const [selected, setSelected] = useState<string[]>(member.vendor_codes);
+  const [entityCode, setEntityCode] = useState(member.entity_code ?? "");
+  const [taskScope, setTaskScope] = useState(member.task_scope ?? "");
+  const [isActive, setIsActive] = useState(member.is_active);
+  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const owned = new Set(accountVendorCodes.map((code) => code.toUpperCase()));
@@ -481,61 +454,158 @@ function VendorRegistrationEditor({
     );
   });
 
-  useEffect(() => setSelected(member.vendor_codes), [member.vendor_codes]);
+  useEffect(() => {
+    setDisplayName(member.display_name);
+    setEmail(member.email);
+    setCategory(member.membership_type);
+    setSelected(member.vendor_codes);
+    setEntityCode(member.entity_code ?? "");
+    setTaskScope(member.task_scope ?? "");
+    setIsActive(member.is_active);
+    setPassword("");
+  }, [member]);
 
   return (
-    <div className="mt-3 border-t pt-3">
+    <form
+      className="mt-3 grid gap-2 border-t pt-3"
+      onSubmit={(formEvent) => {
+        formEvent.preventDefault();
+        setBusy(true);
+        setError(null);
+        void updateEventMembership(event.id, member.id, {
+          display_name: displayName,
+          email,
+          password: password || null,
+          membership_type: category,
+          vendor_code: category === "vendor" ? (selected[0] ?? null) : null,
+          vendor_codes: category === "vendor" ? selected : [],
+          entity_code:
+            category === "franchise_representative"
+              ? entityCode.trim().toUpperCase()
+              : null,
+          module_codes: member.module_codes,
+          task_scope: taskScope || null,
+          is_active: isActive,
+        })
+          .then(() => onUpdated(event.id))
+          .catch((caught: unknown) =>
+            setError(
+              caught instanceof Error
+                ? caught.message
+                : "Unable to update the attendee.",
+            ),
+          )
+          .finally(() => setBusy(false));
+      }}
+    >
       <p className="text-xs font-bold uppercase text-slate-500">
-        Registered vendor access
+        Attendee registration
       </p>
       <p className="mt-1 text-xs text-slate-500">
-        Add or remove vendors this attendee may represent. Only the attendee’s
-        main-portal vendor assignments that have a booth in this event appear.
+        Edit the same account, role, scope, and access details available during
+        initial registration.
       </p>
-      <div className="mt-2 grid gap-1">
-        {options.map((vendor) => (
-          <label
-            className={`event-selectable flex items-center gap-2 rounded-lg border px-2 py-1 text-xs ${selected.includes(vendor.vendor_code) ? "is-selected" : ""}`}
-            key={vendor.vendor_code}
-          >
-            <input
-              checked={selected.includes(vendor.vendor_code)}
-              onChange={(input) =>
-                setSelected((current) =>
-                  input.target.checked
-                    ? [...current, vendor.vendor_code]
-                    : current.filter((code) => code !== vendor.vendor_code),
-                )
-              }
-              type="checkbox"
-            />
-            {vendor.name}
-          </label>
-        ))}
-      </div>
+      <input
+        className="rounded-lg border bg-white p-2"
+        onChange={(input) => setDisplayName(input.target.value)}
+        placeholder="Display name"
+        required
+        value={displayName}
+      />
+      <input
+        className="rounded-lg border bg-white p-2"
+        onChange={(input) => setEmail(input.target.value)}
+        placeholder="Account email"
+        required
+        type="email"
+        value={email}
+      />
+      <input
+        className="rounded-lg border bg-white p-2"
+        minLength={12}
+        onChange={(input) => setPassword(input.target.value)}
+        placeholder="New password (leave blank to keep current)"
+        type="password"
+        value={password}
+      />
+      <label className="text-sm font-semibold">
+        Attendee category
+        <select
+          className="mt-1 w-full rounded-lg border bg-white p-2"
+          onChange={(input) =>
+            setCategory(input.target.value as AttendeeCategory)
+          }
+          value={category}
+        >
+          {attendeeCategories.map((item) => (
+            <option key={item.value} value={item.value}>
+              {item.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      {category === "vendor" ? (
+        <fieldset className="grid gap-1 rounded-lg border p-2">
+          <legend className="px-1 text-xs font-bold uppercase text-slate-500">
+            Registered vendor access
+          </legend>
+          {options.map((vendor) => (
+            <label
+              className={`event-selectable flex items-center gap-2 rounded-lg border px-2 py-1 text-xs ${selected.includes(vendor.vendor_code) ? "is-selected" : ""}`}
+              key={vendor.vendor_code}
+            >
+              <input
+                checked={selected.includes(vendor.vendor_code)}
+                onChange={(input) =>
+                  setSelected((current) =>
+                    input.target.checked
+                      ? [...current, vendor.vendor_code]
+                      : current.filter((code) => code !== vendor.vendor_code),
+                  )
+                }
+                type="checkbox"
+              />
+              {vendor.name}
+            </label>
+          ))}
+          <span className="text-xs text-slate-500">
+            Only main-platform vendor assignments registered for this event
+            appear.
+          </span>
+        </fieldset>
+      ) : null}
+      {category === "franchise_representative" ? (
+        <input
+          className="rounded-lg border bg-white p-2"
+          onChange={(input) => setEntityCode(input.target.value)}
+          placeholder="Ordering entity code"
+          required
+          value={entityCode}
+        />
+      ) : null}
+      <textarea
+        className="rounded-lg border bg-white p-2"
+        onChange={(input) => setTaskScope(input.target.value)}
+        placeholder="Event role, task scope, or notes"
+        value={taskScope}
+      />
+      <label className="event-selectable flex items-center gap-2 rounded-lg border px-2 py-2 text-sm">
+        <input
+          checked={isActive}
+          onChange={(input) => setIsActive(input.target.checked)}
+          type="checkbox"
+        />
+        Active event registration
+      </label>
       {error ? <p className="mt-2 text-xs text-red-700">{error}</p> : null}
       <button
         className="mt-2 rounded-lg border px-3 py-1 text-xs font-bold disabled:text-slate-400"
-        disabled={busy || !selected.length}
-        onClick={() => {
-          setBusy(true);
-          setError(null);
-          void updateEventMembershipVendors(event.id, member.id, selected)
-            .then(() => onUpdated(event.id))
-            .catch((caught: unknown) =>
-              setError(
-                caught instanceof Error
-                  ? caught.message
-                  : "Unable to update vendor access.",
-              ),
-            )
-            .finally(() => setBusy(false));
-        }}
-        type="button"
+        disabled={busy || (category === "vendor" && !selected.length)}
+        type="submit"
       >
-        {busy ? "Saving…" : "Save vendor access"}
+        {busy ? "Saving…" : "Save attendee details"}
       </button>
-    </div>
+    </form>
   );
 }
 
