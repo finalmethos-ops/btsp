@@ -644,7 +644,7 @@ export function OrderRequestLifecycleWorkspace({
                     value={line.product_code}
                   />
                   <div>
-                    <strong>{line.product_code}</strong>
+                    <strong>{line.model_identifier}</strong>
                     <span className="block text-sm text-slate-500">
                       {line.product_name}
                     </span>

@@ -81,7 +81,7 @@ export function ReconciliationPurchaseOrderWorkspace() {
                   <tr className="border-b" key={line.id}>
                     <td className="py-3">{line.store_number}</td>
                     <td>
-                      {line.product_code} — {line.product_name}
+                      {line.model_identifier} — {line.product_name}
                     </td>
                     <td>{line.quantity}</td>
                     <td>{money(line.unit_price, selected.currency)}</td>

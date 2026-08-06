@@ -82,8 +82,12 @@ class ExecutiveEntitySpendMetric(BaseModel):
 
 
 class ExecutiveBestSellerMetric(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     rank: int
     product_code: str
+    model_identifier: str
+    vendor_code: str
     product_name: str
     currency: str
     quantity: Decimal

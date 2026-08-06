@@ -52,6 +52,7 @@ def _order_payload(order: PurchaseOrder) -> dict[str, Any]:
                 "source_line_id": line.source_line_id,
                 "store_number": line.store_number,
                 "product_code": line.product_code,
+                "model_number": line.model_identifier,
                 "product_name": line.product_name,
                 "quantity": str(line.quantity),
                 "unit_price": str(line.unit_price),
@@ -85,6 +86,7 @@ def render_csv(order: PurchaseOrder) -> bytes:
             "source_request_id",
             "source_line_id",
             "product_code",
+            "model_number",
             "product_name",
             "quantity",
             "unit_price",
@@ -105,6 +107,7 @@ def render_csv(order: PurchaseOrder) -> bytes:
                 line.source_request_id,
                 line.source_line_id,
                 _spreadsheet_safe(line.product_code),
+                _spreadsheet_safe(line.model_identifier),
                 _spreadsheet_safe(line.product_name),
                 line.quantity,
                 line.unit_price,
@@ -149,9 +152,9 @@ def render_pdf(order: PurchaseOrder) -> bytes:
             canvas.showPage()
             y = header()
             canvas.setFont("Helvetica", 8)
-        description = _pdf_text(f"{line.store_number} / {line.product_code} - {line.product_name}")[
-            :72
-        ]
+        description = _pdf_text(
+            f"{line.store_number} / {line.model_identifier} - {line.product_name}"
+        )[:72]
         canvas.drawString(40, y, description)
         canvas.drawRightString(390, y, str(line.quantity))
         canvas.drawRightString(465, y, str(line.unit_price))

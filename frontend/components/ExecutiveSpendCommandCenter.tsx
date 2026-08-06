@@ -261,8 +261,10 @@ export function ExecutiveSpendCommandCenter() {
                     >
                       <b>{item.rank}</b>
                       <span>
-                        <strong>{item.product_code}</strong>
-                        <small>{item.product_name}</small>
+                        <strong>{item.model_identifier}</strong>
+                        <small>
+                          {item.vendor_code} · {item.product_name}
+                        </small>
                       </span>
                       <span>
                         <strong>{money(item.amount, currency)}</strong>

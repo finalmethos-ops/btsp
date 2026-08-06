@@ -798,6 +798,10 @@ def test_purchase_order_artifacts_are_immutable_idempotent_and_checksummed(
     db: Session, tmp_path: Path
 ) -> None:
     import_catalog(db, "catalog.xlsx", workbook_bytes(), "admin@example.com")
+    product = db.scalar(select(CatalogProduct).where(CatalogProduct.product_code == "P-100"))
+    assert product is not None
+    product.model_number = "DISPLAY-100"
+    db.commit()
     seed_bpp_purchasing(db, actor="admin@example.com")
     user = User(
         email="buyer@example.com",
@@ -810,6 +814,10 @@ def test_purchase_order_artifacts_are_immutable_idempotent_and_checksummed(
     db.commit()
     request = _request_at_po_created(db, "artifacts", user)
     order = generate_purchase_orders(db, [request.id], user.email, {"workflow.bpp.po_generate"})[0]
+    assert request.line_items[0].product_code == "P-100"
+    assert request.line_items[0].model_identifier == "DISPLAY-100"
+    assert order.lines[0].product_code == "P-100"
+    assert order.lines[0].model_identifier == "DISPLAY-100"
 
     generated = {
         artifact_format: generate_artifact(db, order, artifact_format, user.email, str(tmp_path))
@@ -828,11 +836,16 @@ def test_purchase_order_artifacts_are_immutable_idempotent_and_checksummed(
     json_content = po_artifact_path(
         generated[PurchaseOrderArtifactFormat.JSON], str(tmp_path)
     ).read_text()
-    assert json.loads(json_content)["po_number"] == order.po_number
+    json_payload = json.loads(json_content)
+    assert json_payload["po_number"] == order.po_number
+    assert json_payload["lines"][0]["product_code"] == "P-100"
+    assert json_payload["lines"][0]["model_number"] == "DISPLAY-100"
     csv_content = po_artifact_path(
         generated[PurchaseOrderArtifactFormat.CSV], str(tmp_path)
     ).read_text()
     assert "source_request_id" in csv_content
+    assert "product_code,model_number" in csv_content
+    assert "P-100,DISPLAY-100" in csv_content
     repeated = generate_artifact(
         db,
         order,

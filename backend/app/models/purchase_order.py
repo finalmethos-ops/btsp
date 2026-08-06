@@ -1,11 +1,15 @@
 from datetime import date, datetime
 from decimal import Decimal
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
 from sqlalchemy import JSON, Date, DateTime, ForeignKey, Numeric, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
+
+if TYPE_CHECKING:
+    from app.models.purchasing import PurchaseRequestLineItem
 
 
 class PurchaseOrderSequence(Base):
@@ -131,6 +135,13 @@ class PurchaseOrderLine(Base):
     notes: Mapped[str | None] = mapped_column(String(1000), nullable=True)
 
     purchase_order: Mapped[PurchaseOrder] = relationship(back_populates="lines")
+    source_line: Mapped["PurchaseRequestLineItem | None"] = relationship(lazy="joined")
+
+    @property
+    def model_identifier(self) -> str:
+        if self.source_line is not None:
+            return self.source_line.model_identifier
+        return self.product_code
 
 
 class PurchaseOrderArtifact(Base):

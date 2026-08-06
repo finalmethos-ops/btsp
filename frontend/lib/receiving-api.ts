@@ -4,6 +4,7 @@ export type ReceiptLine = {
   id: number;
   purchase_order_line_id: number;
   product_code: string;
+  model_identifier: string;
   received_quantity: string;
   accepted_quantity: string;
   rejected_quantity: string;
@@ -43,6 +44,7 @@ export type PurchaseBackorder = {
   source_variance_id: string;
   store_number: string;
   product_code: string;
+  model_identifier: string;
   original_quantity: string;
   fulfilled_quantity: string;
   outstanding_quantity: string;

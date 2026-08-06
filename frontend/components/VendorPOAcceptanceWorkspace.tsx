@@ -140,7 +140,7 @@ export function VendorPOAcceptanceWorkspace() {
                   {selected.lines.map((line) => (
                     <tr className="border-b" key={line.id}>
                       <td className="py-3">
-                        {line.store_number} · {line.product_code} —{" "}
+                        {line.store_number} · {line.model_identifier} —{" "}
                         {line.product_name}
                       </td>
                       <td>{line.quantity}</td>

@@ -12,6 +12,7 @@ export type VendorInvoice = {
   lines: Array<{
     id: number;
     product_code: string;
+    model_identifier: string;
     quantity: string;
     unit_price: string;
     match: {

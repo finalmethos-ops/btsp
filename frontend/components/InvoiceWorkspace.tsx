@@ -267,7 +267,7 @@ export function InvoiceWorkspace() {
               <tbody>
                 {order?.lines.map((line) => (
                   <tr className="border-b" key={line.id}>
-                    <td className="p-2">{line.product_code}</td>
+                    <td className="p-2">{line.model_identifier}</td>
                     <td className="p-2">
                       <input
                         className="w-28 rounded border p-2"

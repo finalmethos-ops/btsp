@@ -1,11 +1,15 @@
 from datetime import datetime
 from decimal import Decimal
+from typing import TYPE_CHECKING
 from uuid import uuid4
 
 from sqlalchemy import DateTime, ForeignKey, Numeric, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
+
+if TYPE_CHECKING:
+    from app.models.purchase_order import PurchaseOrderLine
 
 
 class ReceiptSequence(Base):
@@ -78,7 +82,12 @@ class PurchaseReceiptLine(Base):
     lot_number: Mapped[str | None] = mapped_column(String(160), nullable=True)
 
     receipt: Mapped[PurchaseReceipt] = relationship(back_populates="lines")
+    purchase_order_line: Mapped["PurchaseOrderLine"] = relationship(lazy="joined")
     variances: Mapped[list["ReceiptVariance"]] = relationship(back_populates="receipt_line")
+
+    @property
+    def model_identifier(self) -> str:
+        return self.purchase_order_line.model_identifier
 
 
 class ReceiptVariance(Base):
@@ -160,6 +169,11 @@ class PurchaseBackorder(Base):
         cascade="all, delete-orphan",
         order_by="PurchaseBackorderEvent.id",
     )
+    purchase_order_line: Mapped["PurchaseOrderLine"] = relationship(lazy="joined")
+
+    @property
+    def model_identifier(self) -> str:
+        return self.purchase_order_line.model_identifier
 
 
 class PurchaseBackorderEvent(Base):
@@ -231,9 +245,14 @@ class VendorInvoiceLine(Base):
     extended_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2))
 
     invoice: Mapped[VendorInvoice] = relationship(back_populates="lines")
+    purchase_order_line: Mapped["PurchaseOrderLine"] = relationship(lazy="joined")
     match: Mapped["InvoiceLineMatch"] = relationship(
         back_populates="invoice_line", cascade="all, delete-orphan", uselist=False
     )
+
+    @property
+    def model_identifier(self) -> str:
+        return self.purchase_order_line.model_identifier
 
 
 class InvoiceLineMatch(Base):

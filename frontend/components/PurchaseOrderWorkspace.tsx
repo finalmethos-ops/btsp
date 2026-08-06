@@ -249,7 +249,7 @@ export function PurchaseOrderWorkspace() {
                         <strong>{line.store_number}</strong> ·{" "}
                         {line.product_name}
                         <small className="block text-slate-500">
-                          {line.product_code}
+                          {line.model_identifier}
                         </small>
                       </td>
                       <td>{line.quantity}</td>

@@ -11,6 +11,7 @@ export type PurchaseOrderLine = {
   source_line_id: number | null;
   store_number: string;
   product_code: string;
+  model_identifier: string;
   product_name: string;
   quantity: string;
   received_quantity: string;

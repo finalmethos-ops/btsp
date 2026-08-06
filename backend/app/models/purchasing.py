@@ -76,4 +76,8 @@ class PurchaseRequestLineItem(Base):
     )
 
     purchase_request: Mapped[PurchaseRequest] = relationship(back_populates="line_items")
-    catalog_product: Mapped["CatalogProduct"] = relationship()
+    catalog_product: Mapped["CatalogProduct"] = relationship(lazy="joined")
+
+    @property
+    def model_identifier(self) -> str:
+        return self.catalog_product.model_number or self.product_code

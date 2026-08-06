@@ -189,6 +189,8 @@ def executive_spend_dashboard(
     seller_rows = db.execute(
         select(
             PurchaseOrderLine.product_code,
+            func.coalesce(CatalogProduct.model_number, PurchaseOrderLine.product_code),
+            PurchaseOrder.vendor_code,
             PurchaseOrderLine.product_name,
             PurchaseOrder.currency,
             func.coalesce(func.sum(PurchaseOrderLine.quantity), 0),
@@ -198,12 +200,15 @@ def executive_spend_dashboard(
             PurchaseOrderLine,
             PurchaseOrderLine.purchase_order_id == PurchaseOrder.id,
         )
+        .outerjoin(CatalogProduct, CatalogProduct.product_code == PurchaseOrderLine.product_code)
         .where(
             PurchaseOrder.created_at >= month_start,
             PurchaseOrder.created_at <= current,
         )
         .group_by(
             PurchaseOrderLine.product_code,
+            CatalogProduct.model_number,
+            PurchaseOrder.vendor_code,
             PurchaseOrderLine.product_name,
             PurchaseOrder.currency,
         )
@@ -216,15 +221,17 @@ def executive_spend_dashboard(
     ).all()
     sellers_by_currency: dict[str, list[tuple[object, ...]]] = {}
     for row in seller_rows:
-        sellers_by_currency.setdefault(str(row[2]), []).append(row)
+        sellers_by_currency.setdefault(str(row[4]), []).append(row)
     top_sellers = [
         ExecutiveBestSellerMetric(
             rank=rank,
             product_code=str(row[0]),
-            product_name=str(row[1]),
+            model_identifier=str(row[1]),
+            vendor_code=str(row[2]),
+            product_name=str(row[3]),
             currency=currency,
-            quantity=Decimal(row[3]),
-            amount=Decimal(row[4]),
+            quantity=Decimal(row[5]),
+            amount=Decimal(row[6]),
         )
         for currency, currency_rows in sellers_by_currency.items()
         for rank, row in enumerate(currency_rows[:10], start=1)

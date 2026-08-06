@@ -261,7 +261,7 @@ export function PurchasingPOMonitorWorkspace({
                     >
                       <div>
                         <strong>
-                          {line.product_code} — {line.product_name}
+                          {line.model_identifier} — {line.product_name}
                         </strong>
                         <span className="block text-sm text-slate-500">
                           Received {line.received_quantity} of {line.quantity} ·

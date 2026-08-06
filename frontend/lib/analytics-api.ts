@@ -36,6 +36,8 @@ export type ExecutiveEntitySpendMetric = {
 export type ExecutiveBestSellerMetric = {
   rank: number;
   product_code: string;
+  model_identifier: string;
+  vendor_code: string;
   product_name: string;
   currency: string;
   quantity: string;

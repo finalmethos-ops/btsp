@@ -16,13 +16,14 @@ class PurchaseOrderSourceResponse(BaseModel):
 
 
 class PurchaseOrderLineResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
     id: int
     source_request_id: str
     source_line_id: int | None
     store_number: str
     product_code: str
+    model_identifier: str
     product_name: str
     quantity: Decimal
     received_quantity: Decimal

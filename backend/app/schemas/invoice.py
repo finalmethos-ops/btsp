@@ -62,12 +62,13 @@ class InvoiceLineMatchResponse(BaseModel):
 
 
 class VendorInvoiceLineResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
     id: int
     line_number: int
     purchase_order_line_id: int
     product_code: str
+    model_identifier: str
     quantity: Decimal
     unit_price: Decimal
     extended_amount: Decimal

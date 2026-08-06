@@ -290,7 +290,7 @@ export function ReceivingWorkspace() {
                     <td className="p-2 font-medium">
                       {backorder.backorder_number}
                     </td>
-                    <td className="p-2">{backorder.product_code}</td>
+                    <td className="p-2">{backorder.model_identifier}</td>
                     <td className="p-2">
                       {backorder.status.replaceAll("_", " ")}
                     </td>
@@ -384,7 +384,7 @@ export function ReceivingWorkspace() {
                   .map((line) => (
                     <tr className="border-b" key={line.id}>
                       <td className="p-2">
-                        <span className="font-medium">{line.product_code}</span>
+                        <span className="font-medium">{line.model_identifier}</span>
                         <br />
                         <span className="text-slate-500">
                           {line.product_name}

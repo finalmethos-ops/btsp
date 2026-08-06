@@ -30,10 +30,11 @@ class PurchaseLineWrite(BaseModel):
 
 
 class PurchaseLineResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
     id: int
     product_code: str
+    model_identifier: str
     product_name: str
     quantity: Decimal
     unit_price: Decimal

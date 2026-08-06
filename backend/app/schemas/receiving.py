@@ -42,12 +42,13 @@ class PurchaseReceiptCreate(BaseModel):
 
 
 class PurchaseReceiptLineResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
     id: int
     purchase_order_line_id: int
     asn_line_id: int | None
     product_code: str
+    model_identifier: str
     received_quantity: Decimal
     accepted_quantity: Decimal
     rejected_quantity: Decimal
@@ -114,7 +115,7 @@ class PurchaseBackorderEventResponse(BaseModel):
 
 
 class PurchaseBackorderResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
     id: str
     backorder_number: str
@@ -123,6 +124,7 @@ class PurchaseBackorderResponse(BaseModel):
     purchase_order_line_id: int
     store_number: str
     product_code: str
+    model_identifier: str
     original_quantity: Decimal
     fulfilled_quantity: Decimal
     outstanding_quantity: Decimal

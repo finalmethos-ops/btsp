@@ -31,6 +31,7 @@ export type CatalogProduct = {
 export type PurchaseLine = {
   id: number;
   product_code: string;
+  model_identifier: string;
   product_name: string;
   quantity: string;
   unit_price: string;

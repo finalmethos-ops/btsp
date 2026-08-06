@@ -363,7 +363,7 @@ export function PurchaseRequestWorkspace({
                       <td className="py-3">
                         {line.product_name}
                         <small className="block text-slate-500">
-                          {line.product_code}
+                          {line.model_identifier}
                         </small>
                       </td>
                       <td>{line.quantity}</td>

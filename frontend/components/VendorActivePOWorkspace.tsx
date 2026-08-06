@@ -148,7 +148,7 @@ export function VendorActivePOWorkspace({
                   {selected.lines.map((line) => (
                     <div className="rounded-xl border p-4" key={line.id}>
                       <strong>
-                        {line.product_code} — {line.product_name}
+                        {line.model_identifier} — {line.product_name}
                       </strong>
                       <span className="block text-sm text-slate-500">
                         {line.quantity} ordered · {line.received_quantity}{" "}
