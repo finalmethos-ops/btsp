@@ -53,6 +53,7 @@ export function EventPresentationDisplay({
   const [imageFit, setImageFit] = useState<"contain" | "cover">("contain");
   const slide = presentation?.current_slide;
   const isFiller = slide?.slide_type === "filler";
+  const isMultiProduct = Boolean(slide?.product_variants.length);
   const slideId = slide?.id;
   const slideHasImage = slide?.has_image;
   const brandedStyle = eventThemeStyle(
@@ -152,7 +153,7 @@ export function EventPresentationDisplay({
 
   return (
     <main
-      className={`event-ui event-presentation-display event-branded-surface flex min-h-screen flex-col bg-slate-950 p-4 text-white sm:p-8 ${presentation ? "has-event-theme" : ""} ${brandingUrl ? "has-event-branding-image" : ""}`}
+      className={`event-ui event-presentation-display event-branded-surface flex min-h-screen flex-col bg-slate-950 p-4 text-white ${presentation ? "has-event-theme" : ""} ${brandingUrl ? "has-event-branding-image" : ""}`}
       style={brandedStyle}
     >
       {error ? (
@@ -183,7 +184,7 @@ export function EventPresentationDisplay({
       </header>
       {slide ? (
         slide.slide_type === "filler" ? (
-          <section className="flex flex-1 flex-col items-center justify-center gap-8 py-10 text-center">
+          <section className="event-presentation-filler flex min-h-0 flex-1 flex-col items-center justify-center gap-8 py-10 text-center">
             <span className="rounded-full border border-blue-400/40 bg-blue-950 px-5 py-2 text-sm font-black uppercase tracking-[0.2em] text-blue-200">
               {slide.filler_category?.replaceAll("_", " ")}
             </span>
@@ -215,14 +216,14 @@ export function EventPresentationDisplay({
             ) : null}
           </section>
         ) : (
-          <>
-            <div className="grid flex-1 items-stretch gap-6 py-8 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)_minmax(18rem,0.72fr)]">
+          <div className="event-presentation-product-shell">
+            <div className="event-presentation-product-grid grid flex-1 items-stretch gap-5 py-5 lg:grid-cols-[minmax(0,1.08fr)_minmax(0,1fr)_minmax(17rem,0.68fr)]">
               {imageUrl ? (
                 // Protected blob URLs cannot use the Next image optimizer.
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   alt={slide.name}
-                  className={`max-h-[60vh] w-full rounded-2xl bg-white ${imageFit === "contain" ? "object-contain" : "object-cover"}`}
+                  className={`event-presentation-product-image max-h-[58vh] w-full rounded-2xl bg-white ${imageFit === "contain" ? "object-contain" : "object-cover"}`}
                   src={imageUrl}
                 />
               ) : (
@@ -230,14 +231,16 @@ export function EventPresentationDisplay({
                   Product image
                 </div>
               )}
-              <div className="flex flex-col justify-center">
-                <h2 className="text-3xl font-black sm:text-4xl xl:text-5xl">
+              <div className="event-presentation-product-copy flex min-w-0 flex-col justify-center">
+                <h2 className="text-3xl font-black leading-tight sm:text-4xl xl:text-5xl">
                   {slide.name}
                 </h2>
-                <p className="mt-2 text-xl text-slate-300 xl:text-2xl">
-                  {slide.model_number}
-                </p>
-                <div className="mt-5 flex flex-wrap gap-x-8 gap-y-2 border-y border-slate-700 py-3 text-sm uppercase tracking-wide">
+                {!isMultiProduct ? (
+                  <p className="mt-1 text-xl text-slate-300 xl:text-2xl">
+                    {slide.model_number}
+                  </p>
+                ) : null}
+                <div className="mt-3 flex flex-wrap gap-x-8 gap-y-1 border-y border-slate-700 py-2 text-sm uppercase tracking-wide">
                   <span className="text-slate-400">
                     Vendor:{" "}
                     <strong className="text-blue-300">
@@ -251,77 +254,97 @@ export function EventPresentationDisplay({
                     </strong>
                   </span>
                 </div>
-                <p className="mt-5 text-xs font-bold uppercase tracking-widest text-slate-400">
+                <p className="mt-3 text-xs font-bold uppercase tracking-widest text-slate-400">
                   Description
                 </p>
-                <p className="mt-2 text-base leading-relaxed text-slate-200 xl:text-lg">
+                <p className="mt-1 line-clamp-3 text-base leading-relaxed text-slate-200 xl:text-lg">
                   {slide.description || "Offer description pending."}
                 </p>
                 {slide.specifications ? (
-                  <p className="mt-3 text-sm text-slate-400">
+                  <p className="mt-2 line-clamp-2 text-sm text-slate-400">
                     {slide.specifications}
                   </p>
                 ) : null}
-                <div className="mt-6">
-                  {slide.standard_cost ? (
-                    <p className="text-base font-bold text-slate-300">
-                      Standard Cost{" "}
-                      <span className="text-xl line-through">
-                        ${formatMoney(slide.standard_cost)}
-                      </span>
-                    </p>
-                  ) : null}
-                  <p className="text-sm font-black uppercase tracking-widest text-red-400">
-                    Event price
-                  </p>
-                  <strong className="text-4xl font-black text-red-400 xl:text-5xl">
-                    ${formatMoney(slide.event_unit_cost ?? 0)}
-                    <small className="ml-2 text-xl">/ EA</small>
-                  </strong>
-                </div>
-                {primarySavings ? (
-                  <div className="mt-4 rounded-2xl border-2 border-yellow-300 bg-yellow-300 px-5 py-4 text-slate-950 shadow-[0_0_28px_rgba(253,224,71,0.28)]">
-                    <p className="text-sm font-black uppercase tracking-[0.18em]">
-                      Your savings
-                    </p>
-                    <strong className="mt-1 block text-3xl font-black xl:text-4xl">
-                      ${formatMoney(primarySavings.amount)} / EA
-                    </strong>
-                    <span className="text-lg font-black">
-                      {primarySavings.percent}% below Standard Cost
-                    </span>
-                  </div>
-                ) : null}
-                {slide.product_variants.length ? (
-                  <div className="mt-5 grid gap-2 sm:grid-cols-2">
+                {isMultiProduct ? (
+                  <div className="presentation-variant-grid mt-3 grid min-h-0 flex-1 gap-3 sm:grid-cols-2">
                     {slide.product_variants.map((variant) => {
                       const savings = savingsDetails(
                         variant.standard_cost,
                         variant.event_unit_cost,
                       );
                       return (
-                        <div
-                          className="rounded-xl border border-blue-400/40 bg-blue-950 px-3 py-2 text-sm"
+                        <article
+                          className="presentation-variant-card flex min-h-0 flex-col justify-between rounded-xl border border-blue-400/50 bg-blue-950/85 p-3"
                           key={variant.model_number}
                         >
-                          <strong className="block">{variant.name}</strong>
-                          <span className="text-slate-300">
-                            {variant.model_number} · Event $
-                            {formatMoney(variant.event_unit_cost)}
-                          </span>
-                          {savings ? (
-                            <strong className="mt-1 block text-yellow-300">
-                              Save ${formatMoney(savings.amount)} / EA ·{" "}
-                              {savings.percent}%
+                          <div>
+                            <strong className="line-clamp-2 block text-base">
+                              {variant.name}
                             </strong>
+                            <span className="text-sm text-slate-300">
+                              {variant.model_number}
+                            </span>
+                          </div>
+                          <div className="mt-2 border-t border-blue-300/25 pt-2">
+                            {variant.standard_cost ? (
+                              <span className="block text-xs font-bold text-slate-300">
+                                Standard ${formatMoney(variant.standard_cost)}
+                              </span>
+                            ) : null}
+                            <strong className="block text-2xl font-black text-amber-300">
+                              ${formatMoney(variant.event_unit_cost)} / EA
+                            </strong>
+                          </div>
+                          {savings ? (
+                            <div className="presentation-variant-savings mt-2 rounded-lg px-3 py-2">
+                              <strong className="block">
+                                Save ${formatMoney(savings.amount)} / EA
+                              </strong>
+                              <span>
+                                {savings.percent}% below Standard Cost
+                              </span>
+                            </div>
                           ) : null}
-                        </div>
+                        </article>
                       );
                     })}
                   </div>
-                ) : null}
+                ) : (
+                  <>
+                    <div className="mt-4">
+                      {slide.standard_cost ? (
+                        <p className="text-base font-bold text-slate-300">
+                          Standard Cost{" "}
+                          <span className="text-xl line-through">
+                            ${formatMoney(slide.standard_cost)}
+                          </span>
+                        </p>
+                      ) : null}
+                      <p className="text-sm font-black uppercase tracking-widest text-red-400">
+                        Event price
+                      </p>
+                      <strong className="text-4xl font-black text-red-400 xl:text-5xl">
+                        ${formatMoney(slide.event_unit_cost ?? 0)}
+                        <small className="ml-2 text-xl">/ EA</small>
+                      </strong>
+                    </div>
+                    {primarySavings ? (
+                      <div className="presentation-savings-card mt-3 rounded-2xl border-2 px-5 py-3">
+                        <p className="text-sm font-black uppercase tracking-[0.18em]">
+                          Your savings
+                        </p>
+                        <strong className="presentation-savings-value mt-1 block text-3xl font-black xl:text-4xl">
+                          ${formatMoney(primarySavings.amount)} / EA
+                        </strong>
+                        <span className="text-base font-black">
+                          {primarySavings.percent}% below Standard Cost
+                        </span>
+                      </div>
+                    ) : null}
+                  </>
+                )}
               </div>
-              <aside className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/85">
+              <aside className="event-presentation-offer-details overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/85">
                 <h3 className="border-b border-slate-700 px-5 py-4 text-center text-sm font-black uppercase tracking-[0.18em]">
                   Offer Details
                 </h3>
@@ -385,23 +408,25 @@ export function EventPresentationDisplay({
                   </div>
                   <div className="flex justify-between gap-4 px-5 py-4">
                     <dt className="font-bold uppercase text-slate-400">
-                      Minimum order
+                      {isMultiProduct ? "Product options" : "Minimum order"}
                     </dt>
                     <dd className="font-black">
-                      {slide.minimum_order_quantity} EA
+                      {isMultiProduct
+                        ? slide.product_variants.length
+                        : `${slide.minimum_order_quantity} EA`}
                     </dd>
                   </div>
                 </dl>
               </aside>
             </div>
             <section
-              className={`grid items-center gap-4 rounded-2xl border p-4 sm:grid-cols-[1fr_auto_1fr] sm:p-6 ${presentation?.ordering_status === "open" ? "border-green-500/70 bg-green-950/30" : "border-slate-700 bg-slate-900/80"}`}
+              className={`event-presentation-footer grid items-center gap-4 rounded-2xl border p-3 sm:grid-cols-[1fr_auto_1fr] ${presentation?.ordering_status === "open" ? "border-green-500/70 bg-green-950/30" : "border-slate-700 bg-slate-900/80"}`}
             >
               <div className="text-center sm:text-left">
                 <span className="text-sm font-bold uppercase text-slate-400">
                   Live current-product units
                 </span>
-                <strong className="block text-4xl sm:text-5xl">
+                <strong className="block text-3xl sm:text-4xl">
                   {presentation?.total_units_ordered ?? 0}
                 </strong>
                 <small className="text-slate-400">
@@ -415,7 +440,7 @@ export function EventPresentationDisplay({
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     alt={`${presentation?.event_name ?? "Event"} branding`}
-                    className="mb-2 max-h-20 max-w-48 object-contain"
+                    className="mb-1 max-h-14 max-w-40 object-contain"
                     src={brandingUrl}
                   />
                 ) : (
@@ -438,7 +463,7 @@ export function EventPresentationDisplay({
                 <span className="text-sm font-bold uppercase text-slate-400">
                   Live current-product spend
                 </span>
-                <strong className="block text-4xl sm:text-5xl">
+                <strong className="block text-3xl sm:text-4xl">
                   ${presentation?.total_combined_spend ?? "0.00"}
                 </strong>
                 <small className="text-slate-400">
@@ -447,7 +472,7 @@ export function EventPresentationDisplay({
                 </small>
               </div>
             </section>
-          </>
+          </div>
         )
       ) : (
         <div className="flex flex-1 items-center justify-center text-4xl text-slate-500">

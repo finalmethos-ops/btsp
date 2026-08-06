@@ -261,7 +261,7 @@ export function EventPresenterConsole({
               const current = slide.id === presentation?.current_slide?.id;
               return (
                 <li
-                  className={`rounded-xl border p-3 ${current ? "border-blue-400 bg-blue-950/60" : "border-slate-700 bg-slate-900"}`}
+                  className={`presenter-queue-card rounded-xl border p-3 ${current ? "is-current" : "is-upcoming"}`}
                   key={slide.id}
                 >
                   <span className="text-xs font-bold text-slate-400">
@@ -348,6 +348,14 @@ export function EventPresenterConsole({
               : "Preparing projector link…"}
           </button>
         )}
+        <Link
+          className="rounded-lg border border-amber-300 px-4 py-2 font-semibold text-amber-200"
+          href={`/events/presenter/${subEventId}`}
+          rel="noopener noreferrer"
+          target="_blank"
+        >
+          Open presenter monitor ↗
+        </Link>
       </div>
       <p className="mt-3 text-xs text-slate-400">
         Keyboard: ←/→ slides · Space opens product ordering · Enter closes

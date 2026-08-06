@@ -1109,9 +1109,11 @@ td {
   background: linear-gradient(135deg, #b91c1c, #7f1d1d) !important;
 }
 
-/* Branded accent cards can be bright yellow; keep presenter data readable. */
+/* Presenter controls use deliberate light/dark surfaces instead of inheriting
+   ambiguous text colors from an event theme. */
 .presenter-console-card {
   color: #07142c !important;
+  background: linear-gradient(135deg, #ffc400, #ffdc63) !important;
 }
 
 .platform-sidebar {
@@ -1167,6 +1169,10 @@ td {
   color: #334155 !important;
 }
 
+.presenter-console-card :where(p, strong, span, small, h4, th, td, time) {
+  color: #07142c !important;
+}
+
 .presenter-console-card :where(.text-green-400) {
   color: #166534 !important;
 }
@@ -1175,11 +1181,135 @@ td {
   color: #92400e !important;
 }
 
-.presenter-console-card .presenter-progress-dial,
+.presenter-console-card .presenter-progress-dial {
+  background: #07142c !important;
+}
+
 .presenter-console-card
   .presenter-progress-dial
-  :where(.text-slate-300, .text-slate-400) {
+  :where(strong, small, span, .text-slate-300, .text-slate-400) {
   color: #f8fafc !important;
+}
+
+.presenter-queue-card.is-current {
+  color: #f8fafc !important;
+  border-color: #60a5fa !important;
+  background: #102653 !important;
+}
+
+.presenter-queue-card.is-current :where(span, strong, small) {
+  color: #f8fafc !important;
+}
+
+.presenter-queue-card.is-current small {
+  color: #fde68a !important;
+}
+
+.presenter-queue-card.is-upcoming {
+  color: #07142c !important;
+  border-color: #d9ad00 !important;
+  background: linear-gradient(135deg, #ffc400, #ffdc63) !important;
+}
+
+.presenter-queue-card.is-upcoming :where(span, strong) {
+  color: #07142c !important;
+}
+
+.presenter-queue-card.is-upcoming small {
+  color: #713f12 !important;
+}
+
+.presentation-savings-card,
+.presentation-variant-savings {
+  color: #f8fafc !important;
+  border-color: #5eead4 !important;
+  background: linear-gradient(135deg, #0f4c5c, #123150) !important;
+  box-shadow: 0 12px 30px rgba(13, 148, 136, 0.2);
+}
+
+.presentation-savings-card :where(p, span, strong),
+.presentation-variant-savings :where(span, strong) {
+  color: #f8fafc !important;
+}
+
+.presentation-savings-card .presentation-savings-value,
+.presentation-variant-savings strong {
+  color: #fde047 !important;
+}
+
+.presentation-variant-grid {
+  grid-auto-rows: minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.presentation-variant-card {
+  overflow: hidden;
+}
+
+@media (min-width: 1024px) and (min-height: 620px) {
+  .event-presentation-display {
+    width: 100vw;
+    height: 100dvh;
+    min-height: 100dvh;
+    overflow: hidden;
+    padding: clamp(0.75rem, 1.1vw, 1.25rem);
+  }
+
+  .event-presentation-display > header {
+    flex: none;
+    padding-bottom: 0.65rem;
+  }
+
+  .event-presentation-product-shell {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    flex-direction: column;
+  }
+
+  .event-presentation-product-grid {
+    min-height: 0;
+    overflow: hidden;
+    padding-block: clamp(0.65rem, 1.2vh, 1rem);
+  }
+
+  .event-presentation-product-image {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    max-height: 100%;
+  }
+
+  .event-presentation-product-copy,
+  .event-presentation-offer-details {
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .event-presentation-offer-details :where(dl > div) {
+    padding-top: clamp(0.5rem, 1vh, 0.85rem);
+    padding-bottom: clamp(0.5rem, 1vh, 0.85rem);
+  }
+
+  .event-presentation-footer {
+    flex: none;
+    min-height: 6.5rem;
+    max-height: 8.5rem;
+    overflow: hidden;
+  }
+
+  .event-presentation-filler {
+    min-height: 0;
+    overflow: hidden;
+    gap: clamp(0.75rem, 2vh, 1.5rem);
+    padding-block: clamp(0.75rem, 2vh, 1.5rem);
+  }
+
+  .event-presentation-filler img {
+    min-height: 0;
+    max-height: 48dvh;
+  }
 }
 
 .event-ui .selected-object *,
