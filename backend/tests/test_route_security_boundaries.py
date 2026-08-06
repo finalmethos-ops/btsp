@@ -7,7 +7,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.api.v1.routes.event_realtime import _realtime_access_allowed
 from app.auth.dependencies import get_current_user
-from app.auth.security import create_projector_token
+from app.auth.security import create_presenter_token, create_projector_token
 from app.core.config import settings
 from app.db.session import Base, get_db
 from app.main import app
@@ -139,6 +139,21 @@ def test_projector_display_uses_scoped_link_instead_of_user_login(
             assert response.json()["sub_event_id"] == sub_event_id
             assert response.json()["presenter_notes"] is None
             assert response.json()["slide_queue"] == []
+            assert response.json()["presenter_slides"] == []
+
+            presenter_token, _presenter_expires_at = create_presenter_token(sub_event_id)
+            presenter_response = client.get(
+                f"/api/v1/public-event-presentations/{sub_event_id}/presenter-monitor",
+                headers={"X-BTSP-Presenter-Token": presenter_token},
+            )
+            assert presenter_response.status_code == 200
+            assert presenter_response.json()["sub_event_id"] == sub_event_id
+
+            rejected_projector_token = client.get(
+                f"/api/v1/public-event-presentations/{sub_event_id}/presenter-monitor",
+                headers={"X-BTSP-Presenter-Token": token},
+            )
+            assert rejected_projector_token.status_code == 401
 
             wrong_token, _expires_at = create_projector_token("different-sub-event")
             rejected = client.get(

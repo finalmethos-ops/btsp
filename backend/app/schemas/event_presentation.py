@@ -33,6 +33,11 @@ class EventProjectorAccessResponse(BaseModel):
     expires_at: datetime
 
 
+class EventPresenterAccessResponse(BaseModel):
+    presenter_token: str
+    expires_at: datetime
+
+
 class EventPresentationResponse(BaseModel):
     sub_event_id: str
     event_id: str
@@ -49,10 +54,12 @@ class EventPresentationResponse(BaseModel):
     current_position: int | None
     total_units_ordered: int = 0
     total_combined_spend: str = "0.00"
+    variant_units_ordered: dict[str, int] = Field(default_factory=dict)
     sub_event_units_ordered: int = 0
     sub_event_combined_spend: str = "0.00"
     presenter_notes: str | None = None
     slide_queue: list[EventPresentationQueueItem] = Field(default_factory=list)
+    presenter_slides: list[EventProductSlideResponse] = Field(default_factory=list)
     updated_at: datetime | None
 
 

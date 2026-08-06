@@ -151,18 +151,23 @@ def get_presentation(
         )
     total_units = 0
     total_spend = "0.00"
+    variant_units_ordered: dict[str, int] = {}
     if current is not None:
-        totals = db.execute(
-            select(
-                func.coalesce(func.sum(EventEntityOrder.quantity), 0),
-                func.coalesce(func.sum(EventEntityOrder.total_cost), 0),
-            ).where(
-                EventEntityOrder.slide_id == current.id,
-                EventEntityOrder.status == "confirmed",
-            )
-        ).one()
-        total_units = int(totals[0])
-        total_spend = f"{totals[1]:.2f}"
+        current_orders = list(
+            db.scalars(
+                select(EventEntityOrder).where(
+                    EventEntityOrder.slide_id == current.id,
+                    EventEntityOrder.status == "confirmed",
+                )
+            ).all()
+        )
+        total_units = sum(order.quantity for order in current_orders)
+        total_spend = f"{sum(order.total_cost for order in current_orders):.2f}"
+        for order in current_orders:
+            for model_number, quantity in (order.variant_quantities or {}).items():
+                variant_units_ordered[model_number] = variant_units_ordered.get(
+                    model_number, 0
+                ) + int(quantity)
     sub_event_totals = db.execute(
         select(
             func.coalesce(func.sum(EventEntityOrder.quantity), 0),
@@ -192,6 +197,7 @@ def get_presentation(
         current_position=current.position if current else None,
         total_units_ordered=total_units,
         total_combined_spend=total_spend,
+        variant_units_ordered=variant_units_ordered,
         sub_event_units_ordered=int(sub_event_totals[0]),
         sub_event_combined_spend=f"{sub_event_totals[1]:.2f}",
         presenter_notes=(
@@ -207,6 +213,16 @@ def get_presentation(
                     model_number=slide.model_number,
                     name=slide.name,
                     presenter_notes=slide.presenter_notes,
+                )
+                for slide in slides
+            ]
+            if include_presenter_details
+            else []
+        ),
+        presenter_slides=(
+            [
+                EventProductSlideResponse.model_validate(slide, from_attributes=True).model_copy(
+                    update={"has_image": slide.image is not None}
                 )
                 for slide in slides
             ]

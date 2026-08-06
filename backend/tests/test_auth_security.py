@@ -3,8 +3,10 @@ import pytest
 
 from app.auth.security import (
     create_access_token,
+    create_presenter_token,
     create_projector_token,
     decode_access_token,
+    decode_presenter_token,
     decode_projector_token,
     hash_password,
     verify_password,
@@ -65,6 +67,24 @@ def test_user_access_token_cannot_be_used_as_projector_token(
 
     with pytest.raises(jwt.PyJWTError):
         decode_projector_token(create_access_token("admin@example.com"), "sub-event-a")
+
+
+def test_presenter_token_is_read_only_and_sub_event_scoped(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "secret_key", "test-secret-key-with-at-least-32-bytes")
+    token, expires_at = create_presenter_token("sub-event-a")
+
+    payload = decode_presenter_token(token, "sub-event-a")
+
+    assert payload["scope"] == "event_presenter_monitor"
+    assert payload["sub_event_id"] == "sub-event-a"
+    assert payload["aud"] == f"{settings.app_name}:presenter-monitor"
+    assert expires_at.isoformat()
+    with pytest.raises(jwt.PyJWTError):
+        decode_presenter_token(token, "sub-event-b")
+    with pytest.raises(jwt.PyJWTError):
+        decode_projector_token(token, "sub-event-a")
 
 
 @pytest.mark.parametrize(

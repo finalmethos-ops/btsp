@@ -1519,6 +1519,13 @@ def test_event_product_lineup_snapshots_catalog_controls_and_reorders() -> None:
             "buyer@example.com",
             "second-buyer@example.com",
         ]
+        live_presentation = get_presentation(db, sub_event_id)
+        assert live_presentation is not None
+        assert live_presentation.variant_units_ordered == {
+            "SPECIAL-TWIN": 3,
+            "SPECIAL-KING": 2,
+        }
+        assert live_presentation.presenter_slides == []
         filler = create_slide(
             db,
             sub_event_id,
@@ -1555,6 +1562,11 @@ def test_event_product_lineup_snapshots_catalog_controls_and_reorders() -> None:
             "Confirm the winning badge number before advancing."
         )
         assert [item.id for item in presenter_presentation.slide_queue] == [
+            second.id,
+            filler.id,
+            first.id,
+        ]
+        assert [item.id for item in presenter_presentation.presenter_slides] == [
             second.id,
             filler.id,
             first.id,

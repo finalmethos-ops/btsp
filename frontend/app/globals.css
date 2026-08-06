@@ -1237,6 +1237,16 @@ td {
   color: #fde047 !important;
 }
 
+.presentation-variant-savings.is-neutral {
+  border: 1px solid rgba(148, 163, 184, 0.7) !important;
+  background: linear-gradient(135deg, #26354d, #18243a) !important;
+  box-shadow: none;
+}
+
+.presentation-variant-savings.is-neutral strong {
+  color: #e2e8f0 !important;
+}
+
 .presentation-variant-grid {
   grid-auto-rows: minmax(0, 1fr);
   overflow: hidden;
@@ -1292,6 +1302,10 @@ td {
     padding-bottom: clamp(0.5rem, 1vh, 0.85rem);
   }
 
+  .presentation-model-sales {
+    overflow: hidden;
+  }
+
   .event-presentation-footer {
     flex: none;
     min-height: 6.5rem;
@@ -1309,6 +1323,12 @@ td {
   .event-presentation-filler img {
     min-height: 0;
     max-height: 48dvh;
+  }
+}
+
+@media (min-width: 1024px) and (max-height: 680px) {
+  .presentation-model-sales {
+    display: none;
   }
 }
 

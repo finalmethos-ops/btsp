@@ -2,15 +2,10 @@
 
 import { useEffect, useState } from "react";
 import {
-  downloadPresentationImage,
+  downloadPublicPresenterImage,
   EventPresentation,
-  getEventPresenterPresentation,
+  getPublicEventPresenterPresentation,
 } from "@/lib/event-presentation-api";
-import {
-  EventProductSlide,
-  listEventProductSlides,
-} from "@/lib/event-product-slide-api";
-import { subscribeEventRealtime } from "@/lib/event-realtime";
 
 const formatMoney = (value: string | number | null | undefined) =>
   Number(value ?? 0).toLocaleString(undefined, {
@@ -18,25 +13,26 @@ const formatMoney = (value: string | number | null | undefined) =>
     maximumFractionDigits: 2,
   });
 
-export function EventPresenterMonitor({ subEventId }: { subEventId: string }) {
+export function EventPresenterMonitor({
+  presenterToken,
+  subEventId,
+}: {
+  presenterToken: string;
+  subEventId: string;
+}) {
   const [presentation, setPresentation] = useState<EventPresentation | null>(
     null,
   );
-  const [slides, setSlides] = useState<EventProductSlide[]>([]);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
     const refresh = () => {
-      void Promise.all([
-        getEventPresenterPresentation(subEventId),
-        listEventProductSlides(subEventId),
-      ])
-        .then(([nextPresentation, nextSlides]) => {
+      void getPublicEventPresenterPresentation(subEventId, presenterToken)
+        .then((nextPresentation) => {
           if (!active) return;
           setPresentation(nextPresentation);
-          setSlides(nextSlides);
           setError(null);
         })
         .catch((caught: unknown) => {
@@ -49,16 +45,14 @@ export function EventPresenterMonitor({ subEventId }: { subEventId: string }) {
         });
     };
     refresh();
-    const timer = window.setInterval(refresh, 5_000);
-    const unsubscribe = subscribeEventRealtime(subEventId, refresh);
+    const timer = window.setInterval(refresh, 2_000);
     return () => {
       active = false;
       window.clearInterval(timer);
-      unsubscribe();
     };
-  }, [subEventId]);
+  }, [presenterToken, subEventId]);
 
-  const orderedSlides = [...slides].sort(
+  const orderedSlides = [...(presentation?.presenter_slides ?? [])].sort(
     (left, right) => left.position - right.position,
   );
   const nextSlide =
@@ -75,7 +69,11 @@ export function EventPresenterMonitor({ subEventId }: { subEventId: string }) {
     let objectUrl: string | null = null;
     setImageUrl(null);
     if (nextSlide?.has_image)
-      void downloadPresentationImage(nextSlide.id)
+      void downloadPublicPresenterImage(
+        subEventId,
+        nextSlide.id,
+        presenterToken,
+      )
         .then((blob) => {
           objectUrl = URL.createObjectURL(blob);
           setImageUrl(objectUrl);
@@ -84,7 +82,7 @@ export function EventPresenterMonitor({ subEventId }: { subEventId: string }) {
     return () => {
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [nextSlide?.has_image, nextSlide?.id]);
+  }, [nextSlide?.has_image, nextSlide?.id, presenterToken, subEventId]);
 
   return (
     <main className="presenter-monitor min-h-[calc(100dvh-5rem)] bg-slate-950 p-4 text-white sm:p-7">

@@ -272,6 +272,9 @@ export function EventPresentationDisplay({
                         variant.standard_cost,
                         variant.event_unit_cost,
                       );
+                      const standardCost = Number(variant.standard_cost);
+                      const eventCost = Number(variant.event_unit_cost);
+                      const priceDifference = eventCost - standardCost;
                       return (
                         <article
                           className="presentation-variant-card flex min-h-0 flex-col justify-between rounded-xl border border-blue-400/50 bg-blue-950/85 p-3"
@@ -304,7 +307,22 @@ export function EventPresentationDisplay({
                                 {savings.percent}% below Standard Cost
                               </span>
                             </div>
-                          ) : null}
+                          ) : (
+                            <div className="presentation-variant-savings is-neutral mt-2 rounded-lg px-3 py-2">
+                              <strong className="block">
+                                Pricing comparison
+                              </strong>
+                              <span>
+                                {!Number.isFinite(standardCost) ||
+                                !Number.isFinite(eventCost) ||
+                                standardCost <= 0
+                                  ? "Standard Cost not provided"
+                                  : priceDifference === 0
+                                    ? "At Standard Cost"
+                                    : `$${formatMoney(Math.abs(priceDifference))} above Standard Cost`}
+                              </span>
+                            </div>
+                          )}
                         </article>
                       );
                     })}
@@ -417,6 +435,36 @@ export function EventPresentationDisplay({
                     </dd>
                   </div>
                 </dl>
+                {isMultiProduct ? (
+                  <section className="presentation-model-sales border-t border-slate-700 px-5 py-4">
+                    <h4 className="text-xs font-black uppercase tracking-[0.16em] text-slate-400">
+                      Model sales
+                    </h4>
+                    <ul className="mt-3 space-y-2 text-sm">
+                      {slide.product_variants.slice(0, 8).map((variant) => (
+                        <li
+                          className="flex items-center justify-between gap-3 border-b border-slate-700/70 pb-2"
+                          key={`sales-${variant.model_number}`}
+                        >
+                          <span className="min-w-0 truncate font-bold">
+                            {variant.model_number}
+                          </span>
+                          <strong className="shrink-0 text-amber-300">
+                            {presentation?.variant_units_ordered?.[
+                              variant.model_number
+                            ] ?? 0}{" "}
+                            sold
+                          </strong>
+                        </li>
+                      ))}
+                    </ul>
+                    {slide.product_variants.length > 8 ? (
+                      <p className="mt-2 text-xs text-slate-400">
+                        +{slide.product_variants.length - 8} additional models
+                      </p>
+                    ) : null}
+                  </section>
+                ) : null}
               </aside>
             </div>
             <section

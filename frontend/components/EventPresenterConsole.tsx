@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { ManagedSubEvent } from "@/lib/event-admin-api";
 import {
   controlEventPresentation,
+  createEventPresenterAccess,
   createEventProjectorAccess,
   EventLiveAnalytics,
   EventPresentation,
@@ -31,6 +32,8 @@ export function EventPresenterConsole({
   const [imageFit, setImageFit] = useState<"contain" | "cover">("contain");
   const [projectorToken, setProjectorToken] = useState<string | null>(null);
   const [projectorLinkError, setProjectorLinkError] = useState(false);
+  const [presenterToken, setPresenterToken] = useState<string | null>(null);
+  const [presenterLinkError, setPresenterLinkError] = useState(false);
 
   useEffect(() => {
     const saved = window.localStorage.getItem(IMAGE_FIT_STORAGE_KEY);
@@ -70,6 +73,8 @@ export function EventPresenterConsole({
     let active = true;
     setProjectorToken(null);
     setProjectorLinkError(false);
+    setPresenterToken(null);
+    setPresenterLinkError(false);
     if (!subEventId) return;
     void createEventProjectorAccess(subEventId)
       .then((access) => {
@@ -77,6 +82,13 @@ export function EventPresenterConsole({
       })
       .catch(() => {
         if (active) setProjectorLinkError(true);
+      });
+    void createEventPresenterAccess(subEventId)
+      .then((access) => {
+        if (active) setPresenterToken(access.presenter_token);
+      })
+      .catch(() => {
+        if (active) setPresenterLinkError(true);
       });
     return () => {
       active = false;
@@ -348,14 +360,25 @@ export function EventPresenterConsole({
               : "Preparing projector link…"}
           </button>
         )}
-        <Link
-          className="rounded-lg border border-amber-300 px-4 py-2 font-semibold text-amber-200"
-          href={`/events/presenter/${subEventId}`}
-          rel="noopener noreferrer"
-          target="_blank"
-        >
-          Open presenter monitor ↗
-        </Link>
+        {presenterToken ? (
+          <Link
+            className="rounded-lg border border-amber-300 px-4 py-2 font-semibold text-amber-200"
+            href={`/events/presenter/${subEventId}#${new URLSearchParams({ presenter_token: presenterToken }).toString()}`}
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            Open presenter monitor ↗
+          </Link>
+        ) : (
+          <button
+            className="rounded-lg border border-slate-600 px-4 py-2 font-semibold text-slate-400"
+            disabled
+          >
+            {presenterLinkError
+              ? "Presenter link unavailable"
+              : "Preparing presenter link…"}
+          </button>
+        )}
       </div>
       <p className="mt-3 text-xs text-slate-400">
         Keyboard: ←/→ slides · Space opens product ordering · Enter closes
