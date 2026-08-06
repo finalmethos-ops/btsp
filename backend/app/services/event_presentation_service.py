@@ -46,7 +46,7 @@ def get_live_analytics(db: Session, sub_event_id: str) -> EventLiveAnalyticsResp
     slide_id = state.current_slide_id if state else None
     assigned = (
         db.scalar(
-            select(func.count(EventMembership.id)).where(
+            select(func.count(func.distinct(EventMembership.entity_code))).where(
                 EventMembership.event_id == sub_event.event_id,
                 EventMembership.membership_type == "franchise_representative",
                 EventMembership.entity_code.is_not(None),

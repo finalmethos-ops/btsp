@@ -4,7 +4,7 @@ from io import BytesIO
 
 import pytest
 from openpyxl import load_workbook
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, func, select
 from sqlalchemy import event as sqlalchemy_event
 from sqlalchemy.orm import Session
 
@@ -30,6 +30,7 @@ from app.models.catalog import CatalogProduct, CatalogVendor
 from app.models.event_management import (
     EventCalendarEntry,
     EventEntityOrder,
+    EventEntityOrderRevision,
     EventMembership,
     EventOrderReleaseLine,
     EventPoll,
@@ -1382,6 +1383,21 @@ def test_event_product_lineup_snapshots_catalog_controls_and_reorders() -> None:
         with pytest.raises(EventPollError, match="already voted"):
             cast_vote(db, poll.id, poll.options[1].id, buyer)
 
+        event = add_membership(
+            db,
+            event.id,
+            EventMembershipCreate(
+                email="second-buyer@example.com",
+                display_name="Second Entity Buyer",
+                password="Second-Entity-Buyer-Password!",
+                membership_type="franchise_representative",
+                entity_code="ENTITY-2",
+            ),
+        )
+        assert event is not None
+        second_buyer = db.scalar(select(User).where(User.email == "second-buyer@example.com"))
+        assert second_buyer is not None
+
         first = create_slide(
             db,
             sub_event_id,
@@ -1469,6 +1485,40 @@ def test_event_product_lineup_snapshots_catalog_controls_and_reorders() -> None:
         assert workspace.existing_order.requested_delivery_start == date(2027, 6, 1)
         assert workspace.existing_order.requested_delivery_end == date(2027, 6, 30)
         assert "entity_event_spend" not in workspace.model_dump()
+        shared_workspace = ordering_workspace(db, sub_event_id, second_buyer)
+        assert shared_workspace is not None
+        assert shared_workspace.existing_order is not None
+        assert shared_workspace.existing_order.id == workspace.existing_order.id
+        shared_workspace = submit_entity_order(
+            db,
+            sub_event_id,
+            EventEntityOrderWrite(
+                quantity=5,
+                variant_quantities={"SPECIAL-TWIN": 3, "SPECIAL-KING": 2},
+            ),
+            second_buyer,
+        )
+        assert shared_workspace is not None
+        assert shared_workspace.existing_order is not None
+        assert shared_workspace.existing_order.id == workspace.existing_order.id
+        assert (
+            db.scalar(
+                select(func.count(EventEntityOrder.id)).where(
+                    EventEntityOrder.sub_event_id == sub_event_id,
+                    EventEntityOrder.entity_code == "ENTITY-2",
+                )
+            )
+            == 1
+        )
+        revisions = db.scalars(
+            select(EventEntityOrderRevision)
+            .where(EventEntityOrderRevision.order_id == workspace.existing_order.id)
+            .order_by(EventEntityOrderRevision.revision)
+        ).all()
+        assert [item.changed_by for item in revisions] == [
+            "buyer@example.com",
+            "second-buyer@example.com",
+        ]
         filler = create_slide(
             db,
             sub_event_id,
