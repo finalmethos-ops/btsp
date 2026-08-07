@@ -124,34 +124,42 @@ export function EventPresenterMonitor({
           <p className="mt-1 text-slate-300">{presentation?.event_name}</p>
         </div>
         <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-3">
-          <div className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-2">
-            <span className="block text-[0.65rem] font-black uppercase tracking-wider text-slate-400">
+          <div className="rounded-xl border border-amber-300/45 bg-slate-900/75 px-4 py-2 shadow-lg backdrop-blur-sm">
+            <span className="block text-[0.65rem] font-black uppercase tracking-wider text-amber-300">
               Slide
             </span>
-            <strong>
+            <strong className="mt-1 block text-lg text-white">
               {presentation?.current_position ?? 0} /{" "}
               {presentation?.total_slides ?? 0}
             </strong>
           </div>
-          <div className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-2">
-            <span className="block text-[0.65rem] font-black uppercase tracking-wider text-slate-400">
+          <div
+            className={`rounded-xl border-2 bg-white/[0.06] px-4 py-2 shadow-lg backdrop-blur-md ${
+              presentation?.ordering_status === "open"
+                ? "border-green-400/80 shadow-green-500/20"
+                : "border-red-400/80 shadow-red-500/20"
+            }`}
+          >
+            <span className="block text-[0.65rem] font-black uppercase tracking-wider text-white">
               Ordering
             </span>
             <strong
-              className={
+              className={`mt-1 block text-lg uppercase ${
                 presentation?.ordering_status === "open"
-                  ? "text-green-400"
-                  : "text-slate-200"
-              }
+                  ? "text-green-300"
+                  : "text-red-300"
+              }`}
             >
               {presentation?.ordering_status ?? "closed"}
             </strong>
           </div>
-          <div className="col-span-2 rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 sm:col-span-1">
-            <span className="block text-[0.65rem] font-black uppercase tracking-wider text-slate-400">
+          <div className="col-span-2 rounded-xl border border-amber-300/45 bg-slate-900/75 px-4 py-2 shadow-lg backdrop-blur-sm sm:col-span-1">
+            <span className="block text-[0.65rem] font-black uppercase tracking-wider text-amber-300">
               Show status
             </span>
-            <strong>{presentation?.status ?? "idle"}</strong>
+            <strong className="mt-1 block text-lg uppercase text-white">
+              {presentation?.status ?? "idle"}
+            </strong>
           </div>
         </div>
       </header>
@@ -276,8 +284,7 @@ export function EventPresenterMonitor({
                       "Event content"}
                   </span>
                   <p className="mt-2 text-lg leading-relaxed text-slate-200">
-                    {currentSlide.description ??
-                      "No ordering is expected for this slide."}
+                    No ordering is expected for this slide.
                   </p>
                 </div>
               )}
@@ -292,6 +299,16 @@ export function EventPresenterMonitor({
                   </p>
                 </aside>
               ) : null}
+
+              <section className="mt-5 border-t border-slate-700 pt-4">
+                <h3 className="text-xs font-black uppercase tracking-[0.18em] text-amber-300">
+                  Slide description
+                </h3>
+                <p className="mt-2 whitespace-pre-line text-lg leading-relaxed text-slate-100">
+                  {currentSlide.description ??
+                    "No slide description has been provided."}
+                </p>
+              </section>
             </div>
           ) : (
             <div className="flex min-h-72 items-center justify-center text-center">
