@@ -4,6 +4,8 @@ const TOKEN_STORAGE_KEY = "btsp.access_token";
 const REFRESH_TOKEN_STORAGE_KEY = "btsp.refresh_token";
 const inFlightGetRequests = new Map<string, Promise<unknown>>();
 let inFlightRefresh: Promise<LoginResponse> | null = null;
+const TRANSIENT_READ_RETRY_DELAY_MS = 500;
+const TRANSIENT_GATEWAY_STATUSES = new Set([502, 503, 504]);
 
 export type LoginResponse = {
   access_token: string;
@@ -341,18 +343,43 @@ async function apiFetchOnce<T>(
   path: string,
   options: RequestInit,
   allowRefresh: boolean,
+  transientRetriesRemaining = 1,
 ): Promise<T> {
   const token = getStoredToken();
   const usesFormData =
     typeof FormData !== "undefined" && options.body instanceof FormData;
-  const response = await fetch(`${getApiBaseUrl()}/api/v1${path}`, {
-    ...options,
-    headers: {
-      ...(!usesFormData ? { "Content-Type": "application/json" } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
-  });
+  const method = (options.method ?? "GET").toUpperCase();
+  let response: Response;
+  try {
+    response = await fetch(`${getApiBaseUrl()}/api/v1${path}`, {
+      ...options,
+      headers: {
+        ...(!usesFormData ? { "Content-Type": "application/json" } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...options.headers,
+      },
+    });
+  } catch (caught) {
+    if (
+      method === "GET" &&
+      transientRetriesRemaining > 0 &&
+      !options.signal?.aborted
+    ) {
+      await delay(TRANSIENT_READ_RETRY_DELAY_MS);
+      return apiFetchOnce<T>(path, options, allowRefresh, 0);
+    }
+    throw caught;
+  }
+
+  if (
+    method === "GET" &&
+    transientRetriesRemaining > 0 &&
+    TRANSIENT_GATEWAY_STATUSES.has(response.status) &&
+    !options.signal?.aborted
+  ) {
+    await delay(TRANSIENT_READ_RETRY_DELAY_MS);
+    return apiFetchOnce<T>(path, options, allowRefresh, 0);
+  }
 
   if (response.status === 401 && allowRefresh && getStoredRefreshToken()) {
     try {
@@ -442,7 +469,25 @@ async function apiErrorMessage(
     return fallback;
   }
   const text = await response.text().catch(() => "");
-  return text.trim() || fallback;
+  const trimmed = text.trim();
+  if (!trimmed) return fallback;
+  if (looksLikeHtml(trimmed)) {
+    if (TRANSIENT_GATEWAY_STATUSES.has(response.status)) {
+      return "BTSP is temporarily unavailable. Please try again in a moment.";
+    }
+    return fallback;
+  }
+  return trimmed.length <= 500 ? trimmed : fallback;
+}
+
+function looksLikeHtml(value: string) {
+  return /<(?:!doctype|html|head|body|title|div|span|script)\b/i.test(value);
+}
+
+function delay(milliseconds: number) {
+  return new Promise<void>((resolve) =>
+    globalThis.setTimeout(resolve, milliseconds),
+  );
 }
 
 function filenameFromContentDisposition(value: string | null) {

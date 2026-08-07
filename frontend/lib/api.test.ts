@@ -40,6 +40,13 @@ function textResponse(status: number, body: string) {
   } as Response;
 }
 
+function htmlResponse(status: number, body: string) {
+  return new Response(body, {
+    status,
+    headers: { "content-type": "text/html; charset=UTF-8" },
+  });
+}
+
 function downloadResponse(contentDisposition: string) {
   const blob = new Blob(["report"]);
   return {
@@ -187,6 +194,43 @@ describe("BTSP API error handling", () => {
     await expect(
       apiDownload("/vendor-hall/events/event-1/floor-map/content"),
     ).rejects.toThrow("Floor plan preview was not found");
+  });
+
+  it("retries a transient gateway response once for safe read requests", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        htmlResponse(502, "<!DOCTYPE html><title>Bad gateway</title>"),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify([{ id: "task-1" }]), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(apiFetch("/event-staff-tasks/event-1")).resolves.toEqual([
+      { id: "task-1" },
+    ]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("never exposes proxy HTML in an application error", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          htmlResponse(502, "<!DOCTYPE html><title>502: Bad gateway</title>"),
+        ),
+    );
+
+    await expect(
+      apiFetch("/event-staff-tasks/event-1", { method: "POST" }),
+    ).rejects.toThrow(
+      "BTSP is temporarily unavailable. Please try again in a moment.",
+    );
   });
 
   it("returns safe filenames from download content-disposition headers", async () => {

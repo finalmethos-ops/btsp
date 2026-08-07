@@ -79,7 +79,10 @@ export function EventStaffTaskAdministrationPanel({
   const load = useCallback(
     () =>
       listEventStaffTasks(event.id)
-        .then(setTasks)
+        .then((loadedTasks) => {
+          setTasks(loadedTasks);
+          setError(null);
+        })
         .catch((caught) => {
           setError(
             caught instanceof Error

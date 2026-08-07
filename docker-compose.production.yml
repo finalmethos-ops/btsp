@@ -62,7 +62,7 @@ services:
     read_only: true
     tmpfs:
       - /tmp:rw,noexec,nosuid,size=32m
-      - /app/.next/cache:rw,noexec,nosuid,size=64m
+      - /app/.next/cache:rw,noexec,nosuid,size=64m,uid=1000,gid=1000,mode=0755
     cap_drop:
       - ALL
     security_opt:
