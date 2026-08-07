@@ -1671,6 +1671,9 @@ def test_event_product_lineup_snapshots_catalog_controls_and_reorders() -> None:
             filler.id,
             first.id,
         ]
+        assert presenter_presentation.presenter_slides[0].vendor_name == "Expo Vendor"
+        assert presenter_presentation.presenter_slides[1].vendor_name is None
+        assert presenter_presentation.presenter_slides[2].vendor_name == "Expo Vendor"
         attendee_workspace = ordering_workspace(db, sub_event_id, buyer)
         assert attendee_workspace is not None
         assert attendee_workspace.current_slide is not None

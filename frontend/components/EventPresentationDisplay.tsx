@@ -517,16 +517,16 @@ export function EventPresentationDisplay({
                       </p>
                     ) : null}
                   </div>
-                  <div className="flex justify-between gap-4 px-5 py-4">
-                    <dt className="font-bold uppercase text-slate-400">
-                      {isMultiProduct ? "Product options" : "Minimum order"}
-                    </dt>
-                    <dd className="font-black">
-                      {isMultiProduct
-                        ? slide.product_variants.length
-                        : `${slide.minimum_order_quantity} EA`}
-                    </dd>
-                  </div>
+                  {isMultiProduct ? (
+                    <div className="flex justify-between gap-4 px-5 py-4">
+                      <dt className="font-bold uppercase text-slate-400">
+                        Product options
+                      </dt>
+                      <dd className="font-black">
+                        {slide.product_variants.length}
+                      </dd>
+                    </div>
+                  ) : null}
                 </dl>
                 {isMultiProduct ? (
                   <section className="presentation-model-sales border-t border-slate-700 px-5 py-4">

@@ -131,6 +131,18 @@ def get_presentation(
     event = db.get(ManagedEvent, sub_event.event_id)
     state = db.get(EventPresentationState, sub_event_id)
     slides = _slides(db, sub_event_id)
+    vendor_codes = {slide.vendor_code for slide in slides if slide.vendor_code}
+    vendor_names = (
+        dict(
+            db.execute(
+                select(CatalogVendor.vendor_code, CatalogVendor.name).where(
+                    CatalogVendor.vendor_code.in_(vendor_codes)
+                )
+            ).all()
+        )
+        if vendor_codes
+        else {}
+    )
     current = next(
         (slide for slide in slides if state and slide.id == state.current_slide_id), None
     )
@@ -145,13 +157,6 @@ def get_presentation(
             if current.catalog_product_code
             else None
         )
-        vendor_name = (
-            db.scalar(
-                select(CatalogVendor.name).where(CatalogVendor.vendor_code == current.vendor_code)
-            )
-            if current.vendor_code
-            else None
-        )
         current_response = EventProductSlideResponse.model_validate(
             current, from_attributes=True
         ).model_copy(
@@ -159,7 +164,7 @@ def get_presentation(
                 "has_image": current.image is not None,
                 "has_vendor_logo": current.vendor_logo is not None,
                 "presenter_notes": None,
-                "vendor_name": vendor_name,
+                "vendor_name": vendor_names.get(current.vendor_code),
                 "category": current.category
                 or (product.product_category_code or product.department if product else None),
             }
@@ -250,6 +255,7 @@ def get_presentation(
                     update={
                         "has_image": slide.image is not None,
                         "has_vendor_logo": slide.vendor_logo is not None,
+                        "vendor_name": vendor_names.get(slide.vendor_code),
                     }
                 )
                 for slide in slides
