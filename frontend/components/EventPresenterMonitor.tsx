@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   downloadPublicPresenterImage,
   EventPresentation,
@@ -12,6 +12,66 @@ const formatMoney = (value: string | number | null | undefined) =>
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+
+const savingsPerUnit = (
+  standardCost: string | number | null | undefined,
+  eventCost: string | number | null | undefined,
+) => Math.max(Number(standardCost ?? 0) - Number(eventCost ?? 0), 0);
+
+function FitDescription({ text }: { text: string }) {
+  const frameRef = useRef<HTMLDivElement>(null);
+  const textRef = useRef<HTMLParagraphElement>(null);
+
+  useLayoutEffect(() => {
+    const frame = frameRef.current;
+    const paragraph = textRef.current;
+    if (!frame || !paragraph) return;
+
+    const fitText = () => {
+      if (!window.matchMedia("(min-width: 1024px)").matches) {
+        paragraph.style.fontSize = "18px";
+        return;
+      }
+      if (!frame.clientHeight || !frame.clientWidth) return;
+      let minimum = 9;
+      let maximum = 18;
+      let fitted = minimum;
+      while (maximum - minimum > 0.25) {
+        const candidate = (minimum + maximum) / 2;
+        paragraph.style.fontSize = `${candidate}px`;
+        if (
+          paragraph.scrollHeight <= frame.clientHeight &&
+          paragraph.scrollWidth <= frame.clientWidth
+        ) {
+          fitted = candidate;
+          minimum = candidate;
+        } else {
+          maximum = candidate;
+        }
+      }
+      paragraph.style.fontSize = `${fitted}px`;
+    };
+
+    const observer = new ResizeObserver(fitText);
+    observer.observe(frame);
+    fitText();
+    return () => observer.disconnect();
+  }, [text]);
+
+  return (
+    <div
+      className="presenter-description-fit mt-2 min-h-0 lg:flex-1 lg:overflow-hidden"
+      ref={frameRef}
+    >
+      <p
+        className="whitespace-pre-line leading-[1.35] text-slate-100"
+        ref={textRef}
+      >
+        {text}
+      </p>
+    </div>
+  );
+}
 
 export function EventPresenterMonitor({
   presenterToken,
@@ -171,7 +231,7 @@ export function EventPresenterMonitor({
       ) : null}
 
       <section className="mt-5 grid min-h-0 gap-5 lg:h-[calc(100dvh-10.75rem)] lg:grid-cols-2">
-        <article className="min-h-0 overflow-y-auto rounded-2xl border-2 border-amber-300/70 bg-slate-900/90 p-5">
+        <article className="min-h-0 rounded-2xl border-2 border-amber-300/70 bg-slate-900/90 p-5 lg:flex lg:flex-col lg:overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-700 pb-3">
             <div>
               <p className="text-sm font-black uppercase tracking-[0.22em] text-amber-300">
@@ -189,7 +249,7 @@ export function EventPresenterMonitor({
           </div>
 
           {currentSlide ? (
-            <div className="mt-4">
+            <div className="mt-4 min-h-0 lg:flex lg:flex-1 lg:flex-col">
               <h2 className="text-3xl font-black leading-tight">
                 {currentSlide.name}
               </h2>
@@ -248,32 +308,47 @@ export function EventPresenterMonitor({
                       Product details
                     </h3>
                     <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                      {currentProducts.map((product) => (
-                        <div
-                          className="rounded-xl border border-slate-700 bg-slate-950/70 p-3"
-                          key={product.model_number}
-                        >
-                          <strong className="line-clamp-2 block text-base">
-                            {product.name}
-                          </strong>
-                          <div className="mt-1 flex items-end justify-between gap-3">
-                            <span className="text-sm text-slate-400">
-                              {product.model_number}
-                            </span>
-                            <span className="shrink-0 text-lg font-black text-amber-300">
-                              ${formatMoney(product.event_unit_cost)} / EA
-                            </span>
+                      {currentProducts.map((product) => {
+                        const savings = savingsPerUnit(
+                          product.standard_cost,
+                          product.event_unit_cost,
+                        );
+                        return (
+                          <div
+                            className="rounded-xl border border-slate-700 bg-slate-950/70 p-3"
+                            key={product.model_number}
+                          >
+                            <strong className="line-clamp-2 block text-base">
+                              {product.name}
+                            </strong>
+                            <div className="mt-1 flex items-end justify-between gap-3">
+                              <span className="text-sm text-slate-400">
+                                {product.model_number}
+                              </span>
+                              <span className="shrink-0 text-lg font-black text-amber-300">
+                                ${formatMoney(product.event_unit_cost)} / EA
+                              </span>
+                            </div>
+                            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm font-bold">
+                              {currentSlide.product_variants.length ? (
+                                <span className="text-green-300">
+                                  {presentation?.variant_units_ordered?.[
+                                    product.model_number
+                                  ] ?? 0}{" "}
+                                  sold
+                                </span>
+                              ) : (
+                                <span />
+                              )}
+                              {savings > 0 ? (
+                                <span className="text-teal-200">
+                                  Save ${formatMoney(savings)} / EA
+                                </span>
+                              ) : null}
+                            </div>
                           </div>
-                          {currentSlide.product_variants.length ? (
-                            <span className="mt-2 block text-sm font-bold text-green-300">
-                              {presentation?.variant_units_ordered?.[
-                                product.model_number
-                              ] ?? 0}{" "}
-                              sold
-                            </span>
-                          ) : null}
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </section>
                 </>
@@ -300,14 +375,16 @@ export function EventPresenterMonitor({
                 </aside>
               ) : null}
 
-              <section className="mt-5 border-t border-slate-700 pt-4">
+              <section className="mt-5 min-h-20 border-t border-slate-700 pt-4 lg:flex lg:flex-1 lg:flex-col lg:overflow-hidden">
                 <h3 className="text-xs font-black uppercase tracking-[0.18em] text-amber-300">
                   Slide description
                 </h3>
-                <p className="mt-2 whitespace-pre-line text-lg leading-relaxed text-slate-100">
-                  {currentSlide.description ??
-                    "No slide description has been provided."}
-                </p>
+                <FitDescription
+                  text={
+                    currentSlide.description ??
+                    "No slide description has been provided."
+                  }
+                />
               </section>
             </div>
           ) : (
