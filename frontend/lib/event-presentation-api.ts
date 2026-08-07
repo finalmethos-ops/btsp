@@ -32,6 +32,7 @@ export type EventPresentation = {
       | "sponsorship"
       | "special_thanks"
       | "raffle"
+      | "full_screen_image"
       | null;
     model_number: string | null;
     name: string;

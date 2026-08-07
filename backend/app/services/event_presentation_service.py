@@ -37,6 +37,13 @@ def _live_display_enabled(sub_event: ManagedSubEvent) -> None:
         raise EventPresentationError("Live Display is not enabled for this sub-event")
 
 
+def _ensure_projectable(slide: EventProductSlide) -> None:
+    if slide.filler_category == "full_screen_image" and slide.image is None:
+        raise EventPresentationError(
+            f'Upload an image for full-screen slide "{slide.name}" before presenting'
+        )
+
+
 def get_live_analytics(db: Session, sub_event_id: str) -> EventLiveAnalyticsResponse | None:
     sub_event = db.get(ManagedSubEvent, sub_event_id)
     if sub_event is None:
@@ -264,6 +271,7 @@ def control_presentation(
         0,
     )
     if action == "start":
+        _ensure_projectable(slides[0])
         state.current_slide_id = slides[0].id
         state.status = "live"
         state.ordering_status = "closed"
@@ -271,11 +279,15 @@ def control_presentation(
     elif state.status != "live":
         raise EventPresentationError("Start the presentation before using live controls")
     elif action == "next":
-        state.current_slide_id = slides[min(current_index + 1, len(slides) - 1)].id
+        next_slide = slides[min(current_index + 1, len(slides) - 1)]
+        _ensure_projectable(next_slide)
+        state.current_slide_id = next_slide.id
         state.ordering_status = "closed"
         state.ordering_opened_at = None
     elif action == "previous":
-        state.current_slide_id = slides[max(current_index - 1, 0)].id
+        previous_slide = slides[max(current_index - 1, 0)]
+        _ensure_projectable(previous_slide)
+        state.current_slide_id = previous_slide.id
         state.ordering_status = "closed"
         state.ordering_opened_at = None
     elif action == "open":

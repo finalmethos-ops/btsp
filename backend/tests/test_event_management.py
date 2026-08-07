@@ -35,6 +35,8 @@ from app.models.event_management import (
     EventOrderReleaseLine,
     EventPoll,
     EventPresentationState,
+    EventProductSlide,
+    EventProductSlideImage,
     EventSettlementEvent,
     EventStaffTask,
     ManagedEvent,
@@ -124,6 +126,7 @@ from app.services.event_poll_service import (
 )
 from app.services.event_presentation_service import (
     EventPresentationError,
+    _ensure_projectable,
     control_presentation,
     get_live_analytics,
     get_presentation,
@@ -166,6 +169,27 @@ def _event() -> EventWrite:
         state_code="FL",
         postal_code="32801",
     )
+
+
+def test_full_screen_image_slide_requires_projectable_image() -> None:
+    payload = EventProductSlideWrite(
+        slide_type="filler",
+        filler_category="full_screen_image",
+        name="Opening title card",
+        status="ready",
+    )
+    slide = EventProductSlide(**payload.model_dump(), created_by="admin@example.com")
+
+    with pytest.raises(EventPresentationError, match="Upload an image"):
+        _ensure_projectable(slide)
+
+    slide.image = EventProductSlideImage(
+        filename="opening.webp",
+        content_type="image/webp",
+        content=b"image-content",
+        uploaded_by="admin@example.com",
+    )
+    _ensure_projectable(slide)
 
 
 def test_event_publication_opens_attendee_window_and_is_audited() -> None:

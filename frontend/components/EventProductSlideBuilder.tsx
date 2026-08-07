@@ -48,6 +48,8 @@ export function EventProductSlideBuilder({
   const [editing, setEditing] = useState<EventProductSlide | null>(null);
   const [slideProducts, setSlideProducts] = useState<SlideProduct[]>([]);
   const [slideType, setSlideType] = useState<"product" | "filler">("product");
+  const [fillerCategory, setFillerCategory] =
+    useState<EventFillerCategory>("trivia");
   const [productMode, setProductMode] = useState<"single" | "multiple">(
     "single",
   );
@@ -122,7 +124,17 @@ export function EventProductSlideBuilder({
     if (!subEventId) return;
     const data = new FormData(event.currentTarget);
     const filler = slideType === "filler";
+    const fullScreenImage = filler && fillerCategory === "full_screen_image";
     const multipleProducts = !filler && productMode === "multiple";
+    const productImage = data.get("product_image");
+    if (
+      fullScreenImage &&
+      !editing?.has_image &&
+      (!(productImage instanceof File) || productImage.size === 0)
+    ) {
+      setError("A full-screen image slide requires an uploaded image.");
+      return;
+    }
     if (multipleProducts && slideProducts.length < 2) {
       setError("A multiple-product slide requires at least two products.");
       return;
@@ -130,9 +142,7 @@ export function EventProductSlideBuilder({
     const firstProduct = multipleProducts ? slideProducts[0] : null;
     const payload: EventProductSlideWrite = {
       slide_type: slideType,
-      filler_category: filler
-        ? (String(data.get("filler_category")) as EventFillerCategory)
-        : null,
+      filler_category: filler ? fillerCategory : null,
       catalog_product_code:
         filler || multipleProducts
           ? null
@@ -149,9 +159,11 @@ export function EventProductSlideBuilder({
       category: filler
         ? null
         : String(data.get("category") || "").trim() || null,
-      description:
-        String(data.get(filler ? "filler_description" : "description") || "") ||
-        null,
+      description: fullScreenImage
+        ? null
+        : String(
+              data.get(filler ? "filler_description" : "description") || "",
+            ) || null,
       specifications: filler
         ? null
         : String(data.get("specifications") || "") || null,
@@ -210,7 +222,6 @@ export function EventProductSlideBuilder({
       const saved = editing
         ? await updateEventProductSlide(editing.id, payload)
         : await createEventProductSlide(subEventId, payload);
-      const productImage = data.get("product_image");
       if (productImage instanceof File && productImage.size > 0) {
         await uploadEventProductImage(saved.id, productImage);
       } else if (webFill?.image_url) {
@@ -219,6 +230,7 @@ export function EventProductSlideBuilder({
       await refresh();
       setEditing(null);
       setSlideType("product");
+      setFillerCategory("trivia");
       setProductMode("single");
       setCatalogCode("");
       setSlideProducts([]);
@@ -228,7 +240,7 @@ export function EventProductSlideBuilder({
       setError(
         caught instanceof Error
           ? caught.message
-          : "Unable to save the product slide.",
+          : "Unable to save the slide.",
       );
     } finally {
       setBusy(false);
@@ -281,6 +293,8 @@ export function EventProductSlideBuilder({
       await refresh();
       if (editing?.id === slide.id) {
         setEditing(null);
+        setSlideType("product");
+        setFillerCategory("trivia");
         setProductMode("single");
         setSlideProducts([]);
       }
@@ -324,6 +338,8 @@ export function EventProductSlideBuilder({
             onChange={(event) => {
               setSubEventId(event.target.value);
               setEditing(null);
+              setSlideType("product");
+              setFillerCategory("trivia");
               setProductMode("single");
               setSlideProducts([]);
             }}
@@ -409,7 +425,9 @@ export function EventProductSlideBuilder({
               </div>
               <p className="mt-2 text-xs text-slate-500">
                 {slide.slide_type === "filler"
-                  ? "Non-ordering filler"
+                  ? slide.filler_category === "full_screen_image"
+                    ? "Full-screen image · non-ordering"
+                    : "Non-ordering filler"
                   : slide.max_event_units
                     ? `${slide.max_event_units} unit event cap`
                     : "No event cap"}{" "}
@@ -439,6 +457,7 @@ export function EventProductSlideBuilder({
                   onClick={() => {
                     setEditing(slide);
                     setSlideType(slide.slide_type);
+                    setFillerCategory(slide.filler_category ?? "trivia");
                     setProductMode(
                       slide.product_variants.length ? "multiple" : "single",
                     );
@@ -493,7 +512,7 @@ export function EventProductSlideBuilder({
 
         <form
           className="grid gap-3 rounded-xl bg-slate-50 p-4 sm:grid-cols-2"
-          key={`${editing?.id ?? "new"}-${slideType}-${productMode}-${catalogCode}-${webFill?.source_url ?? ""}`}
+          key={`${editing?.id ?? "new"}-${slideType}-${fillerCategory}-${productMode}-${catalogCode}-${webFill?.source_url ?? ""}`}
           onSubmit={save}
         >
           <h4 className="font-bold sm:col-span-2">
@@ -504,52 +523,89 @@ export function EventProductSlideBuilder({
             <select
               className="mt-1 w-full rounded-lg border bg-white p-2"
               onChange={(event) => {
-                setSlideType(event.target.value as "product" | "filler");
+                const mode = event.target.value as
+                  | "product"
+                  | "filler"
+                  | "full_screen_image";
+                setSlideType(mode === "full_screen_image" ? "filler" : mode);
+                setFillerCategory(
+                  mode === "full_screen_image" ? "full_screen_image" : "trivia",
+                );
                 setProductMode("single");
                 setCatalogCode("");
                 setSlideProducts([]);
                 setWebFill(null);
               }}
-              value={slideType}
+              value={
+                slideType === "filler" &&
+                fillerCategory === "full_screen_image"
+                  ? "full_screen_image"
+                  : slideType
+              }
             >
               <option value="product">Orderable product</option>
               <option value="filler">Non-ordering filler</option>
+              <option value="full_screen_image">
+                Full-screen image (intro, outro, or intermission)
+              </option>
             </select>
           </label>
           {slideType === "filler" ? (
             <>
-              <label className="text-sm font-semibold">
-                Filler category
-                <select
-                  className="mt-1 w-full rounded-lg border bg-white p-2"
-                  defaultValue={editing?.filler_category ?? "trivia"}
-                  name="filler_category"
-                  required
-                >
-                  <option value="trivia">Trivia</option>
-                  <option value="giveaway">Giveaway</option>
-                  <option value="sponsorship">Sponsorship</option>
-                  <option value="special_thanks">Special thanks</option>
-                  <option value="raffle">Raffle</option>
-                </select>
-              </label>
+              {fillerCategory !== "full_screen_image" ? (
+                <label className="text-sm font-semibold">
+                  Filler category
+                  <select
+                    className="mt-1 w-full rounded-lg border bg-white p-2"
+                    onChange={(event) =>
+                      setFillerCategory(
+                        event.target.value as EventFillerCategory,
+                      )
+                    }
+                    name="filler_category"
+                    required
+                    value={fillerCategory}
+                  >
+                    <option value="trivia">Trivia</option>
+                    <option value="giveaway">Giveaway</option>
+                    <option value="sponsorship">Sponsorship</option>
+                    <option value="special_thanks">Special thanks</option>
+                    <option value="raffle">Raffle</option>
+                  </select>
+                </label>
+              ) : null}
               <label className="text-sm font-semibold sm:col-span-2">
-                Slide title
+                {fillerCategory === "full_screen_image"
+                  ? "Internal slide label"
+                  : "Slide title"}
                 <input
                   className="mt-1 w-full rounded-lg border bg-white p-2"
-                  defaultValue={editing?.name ?? ""}
+                  defaultValue={
+                    editing?.name ??
+                    (fillerCategory === "full_screen_image"
+                      ? "Full-screen image"
+                      : "")
+                  }
                   name="filler_name"
                   required
                 />
+                {fillerCategory === "full_screen_image" ? (
+                  <span className="mt-1 block font-normal text-slate-500">
+                    Used in the editor and presenter monitor only; it is not
+                    shown on the projector.
+                  </span>
+                ) : null}
               </label>
-              <label className="text-sm font-semibold sm:col-span-2">
-                Slide content
-                <textarea
-                  className="mt-1 min-h-32 w-full rounded-lg border bg-white p-2"
-                  defaultValue={editing?.description ?? ""}
-                  name="filler_description"
-                />
-              </label>
+              {fillerCategory !== "full_screen_image" ? (
+                <label className="text-sm font-semibold sm:col-span-2">
+                  Slide content
+                  <textarea
+                    className="mt-1 min-h-32 w-full rounded-lg border bg-white p-2"
+                    defaultValue={editing?.description ?? ""}
+                    name="filler_description"
+                  />
+                </label>
+              ) : null}
             </>
           ) : null}
           <fieldset
@@ -631,6 +687,7 @@ export function EventProductSlideBuilder({
                 onChange={(event) => {
                   setCatalogCode(event.target.value);
                   setEditing(null);
+                  setFillerCategory("trivia");
                   setSlideProducts([]);
                   setWebFill(null);
                 }}
@@ -1088,25 +1145,34 @@ export function EventProductSlideBuilder({
             </select>
           </label>
           <label className="text-sm font-semibold sm:col-span-2">
-            Slide image
+            {fillerCategory === "full_screen_image"
+              ? "Full-screen slide image"
+              : "Slide image"}
             <input
               accept="image/png,image/jpeg,image/webp"
               className="mt-1 block w-full rounded-lg border bg-white p-2"
               name="product_image"
+              required={
+                fillerCategory === "full_screen_image" && !editing?.has_image
+              }
               type="file"
             />
             <span className="mt-1 block font-normal text-slate-500">
-              Upload an image now. Product slides can also use Web Fill.
+              {fillerCategory === "full_screen_image"
+                ? "Use a high-resolution 16:9 image (ideally 1920 × 1080). The projector shows only this image, without headers or overlays."
+                : "Upload an image now. Product slides can also use Web Fill."}
             </span>
           </label>
-          <label className="text-sm font-semibold sm:col-span-2">
-            Vendor delivery notes
-            <textarea
-              className="mt-1 w-full rounded-lg border bg-white p-2"
-              defaultValue={editing?.vendor_delivery_notes ?? ""}
-              name="vendor_delivery_notes"
-            />
-          </label>
+          {slideType === "product" ? (
+            <label className="text-sm font-semibold sm:col-span-2">
+              Vendor delivery notes
+              <textarea
+                className="mt-1 w-full rounded-lg border bg-white p-2"
+                defaultValue={editing?.vendor_delivery_notes ?? ""}
+                name="vendor_delivery_notes"
+              />
+            </label>
+          ) : null}
           <label className="text-sm font-semibold sm:col-span-2">
             Private presenter notes
             <textarea
@@ -1122,6 +1188,7 @@ export function EventProductSlideBuilder({
                 onClick={() => {
                   setEditing(null);
                   setSlideType("product");
+                  setFillerCategory("trivia");
                   setProductMode("single");
                   setCatalogCode("");
                   setSlideProducts([]);

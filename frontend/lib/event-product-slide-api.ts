@@ -5,7 +5,8 @@ export type EventFillerCategory =
   | "giveaway"
   | "sponsorship"
   | "special_thanks"
-  | "raffle";
+  | "raffle"
+  | "full_screen_image";
 
 export type EventProductSlide = {
   id: string;

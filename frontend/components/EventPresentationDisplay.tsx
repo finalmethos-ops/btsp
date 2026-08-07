@@ -53,6 +53,8 @@ export function EventPresentationDisplay({
   const [imageFit, setImageFit] = useState<"contain" | "cover">("contain");
   const slide = presentation?.current_slide;
   const isFiller = slide?.slide_type === "filler";
+  const isFullScreenImage =
+    isFiller && slide?.filler_category === "full_screen_image";
   const isMultiProduct = Boolean(slide?.product_variants.length);
   const slideId = slide?.id;
   const slideHasImage = slide?.has_image;
@@ -149,6 +151,30 @@ export function EventPresentationDisplay({
         message={error}
         title="Presentation unavailable"
       />
+    );
+
+  if (isFullScreenImage)
+    return (
+      <main className="relative flex h-screen w-screen items-center justify-center overflow-hidden bg-black">
+        {error ? (
+          <p className="absolute inset-x-4 top-4 z-10 rounded-xl border border-red-400 bg-red-950/95 p-3 text-center font-bold text-red-100">
+            {error}
+          </p>
+        ) : null}
+        {imageUrl ? (
+          // Protected blob URL cannot use the Next image optimizer.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            alt={slide.name}
+            className={`h-full w-full ${imageFit === "contain" ? "object-contain" : "object-cover"}`}
+            src={imageUrl}
+          />
+        ) : (
+          <p className="text-lg font-semibold text-slate-400">
+            Preparing full-screen slide…
+          </p>
+        )}
+      </main>
     );
 
   return (

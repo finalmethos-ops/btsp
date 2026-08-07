@@ -6,7 +6,14 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 SlideStatus = Literal["draft", "ready", "archived"]
 SlideType = Literal["product", "filler"]
-FillerCategory = Literal["trivia", "giveaway", "sponsorship", "special_thanks", "raffle"]
+FillerCategory = Literal[
+    "trivia",
+    "giveaway",
+    "sponsorship",
+    "special_thanks",
+    "raffle",
+    "full_screen_image",
+]
 
 
 class EventProductVariant(BaseModel):
