@@ -39,6 +39,7 @@ from app.services.event_management_service import (
     publish_event,
     remove_event,
     remove_sub_event,
+    restore_cancelled_event,
     save_branding,
     save_venue_map,
     update_event,
@@ -145,6 +146,21 @@ def post_cancel_event(
 ) -> EventResponse:
     try:
         event = cancel_event(db, event_id, payload, user.email)
+    except EventManagementError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if event is None:
+        raise HTTPException(status_code=404, detail="Event not found")
+    return event
+
+
+@router.post("/{event_id}/restore", response_model=EventResponse)
+def post_restore_event(
+    event_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission("events.manage")),
+) -> EventResponse:
+    try:
+        event = restore_cancelled_event(db, event_id, user.email)
     except EventManagementError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     if event is None:

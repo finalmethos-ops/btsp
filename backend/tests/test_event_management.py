@@ -98,6 +98,7 @@ from app.services.event_management_service import (
     publish_event,
     remove_event,
     remove_sub_event,
+    restore_cancelled_event,
     update_event,
     update_membership,
     update_membership_role,
@@ -431,6 +432,27 @@ def test_event_cancellation_closes_access_and_permanent_removal_is_guarded() -> 
             "admin@example.com",
         )
         assert calendar is not None
+        slide = EventProductSlide(
+            event_id=created.id,
+            sub_event_id=updated.sub_events[0].id,
+            position=1,
+            slide_type="filler",
+            filler_category="sponsor",
+            name="Cancellation retention slide",
+            created_by="admin@example.com",
+        )
+        db.add(slide)
+        db.flush()
+        db.add(
+            EventProductSlideImage(
+                slide_id=slide.id,
+                filename="retained.png",
+                content_type="image/png",
+                content=b"\x89PNG\r\n\x1a\nretained-image",
+                uploaded_by="admin@example.com",
+            )
+        )
+        db.commit()
 
         cancelled = cancel_event(
             db,
@@ -456,6 +478,7 @@ def test_event_cancellation_closes_access_and_permanent_removal_is_guarded() -> 
         assert presentation_state.status == "ended"
         assert presentation_state.ordering_status == "closed"
         assert db.get(EventPoll, poll.id).status == "closed"
+        assert db.get(EventProductSlideImage, slide.id) is not None
         with pytest.raises(EventPollError, match="archived"):
             set_poll_status(db, poll.id, "open")
         with pytest.raises(EventCalendarError, match="archived"):
@@ -487,6 +510,34 @@ def test_event_cancellation_closes_access_and_permanent_removal_is_guarded() -> 
                 "admin@example.com",
             )
 
+        restored = restore_cancelled_event(db, created.id, "admin@example.com")
+        assert restored is not None
+        assert restored.status == "draft"
+        assert restored.cancelled_at is None
+        assert restored.cancelled_by is None
+        assert restored.cancellation_reason is None
+        assert restored.sub_events[0].status == "draft"
+        assert [event.id for event in list_active_events(db)] == [created.id]
+        assert [event.id for event in list_archived_events(db)] == [completed.id]
+        assert event_window_open_for_user(db, created.id, staff.id)
+        assert [task.id for task in my_tasks(db, staff)] == [staff_task.id]
+        assert db.get(EventCalendarEntry, calendar.id).is_active is True
+        presentation_state = db.get(EventPresentationState, updated.sub_events[0].id)
+        assert presentation_state.status == "running"
+        assert presentation_state.ordering_status == "open"
+        assert presentation_state.updated_by == "presenter@example.com"
+        assert db.get(EventPoll, poll.id).status == "open"
+        assert db.get(EventPoll, poll.id).closed_at is None
+        assert db.get(EventProductSlideImage, slide.id) is not None
+
+        cancelled = cancel_event(
+            db,
+            created.id,
+            EventCancellationWrite(reason="Venue became unavailable"),
+            "admin@example.com",
+        )
+        assert cancelled is not None and cancelled.status == "cancelled"
+
         assert remove_event(db, created.id, "admin@example.com")
         assert db.get(ManagedEvent, created.id) is None
         assert (
@@ -501,6 +552,7 @@ def test_event_cancellation_closes_access_and_permanent_removal_is_guarded() -> 
         assert {item.event_type for item in lifecycle_events} == {
             "event.cancelled",
             "event.deleted",
+            "event.restored",
         }
         cancelled_snapshot = next(
             item for item in lifecycle_events if item.event_type == "event.cancelled"
@@ -508,6 +560,8 @@ def test_event_cancellation_closes_access_and_permanent_removal_is_guarded() -> 
         assert cancelled_snapshot.payload["presentations_ended"] == 1
         assert cancelled_snapshot.payload["polls_closed"] == 1
         assert cancelled_snapshot.payload["calendar_entries_hidden"] == 1
+        assert cancelled_snapshot.payload["presentation_assets_retained"] is True
+        assert cancelled_snapshot.payload["restore_state"]["event_status"] == "draft"
         deleted_snapshot = next(
             item for item in lifecycle_events if item.event_type == "event.deleted"
         )

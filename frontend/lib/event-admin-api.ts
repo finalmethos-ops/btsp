@@ -135,6 +135,9 @@ export const cancelManagedEvent = (eventId: string, reason: string) =>
     body: JSON.stringify({ reason }),
   });
 
+export const restoreManagedEvent = (eventId: string) =>
+  apiFetch<ManagedEvent>(`/events/${eventId}/restore`, { method: "POST" });
+
 export const publishManagedEvent = (eventId: string) =>
   apiFetch<ManagedEvent>(`/events/${eventId}/publish`, { method: "POST" });
 

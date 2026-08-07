@@ -40,7 +40,6 @@ from app.services.event_access_service import (
     event_operations_are_locked,
     event_settlement_is_closed,
 )
-from app.services.event_product_slide_service import purge_event_slide_images
 from app.services.upload_validation import content_matches_declared_type
 from app.services.vendor_access_service import vendor_codes_for_user
 
@@ -553,6 +552,37 @@ def cancel_event(
         raise EventManagementError("Completed events must be retained for audit history")
     previous_status = event.status
     cancelled_at = datetime.now(UTC)
+    sub_event_restore_state = [
+        {"id": item.id, "status": item.status}
+        for item in db.scalars(
+            select(ManagedSubEvent).where(ManagedSubEvent.event_id == event_id)
+        ).all()
+    ]
+    calendar_restore_state = [
+        {"id": item.id, "is_active": item.is_active}
+        for item in db.scalars(
+            select(EventCalendarEntry).where(EventCalendarEntry.event_id == event_id)
+        ).all()
+    ]
+    presentation_restore_state = [
+        {
+            "sub_event_id": item.sub_event_id,
+            "status": item.status,
+            "ordering_status": item.ordering_status,
+            "updated_by": item.updated_by,
+        }
+        for item in db.scalars(
+            select(EventPresentationState).where(EventPresentationState.event_id == event_id)
+        ).all()
+    ]
+    poll_restore_state = [
+        {
+            "id": item.id,
+            "status": item.status,
+            "closed_at": item.closed_at.isoformat() if item.closed_at else None,
+        }
+        for item in db.scalars(select(EventPoll).where(EventPoll.event_id == event_id)).all()
+    ]
     event.status = "cancelled"
     event.cancelled_at = cancelled_at
     event.cancelled_by = actor
@@ -587,7 +617,6 @@ def cancel_event(
         .where(EventPoll.event_id == event_id, EventPoll.status != "closed")
         .values(status="closed", closed_at=cancelled_at)
     ).rowcount
-    images_purged = purge_event_slide_images(db, event_id)
     _lifecycle_snapshot(
         db,
         event_type="event.cancelled",
@@ -602,7 +631,133 @@ def cancel_event(
             "calendar_entries_hidden": calendar_entries_hidden,
             "presentations_ended": presentations_ended,
             "polls_closed": polls_closed,
-            "presentation_images_purged": images_purged,
+            "presentation_assets_retained": True,
+            "restore_state": {
+                "event_status": previous_status,
+                "sub_events": sub_event_restore_state,
+                "calendar_entries": calendar_restore_state,
+                "presentations": presentation_restore_state,
+                "polls": poll_restore_state,
+            },
+        },
+    )
+    db.commit()
+    return event_response(get_event(db, event_id))  # type: ignore[arg-type]
+
+
+def restore_cancelled_event(
+    db: Session,
+    event_id: str,
+    actor: str,
+) -> EventResponse | None:
+    event = get_event(db, event_id)
+    if event is None:
+        return None
+    if event.status != "cancelled":
+        raise EventManagementError("Only cancelled events can be restored")
+    if event_settlement_is_closed(db, event_id):
+        raise EventManagementError("Events with closed settlement records cannot be restored")
+
+    cancellation = db.scalar(
+        select(EventSnapshot)
+        .where(
+            EventSnapshot.entity_id == event_id,
+            EventSnapshot.entity_type == "managed_event",
+            EventSnapshot.event_type == "event.cancelled",
+        )
+        .order_by(EventSnapshot.created_at.desc(), EventSnapshot.id.desc())
+    )
+    restore_state = cancellation.payload.get("restore_state") if cancellation else None
+    if not isinstance(restore_state, dict):
+        raise EventManagementError(
+            "This cancellation predates automatic restoration; use a verified backup recovery"
+        )
+
+    restored_status = restore_state.get("event_status")
+    if restored_status not in {"draft", "published"}:
+        raise EventManagementError("The cancellation audit record has an invalid prior status")
+
+    sub_event_states = restore_state.get("sub_events", [])
+    calendar_states = restore_state.get("calendar_entries", [])
+    presentation_states = restore_state.get("presentations", [])
+    poll_states = restore_state.get("polls", [])
+    for state_group in (
+        sub_event_states,
+        calendar_states,
+        presentation_states,
+        poll_states,
+    ):
+        if not isinstance(state_group, list):
+            raise EventManagementError("The cancellation audit restore data is invalid")
+
+    event.status = restored_status
+    event.cancelled_at = None
+    event.cancelled_by = None
+    event.cancellation_reason = None
+
+    restored_sub_events = 0
+    for state in sub_event_states:
+        if not isinstance(state, dict):
+            continue
+        sub_event = db.get(ManagedSubEvent, state.get("id"))
+        status = state.get("status")
+        if sub_event and sub_event.event_id == event_id and isinstance(status, str):
+            sub_event.status = status
+            restored_sub_events += 1
+
+    restored_calendar_entries = 0
+    for state in calendar_states:
+        if not isinstance(state, dict):
+            continue
+        entry = db.get(EventCalendarEntry, state.get("id"))
+        is_active = state.get("is_active")
+        if entry and entry.event_id == event_id and isinstance(is_active, bool):
+            entry.is_active = is_active
+            restored_calendar_entries += 1
+
+    restored_presentations = 0
+    for state in presentation_states:
+        if not isinstance(state, dict):
+            continue
+        presentation = db.get(EventPresentationState, state.get("sub_event_id"))
+        if presentation is None or presentation.event_id != event_id:
+            continue
+        status = state.get("status")
+        ordering_status = state.get("ordering_status")
+        updated_by = state.get("updated_by")
+        if all(isinstance(value, str) for value in (status, ordering_status, updated_by)):
+            presentation.status = status
+            presentation.ordering_status = ordering_status
+            presentation.updated_by = updated_by
+            restored_presentations += 1
+
+    restored_polls = 0
+    for state in poll_states:
+        if not isinstance(state, dict):
+            continue
+        poll = db.get(EventPoll, state.get("id"))
+        status = state.get("status")
+        if poll is None or poll.event_id != event_id or not isinstance(status, str):
+            continue
+        closed_at = state.get("closed_at")
+        poll.status = status
+        poll.closed_at = datetime.fromisoformat(closed_at) if closed_at else None
+        restored_polls += 1
+
+    _lifecycle_snapshot(
+        db,
+        event_type="event.restored",
+        entity_type="managed_event",
+        entity_id=event.id,
+        actor=actor,
+        payload={
+            "event_name": event.name,
+            "restored_status": restored_status,
+            "cancellation_snapshot_id": cancellation.id if cancellation else None,
+            "sub_events_restored": restored_sub_events,
+            "calendar_entries_restored": restored_calendar_entries,
+            "presentations_restored": restored_presentations,
+            "polls_restored": restored_polls,
         },
     )
     db.commit()

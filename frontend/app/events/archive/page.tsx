@@ -4,7 +4,11 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArchivedEventCloseoutPanel } from "@/components/ArchivedEventCloseoutPanel";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { listArchivedEvents, ManagedEvent } from "@/lib/event-admin-api";
+import {
+  listArchivedEvents,
+  ManagedEvent,
+  restoreManagedEvent,
+} from "@/lib/event-admin-api";
 import {
   archivedEventYears,
   ArchivedStatusFilter,
@@ -25,6 +29,8 @@ function ArchivedEventsWorkspace() {
   const [events, setEvents] = useState<ManagedEvent[]>([]);
   const [selected, setSelected] = useState<ManagedEvent | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<ArchivedStatusFilter>("all");
   const [yearFilter, setYearFilter] = useState("all");
@@ -53,6 +59,33 @@ function ArchivedEventsWorkspace() {
   }, [load]);
 
   const years = useMemo(() => archivedEventYears(events), [events]);
+
+  async function restoreEvent(event: ManagedEvent) {
+    if (
+      !window.confirm(
+        `Restore “${event.name}” to its exact status immediately before cancellation?`,
+      )
+    )
+      return;
+    setRestoringId(event.id);
+    setError(null);
+    setMessage(null);
+    try {
+      await restoreManagedEvent(event.id);
+      await load();
+      setMessage(
+        `${event.name} was restored and returned to Event Management.`,
+      );
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Unable to restore the cancelled event.",
+      );
+    } finally {
+      setRestoringId(null);
+    }
+  }
 
   const filteredEvents = useMemo(
     () =>
@@ -114,6 +147,11 @@ function ArchivedEventsWorkspace() {
 
       {error ? (
         <p className="mt-5 rounded-xl bg-red-50 p-4 text-red-800">{error}</p>
+      ) : null}
+      {message ? (
+        <p className="mt-5 rounded-xl bg-green-50 p-4 text-green-900">
+          {message}
+        </p>
       ) : null}
 
       <section className="event-glass-pane mt-6 rounded-2xl border p-4">
@@ -226,6 +264,16 @@ function ArchivedEventsWorkspace() {
                     ? ` on ${dateTime(selected.cancelled_at)}`
                     : ""}
                 </p>
+                <button
+                  className="mt-4 rounded-xl bg-green-700 px-4 py-3 font-bold text-white disabled:opacity-60"
+                  disabled={restoringId === selected.id}
+                  onClick={() => void restoreEvent(selected)}
+                  type="button"
+                >
+                  {restoringId === selected.id
+                    ? "Restoring event…"
+                    : "Restore event"}
+                </button>
               </section>
             ) : null}
 
