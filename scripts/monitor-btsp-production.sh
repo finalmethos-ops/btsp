@@ -120,6 +120,81 @@ PY
 failures=()
 check_lines=()
 
+# Docker Desktop can retain stale WSL bind-mount handles after its Linux VM
+# restarts. In that state restart policies cannot recover Nginx or cloudflared:
+# both containers repeatedly fail before their processes start. Recreating only
+# the stateless edge services gives Docker fresh mount handles without touching
+# PostgreSQL, Redis, or application data.
+edge_repair_log="$runtime_directory/last-edge-repair.log"
+edge_repair_needed=false
+for edge_service in nginx cloudflared; do
+  edge_state="$(
+    docker inspect --format '{{.State.Status}}' \
+      "btsp-intranet-$edge_service-1" 2>/dev/null || true
+  )"
+  if [[ "$edge_state" != running ]]; then
+    edge_repair_needed=true
+  fi
+done
+
+if [[ "$edge_repair_needed" == true ]]; then
+  compose=(
+    docker compose
+    --env-file .env.intranet
+    -p btsp-intranet
+    -f docker-compose.yml
+    -f docker-compose.production.yml
+    -f docker-compose.intranet.yml
+    -f docker-compose.tunnel.yml
+  )
+  edge_container_ids=()
+  for edge_service in nginx cloudflared; do
+    while IFS= read -r container_id; do
+      if [[ -n "$container_id" ]]; then
+        edge_container_ids+=("$container_id")
+      fi
+    done < <(
+      docker ps --all --quiet \
+        --filter 'label=com.docker.compose.project=btsp-intranet' \
+        --filter "label=com.docker.compose.service=$edge_service"
+    )
+  done
+  : >"$edge_repair_log"
+  if ((${#edge_container_ids[@]} > 0)); then
+    docker rm --force "${edge_container_ids[@]}" >>"$edge_repair_log" 2>&1 || true
+  fi
+  if "${compose[@]}" up -d --no-deps nginx cloudflared \
+    >>"$edge_repair_log" 2>&1; then
+    edge_recovered=false
+    for _attempt in $(seq 1 30); do
+      nginx_state="$(
+        docker inspect --format '{{.State.Status}}' \
+          btsp-intranet-nginx-1 2>/dev/null || true
+      )"
+      cloudflared_state="$(
+        docker inspect --format '{{.State.Status}}' \
+          btsp-intranet-cloudflared-1 2>/dev/null || true
+      )"
+      if [[ "$nginx_state" == running && "$cloudflared_state" == running ]]; then
+        if "$repository_root/scripts/check-btsp-public-health.sh" \
+          >/dev/null 2>&1; then
+          edge_recovered=true
+          break
+        fi
+      fi
+      sleep 2
+    done
+    if [[ "$edge_recovered" == true ]]; then
+      check_lines+=("Nginx and Cloudflare edge services were recreated automatically")
+    else
+      failures+=("Automatic edge recovery completed, but an edge container is not running")
+    fi
+  else
+    failures+=("Automatic Nginx and Cloudflare edge recovery failed")
+  fi
+  chmod 600 "$edge_repair_log" 2>/dev/null || true
+fi
+
 public_check_output="$("$repository_root/scripts/check-btsp-public-health.sh" 2>&1)"
 public_check_status=$?
 printf '%s\n' "$public_check_output" > "$check_output"

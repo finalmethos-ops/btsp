@@ -139,6 +139,10 @@ trusted local clients can continue to use the intranet URL.
 
 - Disable Windows sleep and hibernation while the host is serving production.
 - Start Docker Desktop automatically after reboot.
+- Keep the `BTSP Production Monitor` scheduled task enabled. In addition to
+  reporting health failures, it recreates the stateless Nginx and Cloudflare
+  edge containers when a Docker Desktop restart leaves stale WSL bind mounts.
+  PostgreSQL, Redis, and application data are not recreated by this repair.
 - Keep the computer on a UPS.
 - Run `scripts/backup-and-upload-btsp-production.sh` daily to create, restore
   test, and upload encrypted PostgreSQL and durable-file recovery bundles.
