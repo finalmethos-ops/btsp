@@ -176,6 +176,9 @@ class EventProductSlide(Base):
     image: Mapped["EventProductSlideImage | None"] = relationship(
         back_populates="slide", cascade="all, delete-orphan", uselist=False
     )
+    vendor_logo: Mapped["EventProductSlideVendorLogo | None"] = relationship(
+        back_populates="slide", cascade="all, delete-orphan", uselist=False
+    )
 
 
 class EventProductSlideImage(Base):
@@ -193,6 +196,23 @@ class EventProductSlideImage(Base):
     )
 
     slide: Mapped[EventProductSlide] = relationship(back_populates="image")
+
+
+class EventProductSlideVendorLogo(Base):
+    __tablename__ = "event_product_slide_vendor_logos"
+
+    slide_id: Mapped[str] = mapped_column(
+        ForeignKey("event_product_slides.id", ondelete="CASCADE"), primary_key=True
+    )
+    filename: Mapped[str] = mapped_column(String(255))
+    content_type: Mapped[str] = mapped_column(String(64))
+    content: Mapped[bytes] = mapped_column(LargeBinary)
+    uploaded_by: Mapped[str] = mapped_column(String(320))
+    uploaded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    slide: Mapped[EventProductSlide] = relationship(back_populates="vendor_logo")
 
 
 class EventPresentationState(Base):

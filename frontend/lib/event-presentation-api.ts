@@ -39,6 +39,7 @@ export type EventPresentation = {
     presenter_notes: string | null;
   }>;
   presenter_slides: EventProductSlide[];
+  projector_image_preload_ids: string[];
   updated_at: string | null;
 };
 
@@ -171,6 +172,18 @@ export async function downloadPublicPresentationImage(
 ) {
   const response = await projectorRequest(
     `/public-event-presentations/${subEventId}/slides/${slideId}/image`,
+    projectorToken,
+  );
+  return response.blob();
+}
+
+export async function downloadPublicPresentationVendorLogo(
+  subEventId: string,
+  slideId: string,
+  projectorToken: string,
+) {
+  const response = await projectorRequest(
+    `/public-event-presentations/${subEventId}/slides/${slideId}/vendor-logo`,
     projectorToken,
   );
   return response.blob();

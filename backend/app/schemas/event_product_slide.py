@@ -92,6 +92,7 @@ class EventProductSlideResponse(EventProductSlideWrite):
     position: int
     vendor_name: str | None = None
     has_image: bool = False
+    has_vendor_logo: bool = False
     created_by: str
     created_at: datetime
 

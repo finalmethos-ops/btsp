@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   downloadPublicPresentationBranding,
   downloadPublicPresentationImage,
+  downloadPublicPresentationVendorLogo,
   EventPresentation,
   getPublicEventPresentation,
 } from "@/lib/event-presentation-api";
@@ -49,7 +50,11 @@ export function EventPresentationDisplay({
   );
   const [error, setError] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const imageCacheRef = useRef(new Map<string, string>());
+  const imageDownloadsRef = useRef(new Set<string>());
+  const desiredImageIdsRef = useRef(new Set<string>());
   const [brandingUrl, setBrandingUrl] = useState<string | null>(null);
+  const [vendorLogoUrl, setVendorLogoUrl] = useState<string | null>(null);
   const [imageFit, setImageFit] = useState<"contain" | "cover">("contain");
   const slide = presentation?.current_slide;
   const isFiller = slide?.slide_type === "filler";
@@ -58,6 +63,9 @@ export function EventPresentationDisplay({
   const isMultiProduct = Boolean(slide?.product_variants.length);
   const slideId = slide?.id;
   const slideHasImage = slide?.has_image;
+  const preloadImageKey = (
+    presentation?.projector_image_preload_ids ?? []
+  ).join("|");
   const brandedStyle = eventThemeStyle(
     presentation
       ? {
@@ -89,7 +97,10 @@ export function EventPresentationDisplay({
 
   useEffect(() => {
     let active = true;
-    const refresh = () =>
+    let refreshing = false;
+    const refresh = () => {
+      if (refreshing) return;
+      refreshing = true;
       void getPublicEventPresentation(subEventId, projectorToken)
         .then((value) => {
           if (active) {
@@ -104,9 +115,13 @@ export function EventPresentationDisplay({
                 ? caught.message
                 : "Unable to load the presentation.",
             );
+        })
+        .finally(() => {
+          refreshing = false;
         });
+    };
     refresh();
-    const timer = window.setInterval(refresh, 2_000);
+    const timer = window.setInterval(refresh, 750);
     return () => {
       active = false;
       window.clearInterval(timer);
@@ -114,19 +129,71 @@ export function EventPresentationDisplay({
   }, [projectorToken, subEventId]);
 
   useEffect(() => {
+    const desiredIds = new Set(
+      preloadImageKey ? preloadImageKey.split("|") : [],
+    );
+    if (slideId && slideHasImage) desiredIds.add(slideId);
+    desiredImageIdsRef.current = desiredIds;
+    setImageUrl(slideId ? (imageCacheRef.current.get(slideId) ?? null) : null);
+
+    for (const [cachedId, url] of imageCacheRef.current.entries()) {
+      if (!desiredIds.has(cachedId)) {
+        URL.revokeObjectURL(url);
+        imageCacheRef.current.delete(cachedId);
+      }
+    }
+    for (const imageId of desiredIds) {
+      if (
+        imageCacheRef.current.has(imageId) ||
+        imageDownloadsRef.current.has(imageId)
+      )
+        continue;
+      imageDownloadsRef.current.add(imageId);
+      void downloadPublicPresentationImage(subEventId, imageId, projectorToken)
+        .then((blob) => {
+          const url = URL.createObjectURL(blob);
+          if (desiredImageIdsRef.current.has(imageId)) {
+            imageCacheRef.current.set(imageId, url);
+            if (imageId === slideId) setImageUrl(url);
+          } else {
+            URL.revokeObjectURL(url);
+          }
+        })
+        .catch(() => undefined)
+        .finally(() => imageDownloadsRef.current.delete(imageId));
+    }
+  }, [preloadImageKey, projectorToken, slideHasImage, slideId, subEventId]);
+
+  useEffect(() => {
+    const imageCache = imageCacheRef.current;
+    const desiredImageIds = desiredImageIdsRef.current;
+    return () => {
+      for (const url of imageCache.values()) URL.revokeObjectURL(url);
+      imageCache.clear();
+      desiredImageIds.clear();
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
     let url: string | null = null;
-    setImageUrl(null);
-    if (slideId && slideHasImage)
-      void downloadPublicPresentationImage(subEventId, slideId, projectorToken)
+    setVendorLogoUrl(null);
+    if (slideId && slide?.has_vendor_logo)
+      void downloadPublicPresentationVendorLogo(
+        subEventId,
+        slideId,
+        projectorToken,
+      )
         .then((blob) => {
           url = URL.createObjectURL(blob);
-          setImageUrl(url);
+          if (active) setVendorLogoUrl(url);
         })
         .catch(() => undefined);
     return () => {
+      active = false;
       if (url) URL.revokeObjectURL(url);
     };
-  }, [projectorToken, slideHasImage, slideId, subEventId]);
+  }, [projectorToken, slide?.has_vendor_logo, slideId, subEventId]);
 
   useEffect(() => {
     let active = true;
@@ -388,7 +455,7 @@ export function EventPresentationDisplay({
                   </>
                 )}
               </div>
-              <aside className="event-presentation-offer-details overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/85">
+              <aside className="event-presentation-offer-details flex flex-col overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/85">
                 <h3 className="border-b border-slate-700 px-5 py-4 text-center text-sm font-black uppercase tracking-[0.18em]">
                   Offer Details
                 </h3>
@@ -489,6 +556,17 @@ export function EventPresentationDisplay({
                         +{slide.product_variants.length - 8} additional models
                       </p>
                     ) : null}
+                  </section>
+                ) : null}
+                {vendorLogoUrl ? (
+                  <section className="mt-auto flex min-h-20 items-center justify-center border-t border-slate-700 bg-white/95 px-5 py-3">
+                    {/* Protected blob URL cannot use the Next image optimizer. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      alt={`${slide.vendor_name ?? slide.vendor_code ?? "Vendor"} logo`}
+                      className="max-h-20 max-w-full object-contain"
+                      src={vendorLogoUrl}
+                    />
                   </section>
                 ) : null}
               </aside>

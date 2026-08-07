@@ -10,6 +10,8 @@ from app.models.event_management import (
     EventMembership,
     EventPresentationState,
     EventProductSlide,
+    EventProductSlideImage,
+    EventProductSlideVendorLogo,
     ManagedEvent,
     ManagedSubEvent,
 )
@@ -101,7 +103,12 @@ def _slides(db: Session, sub_event_id: str) -> list[EventProductSlide]:
     return list(
         db.scalars(
             select(EventProductSlide)
-            .options(selectinload(EventProductSlide.image))
+            .options(
+                selectinload(EventProductSlide.image).load_only(EventProductSlideImage.slide_id),
+                selectinload(EventProductSlide.vendor_logo).load_only(
+                    EventProductSlideVendorLogo.slide_id
+                ),
+            )
             .where(
                 EventProductSlide.sub_event_id == sub_event_id,
                 EventProductSlide.status != "archived",
@@ -150,6 +157,7 @@ def get_presentation(
         ).model_copy(
             update={
                 "has_image": current.image is not None,
+                "has_vendor_logo": current.vendor_logo is not None,
                 "presenter_notes": None,
                 "vendor_name": vendor_name,
                 "category": current.category
@@ -184,6 +192,16 @@ def get_presentation(
             EventEntityOrder.status == "confirmed",
         )
     ).one()
+    current_index = (
+        next((index for index, slide in enumerate(slides) if slide.id == current.id), 0)
+        if current is not None
+        else 0
+    )
+    preload_start = max(current_index - 1, 0) if current is not None else 0
+    preload_end = min(current_index + 3, len(slides))
+    projector_image_preload_ids = [
+        slide.id for slide in slides[preload_start:preload_end] if slide.image is not None
+    ]
     return EventPresentationResponse(
         sub_event_id=sub_event.id,
         event_id=sub_event.event_id,
@@ -229,13 +247,17 @@ def get_presentation(
         presenter_slides=(
             [
                 EventProductSlideResponse.model_validate(slide, from_attributes=True).model_copy(
-                    update={"has_image": slide.image is not None}
+                    update={
+                        "has_image": slide.image is not None,
+                        "has_vendor_logo": slide.vendor_logo is not None,
+                    }
                 )
                 for slide in slides
             ]
             if include_presenter_details
             else []
         ),
+        projector_image_preload_ids=projector_image_preload_ids,
         updated_at=state.updated_at if state else None,
     )
 

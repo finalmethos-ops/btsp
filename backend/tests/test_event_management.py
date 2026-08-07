@@ -136,6 +136,8 @@ from app.services.event_product_slide_service import (
     create_slide,
     list_slides,
     reorder_slides,
+    save_slide_image,
+    save_slide_vendor_logo,
 )
 from app.services.event_staff_task_report_service import export_event_staff_tasks
 from app.services.event_staff_task_service import (
@@ -1470,6 +1472,25 @@ def test_event_product_lineup_snapshots_catalog_controls_and_reorders() -> None:
             "admin@example.com",
         )
         assert first is not None and second is not None
+        first = save_slide_image(
+            db,
+            first.id,
+            "product.png",
+            "image/png",
+            b"\x89PNG\r\n\x1a\nproduct-image",
+            "admin@example.com",
+        )
+        first = save_slide_vendor_logo(
+            db,
+            first.id,
+            "vendor-logo.png",
+            "image/png",
+            b"\x89PNG\r\n\x1a\nvendor-logo",
+            "admin@example.com",
+        )
+        assert first is not None
+        assert first.has_image is True
+        assert first.has_vendor_logo is True
         assert first.name == "Event snapshot name"
         assert first.max_event_units == 250
         assert _order_capacity(first) == 250
@@ -1490,6 +1511,7 @@ def test_event_product_lineup_snapshots_catalog_controls_and_reorders() -> None:
         assert presentation is not None
         assert presentation.current_slide is not None
         assert presentation.current_slide.id == second.id
+        assert presentation.projector_image_preload_ids == [first.id]
         presentation = control_presentation(db, sub_event_id, "open", "presenter@example.com")
         assert presentation is not None
         assert presentation.ordering_status == "open"

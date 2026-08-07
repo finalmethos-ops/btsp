@@ -17,6 +17,7 @@ from app.models.event_management import (
     EventBrandingAsset,
     EventProductSlide,
     EventProductSlideImage,
+    EventProductSlideVendorLogo,
     ManagedEvent,
     ManagedSubEvent,
 )
@@ -248,6 +249,27 @@ def read_public_projector_slide_image(
     return Response(
         image.content,
         media_type=image.content_type,
+        headers={"Cache-Control": "private, max-age=300"},
+    )
+
+
+@public_router.get("/{sub_event_id}/slides/{slide_id}/vendor-logo")
+def read_public_projector_vendor_logo(
+    sub_event_id: str,
+    slide_id: str,
+    db: Session = Depends(get_db),
+    projector_token: str = Depends(projector_token_header),
+) -> Response:
+    _validate_projector_access(db, sub_event_id, projector_token)
+    slide = db.get(EventProductSlide, slide_id)
+    if slide is None or slide.sub_event_id != sub_event_id or slide.status == "archived":
+        raise HTTPException(status_code=404, detail="Vendor logo not found")
+    logo = db.get(EventProductSlideVendorLogo, slide_id)
+    if logo is None:
+        raise HTTPException(status_code=404, detail="Vendor logo not found")
+    return Response(
+        logo.content,
+        media_type=logo.content_type,
         headers={"Cache-Control": "private, max-age=300"},
     )
 

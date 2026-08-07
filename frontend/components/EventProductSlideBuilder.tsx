@@ -13,6 +13,7 @@ import {
   reorderEventProductSlides,
   updateEventProductSlide,
   uploadEventProductImage,
+  uploadEventSlideVendorLogo,
   webFillEventProduct,
 } from "@/lib/event-product-slide-api";
 import { ManagedSubEvent } from "@/lib/event-admin-api";
@@ -127,6 +128,7 @@ export function EventProductSlideBuilder({
     const fullScreenImage = filler && fillerCategory === "full_screen_image";
     const multipleProducts = !filler && productMode === "multiple";
     const productImage = data.get("product_image");
+    const vendorLogo = data.get("vendor_logo");
     if (
       fullScreenImage &&
       !editing?.has_image &&
@@ -226,6 +228,9 @@ export function EventProductSlideBuilder({
         await uploadEventProductImage(saved.id, productImage);
       } else if (webFill?.image_url) {
         await importEventProductImage(saved.id, webFill.image_url);
+      }
+      if (!filler && vendorLogo instanceof File && vendorLogo.size > 0) {
+        await uploadEventSlideVendorLogo(saved.id, vendorLogo);
       }
       await refresh();
       setEditing(null);
@@ -363,7 +368,7 @@ export function EventProductSlideBuilder({
       ) : null}
 
       <div className="mt-5 grid gap-5 xl:grid-cols-[320px_1fr]">
-        <div className="space-y-2">
+        <div className="max-h-[72dvh] space-y-2 overflow-y-auto overscroll-contain pr-2">
           <div className="rounded-xl border border-blue-200 bg-blue-50 p-3">
             <strong className="text-sm text-blue-950">
               Presentation order
@@ -451,7 +456,7 @@ export function EventProductSlideBuilder({
                   ))}
                 </select>
               </label>
-              <div className="mt-2 flex gap-2">
+              <div className="mt-2 flex flex-wrap gap-2">
                 <button
                   className="text-sm font-semibold text-blue-800"
                   onClick={() => {
@@ -500,6 +505,34 @@ export function EventProductSlideBuilder({
                     }}
                   />
                 </label>
+                {slide.slide_type === "product" ? (
+                  <label className="cursor-pointer text-sm font-semibold text-blue-800">
+                    {slide.has_vendor_logo
+                      ? "Replace vendor logo"
+                      : "Add vendor logo"}
+                    <input
+                      accept="image/png,image/jpeg,image/webp"
+                      className="sr-only"
+                      type="file"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (file) {
+                          setBusy(true);
+                          void uploadEventSlideVendorLogo(slide.id, file)
+                            .then(refresh)
+                            .catch((caught: unknown) =>
+                              setError(
+                                caught instanceof Error
+                                  ? caught.message
+                                  : "Vendor logo upload failed",
+                              ),
+                            )
+                            .finally(() => setBusy(false));
+                        }
+                      }}
+                    />
+                  </label>
+                ) : null}
               </div>
             </div>
           ))}
@@ -511,7 +544,7 @@ export function EventProductSlideBuilder({
         </div>
 
         <form
-          className="grid gap-3 rounded-xl bg-slate-50 p-4 sm:grid-cols-2"
+          className="grid self-start gap-3 rounded-xl bg-slate-50 p-4 sm:grid-cols-2"
           key={`${editing?.id ?? "new"}-${slideType}-${fillerCategory}-${productMode}-${catalogCode}-${webFill?.source_url ?? ""}`}
           onSubmit={save}
         >
@@ -1164,14 +1197,30 @@ export function EventProductSlideBuilder({
             </span>
           </label>
           {slideType === "product" ? (
-            <label className="text-sm font-semibold sm:col-span-2">
-              Vendor delivery notes
-              <textarea
-                className="mt-1 w-full rounded-lg border bg-white p-2"
-                defaultValue={editing?.vendor_delivery_notes ?? ""}
-                name="vendor_delivery_notes"
-              />
-            </label>
+            <>
+              <label className="text-sm font-semibold sm:col-span-2">
+                Vendor logo
+                <input
+                  accept="image/png,image/jpeg,image/webp"
+                  className="mt-1 block w-full rounded-lg border bg-white p-2"
+                  name="vendor_logo"
+                  type="file"
+                />
+                <span className="mt-1 block font-normal text-slate-500">
+                  Optional. PNG with a transparent background is recommended.
+                  The logo appears at the bottom of the projector Offer Details
+                  panel.
+                </span>
+              </label>
+              <label className="text-sm font-semibold sm:col-span-2">
+                Vendor delivery notes
+                <textarea
+                  className="mt-1 w-full rounded-lg border bg-white p-2"
+                  defaultValue={editing?.vendor_delivery_notes ?? ""}
+                  name="vendor_delivery_notes"
+                />
+              </label>
+            </>
           ) : null}
           <label className="text-sm font-semibold sm:col-span-2">
             Private presenter notes

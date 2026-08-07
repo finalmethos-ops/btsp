@@ -60,6 +60,7 @@ class EventPresentationResponse(BaseModel):
     presenter_notes: str | None = None
     slide_queue: list[EventPresentationQueueItem] = Field(default_factory=list)
     presenter_slides: list[EventProductSlideResponse] = Field(default_factory=list)
+    projector_image_preload_ids: list[str] = Field(default_factory=list)
     updated_at: datetime | None
 
 

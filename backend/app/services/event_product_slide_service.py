@@ -6,6 +6,7 @@ from app.models.event_management import (
     EventPresentationState,
     EventProductSlide,
     EventProductSlideImage,
+    EventProductSlideVendorLogo,
     ManagedSubEvent,
 )
 from app.schemas.event_product_slide import (
@@ -23,10 +24,15 @@ class EventProductSlideError(ValueError):
 def purge_event_slide_images(db: Session, event_id: str) -> int:
     """Remove stored presentation image bytes after an event is concluded."""
     slide_ids = select(EventProductSlide.id).where(EventProductSlide.event_id == event_id)
-    result = db.execute(
+    image_result = db.execute(
         delete(EventProductSlideImage).where(EventProductSlideImage.slide_id.in_(slide_ids))
     )
-    return result.rowcount or 0
+    logo_result = db.execute(
+        delete(EventProductSlideVendorLogo).where(
+            EventProductSlideVendorLogo.slide_id.in_(slide_ids)
+        )
+    )
+    return (image_result.rowcount or 0) + (logo_result.rowcount or 0)
 
 
 def _slides_enabled(sub_event: ManagedSubEvent) -> None:
@@ -36,12 +42,18 @@ def _slides_enabled(sub_event: ManagedSubEvent) -> None:
 
 def _response(slide: EventProductSlide) -> EventProductSlideResponse:
     return EventProductSlideResponse.model_validate(slide, from_attributes=True).model_copy(
-        update={"has_image": slide.image is not None}
+        update={
+            "has_image": slide.image is not None,
+            "has_vendor_logo": slide.vendor_logo is not None,
+        }
     )
 
 
 def _slide_query():
-    return select(EventProductSlide).options(selectinload(EventProductSlide.image))
+    return select(EventProductSlide).options(
+        selectinload(EventProductSlide.image).load_only(EventProductSlideImage.slide_id),
+        selectinload(EventProductSlide.vendor_logo).load_only(EventProductSlideVendorLogo.slide_id),
+    )
 
 
 def list_slides(db: Session, sub_event_id: str) -> list[EventProductSlideResponse] | None:
@@ -244,5 +256,41 @@ def save_slide_image(
     image.content_type = content_type
     image.content = content
     image.uploaded_by = actor
+    db.commit()
+    return _response(db.scalar(_slide_query().where(EventProductSlide.id == slide_id)))
+
+
+def save_slide_vendor_logo(
+    db: Session,
+    slide_id: str,
+    filename: str,
+    content_type: str,
+    content: bytes,
+    actor: str,
+) -> EventProductSlideResponse | None:
+    slide = db.get(EventProductSlide, slide_id)
+    if slide is None:
+        return None
+    if event_operations_are_locked(db, slide.event_id):
+        raise EventProductSlideError(
+            "Product slides are locked because the event is cancelled or settlement is closed"
+        )
+    _slides_enabled(db.get(ManagedSubEvent, slide.sub_event_id))
+    if slide.slide_type != "product":
+        raise EventProductSlideError("Vendor logos can only be added to product slides")
+    if content_type not in {"image/png", "image/jpeg", "image/webp"}:
+        raise EventProductSlideError("Vendor logo must be PNG, JPEG, or WebP")
+    if not content or len(content) > 4 * 1024 * 1024:
+        raise EventProductSlideError("Vendor logo must be between 1 byte and 4 MB")
+    if not content_matches_declared_type(content, content_type):
+        raise EventProductSlideError("Vendor logo content does not match its declared type")
+    logo = db.get(EventProductSlideVendorLogo, slide_id)
+    if logo is None:
+        logo = EventProductSlideVendorLogo(slide_id=slide_id)
+        db.add(logo)
+    logo.filename = filename[:255]
+    logo.content_type = content_type
+    logo.content = content
+    logo.uploaded_by = actor
     db.commit()
     return _response(db.scalar(_slide_query().where(EventProductSlide.id == slide_id)))

@@ -43,6 +43,7 @@ export type EventProductSlide = {
   }>;
   status: "draft" | "ready" | "archived";
   has_image: boolean;
+  has_vendor_logo: boolean;
   created_by: string;
   created_at: string;
 };
@@ -55,6 +56,7 @@ export type EventProductSlideWrite = Omit<
   | "position"
   | "vendor_name"
   | "has_image"
+  | "has_vendor_logo"
   | "created_by"
   | "created_at"
 >;
@@ -104,6 +106,15 @@ export const uploadEventProductImage = (slideId: string, file: File) => {
     method: "POST",
     body,
   });
+};
+
+export const uploadEventSlideVendorLogo = (slideId: string, file: File) => {
+  const body = new FormData();
+  body.append("file", file);
+  return apiFetch<EventProductSlide>(
+    `/event-product-slides/${slideId}/vendor-logo`,
+    { method: "POST", body },
+  );
 };
 
 export type EventProductWebFill = {

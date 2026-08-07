@@ -8,6 +8,7 @@ from app.db.session import get_db
 from app.models.event_management import (
     EventProductSlide,
     EventProductSlideImage,
+    EventProductSlideVendorLogo,
     ManagedSubEvent,
 )
 from app.models.identity import User
@@ -26,6 +27,7 @@ from app.services.event_product_slide_service import (
     list_slides,
     reorder_slides,
     save_slide_image,
+    save_slide_vendor_logo,
     update_slide,
 )
 from app.services.event_product_web_fill_service import (
@@ -154,6 +156,29 @@ async def post_slide_image(
     return slide
 
 
+@router.post("/{slide_id}/vendor-logo", response_model=EventProductSlideResponse)
+async def post_slide_vendor_logo(
+    slide_id: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_permission("events.manage")),
+) -> EventProductSlideResponse:
+    try:
+        slide = save_slide_vendor_logo(
+            db,
+            slide_id,
+            file.filename or "vendor-logo",
+            file.content_type or "application/octet-stream",
+            await file.read(4 * 1024 * 1024 + 1),
+            user.email,
+        )
+    except EventProductSlideError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if slide is None:
+        raise HTTPException(status_code=404, detail="Product slide not found")
+    return slide
+
+
 @router.post("/{slide_id}/image-from-web", response_model=EventProductSlideResponse)
 def post_slide_image_from_web(
     slide_id: str,
@@ -198,5 +223,29 @@ def read_slide_image(
     return Response(
         image.content,
         media_type=image.content_type,
+        headers={"Cache-Control": "private, max-age=300"},
+    )
+
+
+@router.get("/{slide_id}/vendor-logo")
+def read_slide_vendor_logo(
+    slide_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> Response:
+    slide = db.get(EventProductSlide, slide_id)
+    if slide is None:
+        raise HTTPException(status_code=404, detail="Product slide not found")
+    sub_event = db.get(ManagedSubEvent, slide.sub_event_id)
+    if not user_has_permission(user, "events.manage") and not (
+        sub_event and user_has_sub_event_access(db, slide.event_id, slide.sub_event_id, user.id)
+    ):
+        raise HTTPException(status_code=403, detail="Event access is required")
+    logo = db.get(EventProductSlideVendorLogo, slide_id)
+    if logo is None:
+        raise HTTPException(status_code=404, detail="Vendor logo not found")
+    return Response(
+        logo.content,
+        media_type=logo.content_type,
         headers={"Cache-Control": "private, max-age=300"},
     )

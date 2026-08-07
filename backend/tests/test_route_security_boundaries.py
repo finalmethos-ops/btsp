@@ -141,6 +141,16 @@ def test_projector_display_uses_scoped_link_instead_of_user_login(
             assert response.json()["slide_queue"] == []
             assert response.json()["presenter_slides"] == []
 
+            logo_without_token = client.get(
+                f"/api/v1/public-event-presentations/{sub_event_id}/slides/missing/vendor-logo"
+            )
+            assert logo_without_token.status_code in {401, 403}
+            missing_logo = client.get(
+                f"/api/v1/public-event-presentations/{sub_event_id}/slides/missing/vendor-logo",
+                headers={"X-BTSP-Projector-Token": token},
+            )
+            assert missing_logo.status_code == 404
+
             presenter_token, _presenter_expires_at = create_presenter_token(sub_event_id)
             presenter_response = client.get(
                 f"/api/v1/public-event-presentations/{sub_event_id}/presenter-monitor",
