@@ -18,14 +18,14 @@ jobs:
       APP_NAME: BTSP
       APP_VERSION: 0.1.0
       SECRET_KEY: ci-secret-key
-      DATABASE_URL: postgresql+psycopg://btsp:btsp@localhost:5432/btsp
+      DATABASE_URL: postgresql+psycopg://btsp:btsp@localhost:5432/btsp_stress
       REDIS_URL: redis://localhost:6379/0
       CORS_ORIGINS: http://localhost:3000
     services:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_DB: btsp
+          POSTGRES_DB: btsp_stress
           POSTGRES_USER: btsp
           POSTGRES_PASSWORD: btsp
         ports:
@@ -61,6 +61,15 @@ jobs:
       - run: alembic downgrade base
       - run: alembic upgrade head
       - run: pytest
+      - name: Reconcile concurrent live ordering
+        run: >-
+          python ../scripts/stress-test-live-ordering.py
+          --users 50
+          --concurrency 10
+          --display-readers 2
+          --max-order-p95-ms 10000
+          --max-display-p95-ms 3000
+          --min-orders-per-second 2
 
   frontend:
     name: Frontend install and build

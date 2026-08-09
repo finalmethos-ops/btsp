@@ -384,7 +384,9 @@ export function ReceivingWorkspace() {
                   .map((line) => (
                     <tr className="border-b" key={line.id}>
                       <td className="p-2">
-                        <span className="font-medium">{line.model_identifier}</span>
+                        <span className="font-medium">
+                          {line.model_identifier}
+                        </span>
                         <br />
                         <span className="text-slate-500">
                           {line.product_name}

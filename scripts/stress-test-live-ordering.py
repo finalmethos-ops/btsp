@@ -34,10 +34,22 @@ def _arguments() -> argparse.Namespace:
     parser.add_argument("--concurrency", type=int, default=40)
     parser.add_argument("--display-readers", type=int, default=8)
     parser.add_argument("--quantity", type=int, default=1)
+    parser.add_argument("--max-order-p95-ms", type=float, default=0)
+    parser.add_argument("--max-display-p95-ms", type=float, default=0)
+    parser.add_argument("--min-orders-per-second", type=float, default=0)
     parser.add_argument("--keep-data", action="store_true")
     args = parser.parse_args()
     if min(args.users, args.concurrency, args.quantity) < 1 or args.display_readers < 0:
         parser.error("users, concurrency, and quantity must be positive")
+    if (
+        min(
+            args.max_order_p95_ms,
+            args.max_display_p95_ms,
+            args.min_orders_per_second,
+        )
+        < 0
+    ):
+        parser.error("performance thresholds cannot be negative")
     return args
 
 
@@ -305,22 +317,41 @@ def main() -> int:
             and revision_count == args.users
             and all(status == 200 for status, _latency in display_results)
         )
+        order_p95 = _percentile(order_latencies, 0.95)
+        display_p95 = _percentile(display_latencies, 0.95)
+        orders_per_second = args.users / elapsed
+        performance_regressions = []
+        if args.max_order_p95_ms and order_p95 > args.max_order_p95_ms:
+            performance_regressions.append("order p95 exceeded its limit")
+        if args.max_display_p95_ms and display_p95 > args.max_display_p95_ms:
+            performance_regressions.append("display p95 exceeded its limit")
+        if (
+            args.min_orders_per_second
+            and orders_per_second < args.min_orders_per_second
+        ):
+            performance_regressions.append("order throughput fell below its limit")
         summary = {
             "database": "isolated PostgreSQL",
             "authenticated_users": args.users,
             "concurrency": args.concurrency,
             "display_readers": args.display_readers,
             "elapsed_seconds": round(elapsed, 3),
-            "orders_per_second": round(args.users / elapsed, 2),
+            "orders_per_second": round(orders_per_second, 2),
             "order_latency_ms": {
                 "average": round(mean(order_latencies), 2) if order_latencies else 0,
                 "p50": round(_percentile(order_latencies, 0.50), 2),
-                "p95": round(_percentile(order_latencies, 0.95), 2),
+                "p95": round(order_p95, 2),
                 "p99": round(_percentile(order_latencies, 0.99), 2),
                 "maximum": round(max(order_latencies), 2) if order_latencies else 0,
             },
             "display_reads": len(display_results),
-            "display_latency_p95_ms": round(_percentile(display_latencies, 0.95), 2),
+            "display_latency_p95_ms": round(display_p95, 2),
+            "performance_thresholds": {
+                "max_order_p95_ms": args.max_order_p95_ms or None,
+                "max_display_p95_ms": args.max_display_p95_ms or None,
+                "min_orders_per_second": args.min_orders_per_second or None,
+            },
+            "performance_regressions": performance_regressions,
             "http_errors": errors[:5],
             "persisted_orders": int(order_count),
             "distinct_entities": int(distinct_entities),
@@ -329,7 +360,7 @@ def main() -> int:
             "reconciled_without_loss": reconciled,
         }
         print(json.dumps(summary, indent=2, sort_keys=True))
-        return 0 if reconciled else 1
+        return 0 if reconciled and not performance_regressions else 1
     finally:
         if not args.keep_data:
             Base.metadata.drop_all(engine)

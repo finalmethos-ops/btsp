@@ -33,3 +33,22 @@ Do not point this at production. If a controlled production test is ever
 approved, it requires both `ALLOW_PRODUCTION_ORDER_LOAD=YES` and
 `PRODUCTION_ORDER_LOAD_CONFIRM=I_UNDERSTAND_THIS_WRITES_TEST_ORDERS` and must
 be coordinated with an explicit cleanup plan.
+
+For a fully reconciled test with distinct authenticated users, use the guarded
+PostgreSQL harness. It drops and recreates its target schema and therefore
+refuses every database whose name does not contain `stress`:
+
+```bash
+DATABASE_URL=postgresql+psycopg://btsp:btsp@localhost:5433/btsp_stress \
+python scripts/stress-test-live-ordering.py \
+  --users 200 \
+  --concurrency 40 \
+  --display-readers 8 \
+  --max-order-p95-ms 10000 \
+  --max-display-p95-ms 3000 \
+  --min-orders-per-second 2
+```
+
+The harness fails unless every user order, distinct entity, quantity, and audit
+revision reconciles exactly. Optional latency and throughput thresholds also
+make major performance regressions fail CI without relaxing order correctness.

@@ -1,12 +1,19 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   downloadPublicPresenterImage,
   EventPresentation,
   getPublicEventPresenterPresentation,
 } from "@/lib/event-presentation-api";
 import { subscribePresenterRealtime } from "@/lib/event-realtime";
+import { usePresentationImageCache } from "@/lib/presentation-image-cache";
 
 const formatMoney = (value: string | number | null | undefined) =>
   Number(value ?? 0).toLocaleString(undefined, {
@@ -84,7 +91,6 @@ export function EventPresenterMonitor({
   const [presentation, setPresentation] = useState<EventPresentation | null>(
     null,
   );
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -143,6 +149,26 @@ export function EventPresenterMonitor({
       : (orderedSlides.find(
           (slide) => slide.position > (presentation.current_position ?? 0),
         ) ?? null);
+  const nextSlideIndex = nextSlide
+    ? orderedSlides.findIndex((slide) => slide.id === nextSlide.id)
+    : -1;
+  const presenterImageLoader = useCallback(
+    (imageId: string) =>
+      downloadPublicPresenterImage(subEventId, imageId, presenterToken),
+    [presenterToken, subEventId],
+  );
+  const imageUrl = usePresentationImageCache({
+    activeImageId: nextSlide?.has_image ? nextSlide.id : null,
+    cacheScope: `${subEventId}:${presenterToken}:presenter-slides`,
+    loadImage: presenterImageLoader,
+    preloadImageIds:
+      nextSlideIndex < 0
+        ? []
+        : orderedSlides
+            .slice(nextSlideIndex, nextSlideIndex + 3)
+            .filter((slide) => slide.has_image)
+            .map((slide) => slide.id),
+  });
   const currentProducts = currentSlide
     ? currentSlide.product_variants.length
       ? currentSlide.product_variants
@@ -164,40 +190,6 @@ export function EventPresenterMonitor({
     offerLimit == null
       ? null
       : Math.max(offerLimit - (presentation?.total_units_ordered ?? 0), 0);
-
-  useEffect(() => {
-    let active = true;
-    let objectUrl: string | null = null;
-    setImageUrl(null);
-    if (nextSlide?.has_image)
-      void downloadPublicPresenterImage(
-        subEventId,
-        nextSlide.id,
-        presenterToken,
-      )
-        .then(async (blob) => {
-          objectUrl = URL.createObjectURL(blob);
-          if (typeof Image !== "undefined") {
-            const decodedImage = new Image();
-            decodedImage.src = objectUrl;
-            if (typeof decodedImage.decode === "function") {
-              try {
-                await decodedImage.decode();
-              } catch {
-                URL.revokeObjectURL(objectUrl);
-                objectUrl = null;
-                return;
-              }
-            }
-          }
-          if (active) setImageUrl(objectUrl);
-        })
-        .catch(() => undefined);
-    return () => {
-      active = false;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [nextSlide?.has_image, nextSlide?.id, presenterToken, subEventId]);
 
   return (
     <main className="presenter-monitor min-h-[calc(100dvh-5rem)] bg-slate-950 p-4 text-white sm:p-6">

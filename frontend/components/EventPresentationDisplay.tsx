@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   downloadPublicPresentationBranding,
   downloadPublicPresentationImage,
@@ -11,6 +11,7 @@ import {
 import { EventAccessUnavailable } from "@/components/EventAccessUnavailable";
 import { eventThemeStyle } from "@/components/EventBrandingProvider";
 import { subscribeProjectorRealtime } from "@/lib/event-realtime";
+import { usePresentationImageCache } from "@/lib/presentation-image-cache";
 
 const IMAGE_FIT_STORAGE_KEY = "btsp.presentation.image-fit";
 
@@ -50,12 +51,7 @@ export function EventPresentationDisplay({
     null,
   );
   const [error, setError] = useState<string | null>(null);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const imageCacheRef = useRef(new Map<string, string>());
-  const imageDownloadsRef = useRef(new Set<string>());
-  const desiredImageIdsRef = useRef(new Set<string>());
   const [brandingUrl, setBrandingUrl] = useState<string | null>(null);
-  const [vendorLogoUrl, setVendorLogoUrl] = useState<string | null>(null);
   const [imageFit, setImageFit] = useState<"contain" | "cover">("contain");
   const slide = presentation?.current_slide;
   const isFiller = slide?.slide_type === "filler";
@@ -64,9 +60,28 @@ export function EventPresentationDisplay({
   const isMultiProduct = Boolean(slide?.product_variants.length);
   const slideId = slide?.id;
   const slideHasImage = slide?.has_image;
-  const preloadImageKey = (
-    presentation?.projector_image_preload_ids ?? []
-  ).join("|");
+  const projectorImageLoader = useCallback(
+    (imageId: string) =>
+      downloadPublicPresentationImage(subEventId, imageId, projectorToken),
+    [projectorToken, subEventId],
+  );
+  const vendorLogoLoader = useCallback(
+    (imageId: string) =>
+      downloadPublicPresentationVendorLogo(subEventId, imageId, projectorToken),
+    [projectorToken, subEventId],
+  );
+  const imageUrl = usePresentationImageCache({
+    activeImageId: slideId && slideHasImage ? slideId : null,
+    cacheScope: `${subEventId}:${projectorToken}:slides`,
+    loadImage: projectorImageLoader,
+    preloadImageIds: presentation?.projector_image_preload_ids ?? [],
+  });
+  const vendorLogoUrl = usePresentationImageCache({
+    activeImageId: slideId && slide?.has_vendor_logo ? slideId : null,
+    cacheScope: `${subEventId}:${projectorToken}:vendor-logos`,
+    loadImage: vendorLogoLoader,
+    maxEntries: 6,
+  });
   const brandedStyle = eventThemeStyle(
     presentation
       ? {
@@ -142,85 +157,6 @@ export function EventPresentationDisplay({
       unsubscribe();
     };
   }, [projectorToken, subEventId]);
-
-  useEffect(() => {
-    const desiredIds = new Set(
-      preloadImageKey ? preloadImageKey.split("|") : [],
-    );
-    if (slideId && slideHasImage) desiredIds.add(slideId);
-    desiredImageIdsRef.current = desiredIds;
-    setImageUrl(slideId ? (imageCacheRef.current.get(slideId) ?? null) : null);
-
-    for (const [cachedId, url] of imageCacheRef.current.entries()) {
-      if (!desiredIds.has(cachedId)) {
-        URL.revokeObjectURL(url);
-        imageCacheRef.current.delete(cachedId);
-      }
-    }
-    for (const imageId of desiredIds) {
-      if (
-        imageCacheRef.current.has(imageId) ||
-        imageDownloadsRef.current.has(imageId)
-      )
-        continue;
-      imageDownloadsRef.current.add(imageId);
-      void downloadPublicPresentationImage(subEventId, imageId, projectorToken)
-        .then(async (blob) => {
-          const url = URL.createObjectURL(blob);
-          if (typeof Image !== "undefined") {
-            const decodedImage = new Image();
-            decodedImage.src = url;
-            if (typeof decodedImage.decode === "function") {
-              try {
-                await decodedImage.decode();
-              } catch {
-                URL.revokeObjectURL(url);
-                return;
-              }
-            }
-          }
-          if (desiredImageIdsRef.current.has(imageId)) {
-            imageCacheRef.current.set(imageId, url);
-            if (imageId === slideId) setImageUrl(url);
-          } else {
-            URL.revokeObjectURL(url);
-          }
-        })
-        .catch(() => undefined)
-        .finally(() => imageDownloadsRef.current.delete(imageId));
-    }
-  }, [preloadImageKey, projectorToken, slideHasImage, slideId, subEventId]);
-
-  useEffect(() => {
-    const imageCache = imageCacheRef.current;
-    const desiredImageIds = desiredImageIdsRef.current;
-    return () => {
-      for (const url of imageCache.values()) URL.revokeObjectURL(url);
-      imageCache.clear();
-      desiredImageIds.clear();
-    };
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-    let url: string | null = null;
-    setVendorLogoUrl(null);
-    if (slideId && slide?.has_vendor_logo)
-      void downloadPublicPresentationVendorLogo(
-        subEventId,
-        slideId,
-        projectorToken,
-      )
-        .then((blob) => {
-          url = URL.createObjectURL(blob);
-          if (active) setVendorLogoUrl(url);
-        })
-        .catch(() => undefined);
-    return () => {
-      active = false;
-      if (url) URL.revokeObjectURL(url);
-    };
-  }, [projectorToken, slide?.has_vendor_logo, slideId, subEventId]);
 
   useEffect(() => {
     let active = true;
