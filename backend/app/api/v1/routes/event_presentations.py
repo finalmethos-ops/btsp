@@ -1,5 +1,7 @@
+import re
+
 import jwt
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 from fastapi.security import APIKeyHeader
 from sqlalchemy.orm import Session
@@ -30,6 +32,7 @@ from app.schemas.event_presentation import (
     EventProjectorAccessResponse,
 )
 from app.services.event_access_service import user_has_sub_event_access
+from app.services.event_mobile_guide_service import render_event_mobile_quick_start_pdf
 from app.services.event_presentation_service import (
     EventPresentationError,
     control_presentation,
@@ -48,6 +51,22 @@ presenter_token_header = APIKeyHeader(
     name="X-BTSP-Presenter-Token",
     scheme_name="PresenterMonitorAccessToken",
 )
+
+
+def _request_origin(request: Request) -> str:
+    # Nginx replaces Host with its normalized $host value. Do not trust an
+    # optional client-supplied X-Forwarded-Host when encoding a destination.
+    host = (request.headers.get("host") or request.url.netloc).split(",")[0]
+    forwarded_proto = request.headers.get("x-forwarded-proto")
+    scheme = (forwarded_proto or request.url.scheme).split(",")[0].strip().lower()
+    if scheme not in {"http", "https"}:
+        scheme = "https"
+    return f"{scheme.strip()}://{host.strip()}"
+
+
+def _guide_filename(event: ManagedEvent, sub_event: ManagedSubEvent) -> str:
+    stem = f"{event.slug}-{sub_event.name}-mobile-quick-start".lower()
+    return f"{re.sub(r'[^a-z0-9]+', '-', stem).strip('-')}.pdf"
 
 
 def _validate_projector_access(
@@ -103,6 +122,36 @@ def read_live_analytics(
     if analytics is None:
         raise HTTPException(status_code=404, detail="Sub-event not found")
     return analytics
+
+
+@router.get("/{sub_event_id}/mobile-quick-start.pdf")
+def download_mobile_quick_start(
+    sub_event_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    _user: User = Depends(require_permission("events.manage")),
+) -> Response:
+    sub_event = db.get(ManagedSubEvent, sub_event_id)
+    if sub_event is None:
+        raise HTTPException(status_code=404, detail="Sub-event not found")
+    event = db.get(ManagedEvent, sub_event.event_id)
+    if event is None:
+        raise HTTPException(status_code=404, detail="Event not found")
+    branding = db.get(EventBrandingAsset, event.id)
+    content = render_event_mobile_quick_start_pdf(
+        event,
+        sub_event,
+        f"{_request_origin(request)}/event-login",
+        branding,
+    )
+    return Response(
+        content=content,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{_guide_filename(event, sub_event)}"',
+            "Cache-Control": "private, no-store",
+        },
+    )
 
 
 @router.get("/{sub_event_id}", response_model=EventPresentationResponse)

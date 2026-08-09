@@ -1,4 +1,4 @@
-import { apiDownload, apiFetch } from "./api";
+import { apiDownload, apiDownloadWithFilename, apiFetch } from "./api";
 import { getApiBaseUrl } from "./api-origin";
 import { EventProductSlide } from "./event-product-slide-api";
 
@@ -113,6 +113,11 @@ export const downloadPresentationImage = (slideId: string) =>
 
 export const getEventLiveAnalytics = (subEventId: string) =>
   apiFetch<EventLiveAnalytics>(`/event-presentations/${subEventId}/analytics`);
+
+export const downloadEventMobileQuickStart = (subEventId: string) =>
+  apiDownloadWithFilename(
+    `/event-presentations/${encodeURIComponent(subEventId)}/mobile-quick-start.pdf`,
+  );
 
 async function projectorRequest(
   path: string,

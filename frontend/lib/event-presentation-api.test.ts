@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  downloadEventMobileQuickStart,
   getPublicEventPresentation,
   getPublicEventPresenterPresentation,
 } from "./event-presentation-api";
@@ -49,5 +50,30 @@ describe("presenter monitor access", () => {
     expect(fetchMock.mock.calls[0][1].headers).not.toHaveProperty(
       "Authorization",
     );
+  });
+});
+
+describe("mobile quick-start guide", () => {
+  it("downloads the guide for the selected sub-event", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response("guide", {
+        status: 200,
+        headers: {
+          "Content-Disposition":
+            'attachment; filename="hot-show-mobile-quick-start.pdf"',
+          "Content-Type": "application/pdf",
+        },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const download = await downloadEventMobileQuickStart("hot show/1");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/event-presentations/hot%20show%2F1/mobile-quick-start.pdf",
+      { headers: {} },
+    );
+    expect(download.filename).toBe("hot-show-mobile-quick-start.pdf");
+    expect(await download.blob.text()).toBe("guide");
   });
 });

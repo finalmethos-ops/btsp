@@ -17,6 +17,7 @@ import {
   webFillEventProduct,
 } from "@/lib/event-product-slide-api";
 import { ManagedSubEvent } from "@/lib/event-admin-api";
+import { downloadEventMobileQuickStart } from "@/lib/event-presentation-api";
 import { searchModelCatalog } from "@/lib/model-catalog-api";
 import { VendorModel } from "@/lib/vendor-model-api";
 
@@ -120,6 +121,36 @@ export function EventProductSlideBuilder({
     if (subEventId) setSlides(await listEventProductSlides(subEventId));
   }
 
+  async function downloadMobileGuide() {
+    if (!subEventId) return;
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const { blob, filename } =
+        await downloadEventMobileQuickStart(subEventId);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename ?? "live-event-mobile-quick-start.pdf";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+      setMessage(
+        "Mobile quick-start guide downloaded for printing or projection.",
+      );
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Unable to download the mobile guide.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!subEventId) return;
@@ -164,8 +195,8 @@ export function EventProductSlideBuilder({
       description: fullScreenImage
         ? null
         : String(
-              data.get(filler ? "filler_description" : "description") || "",
-            ) || null,
+            data.get(filler ? "filler_description" : "description") || "",
+          ) || null,
       specifications: filler
         ? null
         : String(data.get("specifications") || "") || null,
@@ -243,9 +274,7 @@ export function EventProductSlideBuilder({
       setMessage(editing ? "Slide updated." : "Slide added to the lineup.");
     } catch (caught) {
       setError(
-        caught instanceof Error
-          ? caught.message
-          : "Unable to save the slide.",
+        caught instanceof Error ? caught.message : "Unable to save the slide.",
       );
     } finally {
       setBusy(false);
@@ -336,27 +365,37 @@ export function EventProductSlideBuilder({
             presenter’s live order.
           </p>
         </div>
-        <label className="text-sm font-semibold">
-          Sub-event
-          <select
-            className="ml-2 rounded-lg border p-2"
-            onChange={(event) => {
-              setSubEventId(event.target.value);
-              setEditing(null);
-              setSlideType("product");
-              setFillerCategory("trivia");
-              setProductMode("single");
-              setSlideProducts([]);
-            }}
-            value={subEventId}
+        <div className="flex flex-wrap items-end gap-2">
+          <button
+            className="brand-button text-sm"
+            disabled={busy || !subEventId}
+            onClick={() => void downloadMobileGuide()}
+            type="button"
           >
-            {subEvents.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </select>
-        </label>
+            Download mobile guide (PDF)
+          </button>
+          <label className="text-sm font-semibold">
+            Sub-event
+            <select
+              className="ml-2 rounded-lg border p-2"
+              onChange={(event) => {
+                setSubEventId(event.target.value);
+                setEditing(null);
+                setSlideType("product");
+                setFillerCategory("trivia");
+                setProductMode("single");
+                setSlideProducts([]);
+              }}
+              value={subEventId}
+            >
+              {subEvents.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </div>
       {message ? (
         <p className="mt-3 rounded-lg bg-green-50 p-2 text-green-800">
@@ -570,8 +609,7 @@ export function EventProductSlideBuilder({
                 setWebFill(null);
               }}
               value={
-                slideType === "filler" &&
-                fillerCategory === "full_screen_image"
+                slideType === "filler" && fillerCategory === "full_screen_image"
                   ? "full_screen_image"
                   : slideType
               }
