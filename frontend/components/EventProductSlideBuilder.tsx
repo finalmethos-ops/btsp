@@ -17,7 +17,10 @@ import {
   webFillEventProduct,
 } from "@/lib/event-product-slide-api";
 import { ManagedSubEvent } from "@/lib/event-admin-api";
-import { downloadEventMobileQuickStart } from "@/lib/event-presentation-api";
+import {
+  downloadEventMobileQuickStart,
+  downloadEventMobileQuickStartImage,
+} from "@/lib/event-presentation-api";
 import { searchModelCatalog } from "@/lib/model-catalog-api";
 import { VendorModel } from "@/lib/vendor-model-api";
 
@@ -145,6 +148,80 @@ export function EventProductSlideBuilder({
         caught instanceof Error
           ? caught.message
           : "Unable to download the mobile guide.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function addMobileGuideSlide() {
+    if (!subEventId) return;
+    if (
+      slides.some(
+        (slide) =>
+          slide.slide_type === "filler" &&
+          slide.filler_category === "full_screen_image" &&
+          slide.name === "Mobile quick-start guide",
+      )
+    ) {
+      setError(
+        "This presentation already includes a mobile quick-start slide.",
+      );
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    let createdSlide: EventProductSlide | null = null;
+    try {
+      const image = await downloadEventMobileQuickStartImage(subEventId);
+      createdSlide = await createEventProductSlide(subEventId, {
+        slide_type: "filler",
+        filler_category: "full_screen_image",
+        catalog_product_code: null,
+        model_number: null,
+        name: "Mobile quick-start guide",
+        vendor_code: null,
+        category: null,
+        description: null,
+        specifications: null,
+        event_unit_cost: null,
+        standard_cost: null,
+        currency: "USD",
+        minimum_order_quantity: 1,
+        available_inventory: null,
+        max_event_units: null,
+        allow_waitlist: false,
+        delivery_window_start: null,
+        delivery_window_end: null,
+        vendor_delivery_notes: null,
+        presenter_notes:
+          "Leave this opening guide visible while attendees sign in on their phones.",
+        product_variants: [],
+        status: "ready",
+      });
+      await uploadEventProductImage(
+        createdSlide.id,
+        new File([image], "mobile-quick-start.png", { type: "image/png" }),
+      );
+      const currentSlides = await listEventProductSlides(subEventId);
+      await reorderEventProductSlides(subEventId, [
+        createdSlide.id,
+        ...currentSlides
+          .filter((slide) => slide.id !== createdSlide?.id)
+          .map((slide) => slide.id),
+      ]);
+      await refresh();
+      setMessage("Mobile quick-start guide added as the opening slide.");
+    } catch (caught) {
+      if (createdSlide) {
+        await deleteEventProductSlide(createdSlide.id).catch(() => undefined);
+        await refresh().catch(() => undefined);
+      }
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Unable to add the mobile guide slide.",
       );
     } finally {
       setBusy(false);
@@ -373,6 +450,14 @@ export function EventProductSlideBuilder({
             type="button"
           >
             Download mobile guide (PDF)
+          </button>
+          <button
+            className="brand-button text-sm"
+            disabled={busy || !subEventId}
+            onClick={() => void addMobileGuideSlide()}
+            type="button"
+          >
+            Add guide as opening slide
           </button>
           <label className="text-sm font-semibold">
             Sub-event

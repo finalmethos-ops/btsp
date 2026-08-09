@@ -1,12 +1,16 @@
 from datetime import UTC, datetime
 from io import BytesIO
 
+from PIL import Image
 from pypdf import PdfReader
 from starlette.requests import Request
 
 from app.api.v1.routes.event_presentations import _request_origin
 from app.models.event_management import ManagedEvent, ManagedSubEvent
-from app.services.event_mobile_guide_service import render_event_mobile_quick_start_pdf
+from app.services.event_mobile_guide_service import (
+    render_event_mobile_quick_start_image,
+    render_event_mobile_quick_start_pdf,
+)
 
 
 def test_mobile_guide_origin_ignores_client_forwarded_host() -> None:
@@ -72,3 +76,10 @@ def test_mobile_quick_start_pdf_contains_event_login_and_instructions() -> None:
     assert "Franchise representatives" in text
     assert "Vendor representatives" in text
     assert "MOBILE CHECKLIST" in text
+
+    image_content = render_event_mobile_quick_start_image(event, sub_event, login_url)
+    assert image_content.startswith(b"\x89PNG\r\n\x1a\n")
+    with Image.open(BytesIO(image_content)) as image:
+        assert image.format == "PNG"
+        assert image.width >= 1500
+        assert image.height >= 1200

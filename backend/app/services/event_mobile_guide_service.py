@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+import warnings
 from datetime import UTC, datetime
 from io import BytesIO
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", DeprecationWarning)
+    import pymupdf  # noqa: E402
 
 from reportlab.graphics import renderPDF
 from reportlab.graphics.barcode.qr import QrCodeWidget
@@ -314,3 +319,18 @@ def render_event_mobile_quick_start_pdf(
     canvas.showPage()
     canvas.save()
     return buffer.getvalue()
+
+
+def render_event_mobile_quick_start_image(
+    event: ManagedEvent,
+    sub_event: ManagedSubEvent,
+    login_url: str,
+    branding: EventBrandingAsset | None = None,
+) -> bytes:
+    """Render the printable guide as a projector-ready full-screen slide image."""
+
+    pdf = render_event_mobile_quick_start_pdf(event, sub_event, login_url, branding)
+    with pymupdf.open(stream=pdf, filetype="pdf") as document:
+        page = document[0]
+        image = page.get_pixmap(matrix=pymupdf.Matrix(2, 2), alpha=False)
+        return image.tobytes("png")

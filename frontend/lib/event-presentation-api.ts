@@ -119,6 +119,11 @@ export const downloadEventMobileQuickStart = (subEventId: string) =>
     `/event-presentations/${encodeURIComponent(subEventId)}/mobile-quick-start.pdf`,
   );
 
+export const downloadEventMobileQuickStartImage = (subEventId: string) =>
+  apiDownload(
+    `/event-presentations/${encodeURIComponent(subEventId)}/mobile-quick-start.png`,
+  );
+
 async function projectorRequest(
   path: string,
   projectorToken: string,

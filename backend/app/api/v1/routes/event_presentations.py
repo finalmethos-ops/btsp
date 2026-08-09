@@ -32,7 +32,10 @@ from app.schemas.event_presentation import (
     EventProjectorAccessResponse,
 )
 from app.services.event_access_service import user_has_sub_event_access
-from app.services.event_mobile_guide_service import render_event_mobile_quick_start_pdf
+from app.services.event_mobile_guide_service import (
+    render_event_mobile_quick_start_image,
+    render_event_mobile_quick_start_pdf,
+)
 from app.services.event_presentation_service import (
     EventPresentationError,
     control_presentation,
@@ -151,6 +154,33 @@ def download_mobile_quick_start(
             "Content-Disposition": f'attachment; filename="{_guide_filename(event, sub_event)}"',
             "Cache-Control": "private, no-store",
         },
+    )
+
+
+@router.get("/{sub_event_id}/mobile-quick-start.png")
+def download_mobile_quick_start_image(
+    sub_event_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    _user: User = Depends(require_permission("events.manage")),
+) -> Response:
+    sub_event = db.get(ManagedSubEvent, sub_event_id)
+    if sub_event is None:
+        raise HTTPException(status_code=404, detail="Sub-event not found")
+    event = db.get(ManagedEvent, sub_event.event_id)
+    if event is None:
+        raise HTTPException(status_code=404, detail="Event not found")
+    branding = db.get(EventBrandingAsset, event.id)
+    content = render_event_mobile_quick_start_image(
+        event,
+        sub_event,
+        f"{_request_origin(request)}/event-login",
+        branding,
+    )
+    return Response(
+        content=content,
+        media_type="image/png",
+        headers={"Cache-Control": "private, no-store"},
     )
 
 

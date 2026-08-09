@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   downloadEventMobileQuickStart,
+  downloadEventMobileQuickStartImage,
   getPublicEventPresentation,
   getPublicEventPresenterPresentation,
 } from "./event-presentation-api";
@@ -75,5 +76,23 @@ describe("mobile quick-start guide", () => {
     );
     expect(download.filename).toBe("hot-show-mobile-quick-start.pdf");
     expect(await download.blob.text()).toBe("guide");
+  });
+
+  it("downloads a projector image for the opening slide", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response("image", {
+        status: 200,
+        headers: { "Content-Type": "image/png" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const image = await downloadEventMobileQuickStartImage("hot-show-1");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/v1/event-presentations/hot-show-1/mobile-quick-start.png",
+      { headers: {} },
+    );
+    expect(await image.text()).toBe("image");
   });
 });
