@@ -36,6 +36,19 @@ class Settings(BaseSettings):
         default=40, ge=10, le=1000, alias="LOGIN_RATE_LIMIT_HOST_ATTEMPTS"
     )
     database_url: str = Field(alias="DATABASE_URL")
+    database_pool_size: int = Field(default=20, ge=5, le=50, alias="DATABASE_POOL_SIZE")
+    database_max_overflow: int = Field(
+        default=30,
+        ge=0,
+        le=50,
+        alias="DATABASE_MAX_OVERFLOW",
+    )
+    database_pool_timeout_seconds: int = Field(
+        default=30,
+        ge=5,
+        le=120,
+        alias="DATABASE_POOL_TIMEOUT_SECONDS",
+    )
     redis_url: str = Field(default="redis://redis:6379/0", alias="REDIS_URL")
     brave_search_api_key: str | None = Field(default=None, alias="BRAVE_SEARCH_API_KEY")
     routing_api_url: str = Field(

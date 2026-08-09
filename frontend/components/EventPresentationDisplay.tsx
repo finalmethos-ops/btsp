@@ -10,6 +10,7 @@ import {
 } from "@/lib/event-presentation-api";
 import { EventAccessUnavailable } from "@/components/EventAccessUnavailable";
 import { eventThemeStyle } from "@/components/EventBrandingProvider";
+import { subscribeProjectorRealtime } from "@/lib/event-realtime";
 
 const IMAGE_FIT_STORAGE_KEY = "btsp.presentation.image-fit";
 
@@ -98,8 +99,12 @@ export function EventPresentationDisplay({
   useEffect(() => {
     let active = true;
     let refreshing = false;
+    let refreshPending = false;
     const refresh = () => {
-      if (refreshing) return;
+      if (refreshing) {
+        refreshPending = true;
+        return;
+      }
       refreshing = true;
       void getPublicEventPresentation(subEventId, projectorToken)
         .then((value) => {
@@ -118,13 +123,23 @@ export function EventPresentationDisplay({
         })
         .finally(() => {
           refreshing = false;
+          if (active && refreshPending) {
+            refreshPending = false;
+            refresh();
+          }
         });
     };
     refresh();
-    const timer = window.setInterval(refresh, 750);
+    const timer = window.setInterval(refresh, 5_000);
+    const unsubscribe = subscribeProjectorRealtime(
+      subEventId,
+      projectorToken,
+      refresh,
+    );
     return () => {
       active = false;
       window.clearInterval(timer);
+      unsubscribe();
     };
   }, [projectorToken, subEventId]);
 
@@ -150,8 +165,20 @@ export function EventPresentationDisplay({
         continue;
       imageDownloadsRef.current.add(imageId);
       void downloadPublicPresentationImage(subEventId, imageId, projectorToken)
-        .then((blob) => {
+        .then(async (blob) => {
           const url = URL.createObjectURL(blob);
+          if (typeof Image !== "undefined") {
+            const decodedImage = new Image();
+            decodedImage.src = url;
+            if (typeof decodedImage.decode === "function") {
+              try {
+                await decodedImage.decode();
+              } catch {
+                URL.revokeObjectURL(url);
+                return;
+              }
+            }
+          }
           if (desiredImageIdsRef.current.has(imageId)) {
             imageCacheRef.current.set(imageId, url);
             if (imageId === slideId) setImageUrl(url);

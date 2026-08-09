@@ -1,8 +1,12 @@
 import { getStoredToken } from "./api";
 import { getApiBaseUrl } from "./api-origin";
 
-export function subscribeEventRealtime(
+type EventRealtimeScope = "user" | "projector" | "presenter";
+
+function subscribeScopedEventRealtime(
   subEventId: string,
+  scope: EventRealtimeScope,
+  accessToken: () => string | null,
   onEvent: () => void,
 ): () => void {
   let socket: WebSocket | null = null;
@@ -28,13 +32,19 @@ export function subscribeEventRealtime(
   const connect = () => {
     if (typeof window === "undefined" || typeof WebSocket === "undefined")
       return;
-    const token = getStoredToken();
+    const token = accessToken();
     if (!token || stopped) return;
     const origin = getApiBaseUrl() || window.location.origin;
     const url = new URL(`/api/v1/event-realtime/${subEventId}`, origin);
     url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
     try {
-      socket = new WebSocket(url, [`btsp-token.${token}`]);
+      const protocolPrefix =
+        scope === "user"
+          ? "btsp-token"
+          : scope === "projector"
+            ? "btsp-projector"
+            : "btsp-presenter";
+      socket = new WebSocket(url, [`${protocolPrefix}.${token}`]);
     } catch {
       scheduleReconnect();
       return;
@@ -69,4 +79,42 @@ export function subscribeEventRealtime(
     socket?.close();
     socket = null;
   };
+}
+
+export function subscribeEventRealtime(
+  subEventId: string,
+  onEvent: () => void,
+): () => void {
+  return subscribeScopedEventRealtime(
+    subEventId,
+    "user",
+    getStoredToken,
+    onEvent,
+  );
+}
+
+export function subscribeProjectorRealtime(
+  subEventId: string,
+  projectorToken: string,
+  onEvent: () => void,
+): () => void {
+  return subscribeScopedEventRealtime(
+    subEventId,
+    "projector",
+    () => projectorToken,
+    onEvent,
+  );
+}
+
+export function subscribePresenterRealtime(
+  subEventId: string,
+  presenterToken: string,
+  onEvent: () => void,
+): () => void {
+  return subscribeScopedEventRealtime(
+    subEventId,
+    "presenter",
+    () => presenterToken,
+    onEvent,
+  );
 }

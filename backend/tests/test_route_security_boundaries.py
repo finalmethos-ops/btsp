@@ -5,7 +5,10 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
-from app.api.v1.routes.event_realtime import _realtime_access_allowed
+from app.api.v1.routes.event_realtime import (
+    _realtime_access_allowed,
+    _scoped_realtime_access_allowed,
+)
 from app.auth.dependencies import get_current_user
 from app.auth.security import create_presenter_token, create_projector_token
 from app.core.config import settings
@@ -218,6 +221,11 @@ def test_completed_event_realtime_channel_is_closed_to_managers() -> None:
         assert event is not None
         sub_event_id = event.sub_events[0].id
         assert _realtime_access_allowed(db, manager.email, sub_event_id)
+        projector_token, _projector_expires = create_projector_token(sub_event_id)
+        presenter_token, _presenter_expires = create_presenter_token(sub_event_id)
+        assert _scoped_realtime_access_allowed(db, "projector", projector_token, sub_event_id)
+        assert _scoped_realtime_access_allowed(db, "presenter", presenter_token, sub_event_id)
+        assert not _scoped_realtime_access_allowed(db, "projector", presenter_token, sub_event_id)
 
         event_record = db.get(ManagedEvent, event.id)
         assert event_record is not None
@@ -225,6 +233,7 @@ def test_completed_event_realtime_channel_is_closed_to_managers() -> None:
         db.commit()
 
         assert not _realtime_access_allowed(db, manager.email, sub_event_id)
+        assert not _scoped_realtime_access_allowed(db, "projector", projector_token, sub_event_id)
 
 
 def test_event_member_resources_are_blocked_after_event_window() -> None:

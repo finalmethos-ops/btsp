@@ -46,6 +46,14 @@ def _event_datetime(value: datetime, timezone_name: str) -> datetime:
     return value.astimezone(timezone)
 
 
+def _friendly_date(value: datetime) -> str:
+    return f"{value.strftime('%A, %B')} {value.day}"
+
+
+def _friendly_time(value: datetime) -> str:
+    return value.strftime("%I:%M %p").lstrip("0")
+
+
 def _draw_paragraph(
     canvas: Canvas,
     text: str,
@@ -200,8 +208,7 @@ def render_event_mobile_quick_start_pdf(
     start = _event_datetime(sub_event.starts_at, event.timezone)
     end = _event_datetime(sub_event.ends_at, event.timezone)
     date_line = (
-        f"{start.strftime('%A, %B %-d')} &middot; "
-        f"{start.strftime('%-I:%M %p')} - {end.strftime('%-I:%M %p')}"
+        f"{_friendly_date(start)} &middot; " f"{_friendly_time(start)} - {_friendly_time(end)}"
     )
     location_line = sub_event.location or event.venue_name
 

@@ -6,6 +6,7 @@ import {
   EventPresentation,
   getPublicEventPresenterPresentation,
 } from "@/lib/event-presentation-api";
+import { subscribePresenterRealtime } from "@/lib/event-realtime";
 
 const formatMoney = (value: string | number | null | undefined) =>
   Number(value ?? 0).toLocaleString(undefined, {
@@ -89,8 +90,12 @@ export function EventPresenterMonitor({
   useEffect(() => {
     let active = true;
     let refreshing = false;
+    let refreshPending = false;
     const refresh = () => {
-      if (refreshing) return;
+      if (refreshing) {
+        refreshPending = true;
+        return;
+      }
       refreshing = true;
       void getPublicEventPresenterPresentation(subEventId, presenterToken)
         .then((nextPresentation) => {
@@ -108,13 +113,23 @@ export function EventPresenterMonitor({
         })
         .finally(() => {
           refreshing = false;
+          if (active && refreshPending) {
+            refreshPending = false;
+            refresh();
+          }
         });
     };
     refresh();
-    const timer = window.setInterval(refresh, 1_000);
+    const timer = window.setInterval(refresh, 5_000);
+    const unsubscribe = subscribePresenterRealtime(
+      subEventId,
+      presenterToken,
+      refresh,
+    );
     return () => {
       active = false;
       window.clearInterval(timer);
+      unsubscribe();
     };
   }, [presenterToken, subEventId]);
 
@@ -160,8 +175,21 @@ export function EventPresenterMonitor({
         nextSlide.id,
         presenterToken,
       )
-        .then((blob) => {
+        .then(async (blob) => {
           objectUrl = URL.createObjectURL(blob);
+          if (typeof Image !== "undefined") {
+            const decodedImage = new Image();
+            decodedImage.src = objectUrl;
+            if (typeof decodedImage.decode === "function") {
+              try {
+                await decodedImage.decode();
+              } catch {
+                URL.revokeObjectURL(objectUrl);
+                objectUrl = null;
+                return;
+              }
+            }
+          }
           if (active) setImageUrl(objectUrl);
         })
         .catch(() => undefined);

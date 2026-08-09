@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user
@@ -59,9 +59,10 @@ def read_ordering_workspace(
 
 
 @router.put("/{sub_event_id}/order", response_model=EventOrderingWorkspaceResponse)
-async def put_entity_order(
+def put_entity_order(
     sub_event_id: str,
     payload: EventEntityOrderWrite,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> EventOrderingWorkspaceResponse:
@@ -72,5 +73,5 @@ async def put_entity_order(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     if workspace is None:
         raise HTTPException(status_code=404, detail="Sub-event not found")
-    await event_realtime_hub.publish(sub_event_id, "order.changed")
+    background_tasks.add_task(event_realtime_hub.publish, sub_event_id, "order.changed")
     return workspace

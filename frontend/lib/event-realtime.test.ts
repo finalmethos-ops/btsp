@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { subscribeEventRealtime } from "./event-realtime";
+import {
+  subscribeEventRealtime,
+  subscribePresenterRealtime,
+  subscribeProjectorRealtime,
+} from "./event-realtime";
 
 vi.mock("./api", () => ({
   getStoredToken: () => "test-token",
@@ -86,5 +90,27 @@ describe("event realtime subscription", () => {
     vi.advanceTimersByTime(2_000);
     expect(MockWebSocket.instances).toHaveLength(2);
     unsubscribe();
+  });
+
+  it("uses scoped read-only protocols for public presentation screens", () => {
+    const stopProjector = subscribeProjectorRealtime(
+      "sub-projector",
+      "projector-token",
+      vi.fn(),
+    );
+    const stopPresenter = subscribePresenterRealtime(
+      "sub-presenter",
+      "presenter-token",
+      vi.fn(),
+    );
+
+    expect(MockWebSocket.instances[0].protocols).toEqual([
+      "btsp-projector.projector-token",
+    ]);
+    expect(MockWebSocket.instances[1].protocols).toEqual([
+      "btsp-presenter.presenter-token",
+    ]);
+    stopProjector();
+    stopPresenter();
   });
 });

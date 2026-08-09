@@ -92,6 +92,59 @@ def _membership(
     return None
 
 
+def _ordering_workspace_response(
+    db: Session,
+    sub_event: ManagedSubEvent,
+    event: ManagedEvent,
+    membership: EventMembership,
+    state: EventPresentationState | None,
+    slide: EventProductSlide | None,
+    order: EventEntityOrder | None,
+    confirmed: int,
+    *,
+    operations_locked: bool,
+) -> EventOrderingWorkspaceResponse:
+    cap = _order_capacity(slide)
+    entity_sub_event_spend = db.scalar(
+        select(func.coalesce(func.sum(EventEntityOrder.total_cost), 0)).where(
+            EventEntityOrder.sub_event_id == sub_event.id,
+            EventEntityOrder.entity_code == membership.entity_code,
+            EventEntityOrder.status.in_(["confirmed", "waitlisted"]),
+        )
+    ) or Decimal("0.00")
+    return EventOrderingWorkspaceResponse(
+        event_id=sub_event.event_id,
+        event_name=event.name,
+        sub_event_id=sub_event.id,
+        sub_event_name=sub_event.name,
+        entity_code=membership.entity_code,
+        ordering_status=(
+            "open"
+            if not operations_locked
+            and state
+            and state.ordering_status == "open"
+            and slide is not None
+            and slide.slide_type == "product"
+            else "closed"
+        ),
+        ordering_opened_at=state.ordering_opened_at if state else None,
+        presentation_status=state.status if state else "idle",
+        current_slide=(
+            EventProductSlideResponse.model_validate(slide, from_attributes=True).model_copy(
+                update={
+                    "has_image": slide.image is not None,
+                    "presenter_notes": None,
+                }
+            )
+            if slide
+            else None
+        ),
+        existing_order=EventEntityOrderResponse.model_validate(order) if order else None,
+        units_remaining=max(cap - confirmed, 0) if cap is not None else None,
+        entity_sub_event_spend=entity_sub_event_spend,
+    )
+
+
 def ordering_workspace(
     db: Session, sub_event_id: str, user: User
 ) -> EventOrderingWorkspaceResponse | None:
@@ -131,44 +184,16 @@ def ordering_workspace(
             )
             or 0
         )
-    cap = _order_capacity(slide)
-    entity_sub_event_spend = db.scalar(
-        select(func.coalesce(func.sum(EventEntityOrder.total_cost), 0)).where(
-            EventEntityOrder.sub_event_id == sub_event.id,
-            EventEntityOrder.entity_code == membership.entity_code,
-            EventEntityOrder.status.in_(["confirmed", "waitlisted"]),
-        )
-    ) or Decimal("0.00")
-    return EventOrderingWorkspaceResponse(
-        event_id=sub_event.event_id,
-        event_name=event.name,
-        sub_event_id=sub_event.id,
-        sub_event_name=sub_event.name,
-        entity_code=membership.entity_code,
-        ordering_status=(
-            "open"
-            if not event_operations_are_locked(db, sub_event.event_id)
-            and state
-            and state.ordering_status == "open"
-            and slide is not None
-            and slide.slide_type == "product"
-            else "closed"
-        ),
-        ordering_opened_at=state.ordering_opened_at if state else None,
-        presentation_status=state.status if state else "idle",
-        current_slide=(
-            EventProductSlideResponse.model_validate(slide, from_attributes=True).model_copy(
-                update={
-                    "has_image": slide.image is not None,
-                    "presenter_notes": None,
-                }
-            )
-            if slide
-            else None
-        ),
-        existing_order=EventEntityOrderResponse.model_validate(order) if order else None,
-        units_remaining=max(cap - confirmed, 0) if cap is not None else None,
-        entity_sub_event_spend=entity_sub_event_spend,
+    return _ordering_workspace_response(
+        db,
+        sub_event,
+        event,
+        membership,
+        state,
+        slide,
+        order,
+        confirmed,
+        operations_locked=event_operations_are_locked(db, sub_event.event_id),
     )
 
 
@@ -189,6 +214,7 @@ def submit_entity_order(
     membership = _membership(db, sub_event.event_id, sub_event_id, user)
     if membership is None:
         raise EventOrderingError("An active entity ordering assignment is required")
+    event = db.get(ManagedEvent, sub_event.event_id)
     state = db.scalar(
         select(EventPresentationState)
         .where(EventPresentationState.sub_event_id == sub_event_id)
@@ -293,4 +319,15 @@ def submit_entity_order(
         )
     )
     db.commit()
-    return ordering_workspace(db, sub_event_id, user)
+    confirmed = confirmed_other + (requested_quantity if status == "confirmed" else 0)
+    return _ordering_workspace_response(
+        db,
+        sub_event,
+        event,
+        membership,
+        state,
+        slide,
+        order,
+        confirmed,
+        operations_locked=False,
+    )

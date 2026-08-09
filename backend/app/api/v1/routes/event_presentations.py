@@ -1,7 +1,7 @@
 import re
 
 import jwt
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import Response
 from fastapi.security import APIKeyHeader
 from sqlalchemy.orm import Session
@@ -392,9 +392,10 @@ def read_public_projector_branding(
 
 
 @router.post("/{sub_event_id}/control", response_model=EventPresentationResponse)
-async def post_presentation_control(
+def post_presentation_control(
     sub_event_id: str,
     payload: EventPresentationAction,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     user: User = Depends(require_permission("events.manage")),
 ) -> EventPresentationResponse:
@@ -404,5 +405,9 @@ async def post_presentation_control(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     if presentation is None:
         raise HTTPException(status_code=404, detail="Sub-event not found")
-    await event_realtime_hub.publish(sub_event_id, "presentation.changed")
+    background_tasks.add_task(
+        event_realtime_hub.publish,
+        sub_event_id,
+        "presentation.changed",
+    )
     return presentation

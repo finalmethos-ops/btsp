@@ -85,5 +85,16 @@ class EventRealtimeHub:
             # functional while Redis is unavailable.
             return
 
+    async def close(self) -> None:
+        """Release Redis resources in short-lived workers and test harnesses."""
+        if self._listener_task is not None:
+            self._listener_task.cancel()
+            try:
+                await self._listener_task
+            except asyncio.CancelledError:
+                pass
+            self._listener_task = None
+        await self._redis.aclose()
+
 
 event_realtime_hub = EventRealtimeHub()
