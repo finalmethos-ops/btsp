@@ -1851,10 +1851,28 @@ def test_event_product_lineup_snapshots_catalog_controls_and_reorders() -> None:
                 buyer,
             )
         order_id = workspace.existing_order.id
+        with pytest.raises(
+            EventOrderReviewError,
+            match="revised quantity for every product",
+        ):
+            decide_order(
+                db,
+                order_id,
+                EventOrderReviewDecision(
+                    decision="revise",
+                    revised_quantity=8,
+                    reason="Shared totals cannot change a combined offer",
+                ),
+                "purchasing@example.com",
+            )
         reviewed_event_id = decide_order(
             db,
             order_id,
-            EventOrderReviewDecision(decision="revise", revised_quantity=8, reason="Budget"),
+            EventOrderReviewDecision(
+                decision="revise",
+                revised_variant_quantities={"SPECIAL-TWIN": 5, "SPECIAL-KING": 3},
+                reason="Budget",
+            ),
             "purchasing@example.com",
         )
         assert reviewed_event_id == event.id
@@ -1862,6 +1880,12 @@ def test_event_product_lineup_snapshots_catalog_controls_and_reorders() -> None:
         assert review is not None
         assert review.approved == 1
         assert review.approved_units == 8
+        reviewed_item = next(item for item in review.items if item.order_id == order_id)
+        assert reviewed_item.is_combined_offer is True
+        assert {line.model_number: line.quantity for line in reviewed_item.variant_lines} == {
+            "SPECIAL-TWIN": 5,
+            "SPECIAL-KING": 3,
+        }
         batch = release_approved_orders(db, event.id, "purchasing@example.com")
         assert batch is not None
         assert batch.order_count == 1
@@ -1878,6 +1902,10 @@ def test_event_product_lineup_snapshots_catalog_controls_and_reorders() -> None:
             "SPECIAL-KING",
         }
         assert sum(line.quantity for line in released_lines) == 8
+        assert {line.model_number: line.quantity for line in released_lines} == {
+            "SPECIAL-TWIN": 5,
+            "SPECIAL-KING": 3,
+        }
         assert sum((line.total_cost for line in released_lines), Decimal("0")) == Decimal("475.00")
         purchase_requests = list(
             db.scalars(

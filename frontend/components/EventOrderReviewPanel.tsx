@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   decideEventOrder,
+  EventOrderReviewItem,
   EventOrderReviewSummary,
   exportEventOrders,
   exportEventOrderBackup,
@@ -19,6 +20,9 @@ export function EventOrderReviewPanel({
 }) {
   const [summary, setSummary] = useState<EventOrderReviewSummary | null>(null);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [variantQuantities, setVariantQuantities] = useState<
+    Record<string, Record<string, number>>
+  >({});
   const [reasons, setReasons] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -39,17 +43,30 @@ export function EventOrderReviewPanel({
   useEffect(load, [load]);
 
   async function decide(
-    orderId: string,
+    item: EventOrderReviewItem,
     decision: "approve" | "reject" | "revise",
   ) {
     setBusy(true);
     setError(null);
     setMessage(null);
     try {
-      const updated = await decideEventOrder(orderId, {
+      const updated = await decideEventOrder(item.order_id, {
         decision,
-        revised_quantity: decision === "revise" ? quantities[orderId] : null,
-        reason: decision === "approve" ? null : reasons[orderId],
+        revised_quantity:
+          decision === "revise" && !item.is_combined_offer
+            ? quantities[item.order_id]
+            : null,
+        revised_variant_quantities:
+          decision === "revise" && item.is_combined_offer
+            ? Object.fromEntries(
+                item.variant_lines.map((variant) => [
+                  variant.model_number,
+                  variantQuantities[item.order_id]?.[variant.model_number] ??
+                    variant.quantity,
+                ]),
+              )
+            : {},
+        reason: decision === "approve" ? null : reasons[item.order_id],
       });
       setSummary(updated);
       setMessage(`Order ${decision} decision recorded.`);
@@ -177,7 +194,7 @@ export function EventOrderReviewPanel({
                   <strong>{item.model_number}</strong>
                   <br />
                   {item.product_name}
-                  {item.variant_lines.length > 1 ? (
+                  {item.is_combined_offer ? (
                     <div className="mt-2 space-y-1 border-t pt-2 text-xs">
                       {item.variant_lines.map((variant) => (
                         <div key={variant.model_number}>
@@ -225,43 +242,79 @@ export function EventOrderReviewPanel({
                         <button
                           className="rounded bg-green-700 px-2 py-1 text-white"
                           disabled={busy}
-                          onClick={() => void decide(item.order_id, "approve")}
+                          onClick={() => void decide(item, "approve")}
                         >
                           Approve
                         </button>
                         <button
                           className="rounded bg-red-700 px-2 py-1 text-white"
                           disabled={busy}
-                          onClick={() => void decide(item.order_id, "reject")}
+                          onClick={() => void decide(item, "reject")}
                         >
                           Reject
                         </button>
                         <button
                           className="rounded bg-amber-700 px-2 py-1 text-white"
                           disabled={busy}
-                          onClick={() => void decide(item.order_id, "revise")}
+                          onClick={() => void decide(item, "revise")}
                         >
                           Revise
                         </button>
                       </div>
-                      <input
-                        className="rounded border p-1"
-                        min="1"
-                        onChange={(event) =>
-                          setQuantities((current) => ({
-                            ...current,
-                            [item.order_id]: Number(event.target.value),
-                          }))
-                        }
-                        placeholder={`Revised qty (${item.quantity})`}
-                        type="number"
-                      />
-                      {item.variant_lines.length > 1 ? (
-                        <small className="text-amber-700">
-                          Aggregate revisions are distributed proportionally
-                          across these model lines.
-                        </small>
-                      ) : null}
+                      {item.is_combined_offer ? (
+                        <fieldset className="grid gap-1 rounded border p-2">
+                          <legend className="px-1 text-xs font-bold uppercase">
+                            Revised model quantities
+                          </legend>
+                          {item.variant_lines.map((variant) => (
+                            <label
+                              className="grid grid-cols-[minmax(0,1fr)_72px] items-center gap-2 text-xs"
+                              key={variant.model_number}
+                            >
+                              <span className="min-w-0 break-words font-semibold">
+                                {variant.model_number}
+                              </span>
+                              <input
+                                aria-label={`${variant.model_number} revised quantity`}
+                                className="min-w-0 rounded border p-1"
+                                inputMode="numeric"
+                                min="0"
+                                onChange={(event) =>
+                                  setVariantQuantities((current) => ({
+                                    ...current,
+                                    [item.order_id]: {
+                                      ...current[item.order_id],
+                                      [variant.model_number]: Number(
+                                        event.target.value,
+                                      ),
+                                    },
+                                  }))
+                                }
+                                type="number"
+                                value={
+                                  variantQuantities[item.order_id]?.[
+                                    variant.model_number
+                                  ] ?? variant.quantity
+                                }
+                              />
+                            </label>
+                          ))}
+                        </fieldset>
+                      ) : (
+                        <input
+                          className="rounded border p-1"
+                          inputMode="numeric"
+                          min="1"
+                          onChange={(event) =>
+                            setQuantities((current) => ({
+                              ...current,
+                              [item.order_id]: Number(event.target.value),
+                            }))
+                          }
+                          placeholder={`Revised qty (${item.quantity})`}
+                          type="number"
+                        />
+                      )}
                       <input
                         className="rounded border p-1"
                         onChange={(event) =>

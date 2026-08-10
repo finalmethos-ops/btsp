@@ -53,18 +53,6 @@ def _variant_release_lines(order: EventEntityOrder, slide: EventProductSlide):
     return [(slide.model_number, order.quantity, order.unit_cost, order.total_cost)]
 
 
-def _scale_variant_quantities(values: dict[str, int], target: int) -> dict[str, int]:
-    current = sum(values.values())
-    if not current or current == target:
-        return values
-    raw = {model: quantity * target / current for model, quantity in values.items()}
-    scaled = {model: int(value) for model, value in raw.items()}
-    remainder = target - sum(scaled.values())
-    for model in sorted(raw, key=lambda item: raw[item] - scaled[item], reverse=True)[:remainder]:
-        scaled[model] += 1
-    return {model: quantity for model, quantity in scaled.items() if quantity > 0}
-
-
 def _release_store(db: Session, order: EventEntityOrder) -> str:
     stores = list(
         db.scalars(
@@ -168,6 +156,7 @@ def review_summary(db: Session, event_id: str) -> EventOrderReviewSummary | None
             review_status=order.review_status,
             reviewed_by=order.reviewed_by,
             reviewed_at=order.reviewed_at,
+            is_combined_offer=bool(slide.product_variants),
             variant_lines=[
                 EventOrderVariantLine(
                     model_number=model_number,
@@ -231,24 +220,43 @@ def decide_order(
         raise EventOrderReviewError("Released orders cannot be changed")
     slide = db.get(EventProductSlide, order.slide_id)
     previous_quantity = order.quantity
-    resulting_quantity = payload.revised_quantity or order.quantity
-    if resulting_quantity < slide.minimum_order_quantity:
-        raise EventOrderReviewError(
-            f"Quantity must meet the minimum order quantity of {slide.minimum_order_quantity}"
-        )
     if payload.decision == "revise":
-        order.quantity = resulting_quantity
         if order.variant_quantities and slide.product_variants:
-            order.variant_quantities = _scale_variant_quantities(
-                order.variant_quantities, resulting_quantity
-            )
             variants = {str(item["model_number"]): item for item in slide.product_variants}
+            revised = payload.revised_variant_quantities
+            expected_models = set(order.variant_quantities)
+            if not revised or set(revised) != expected_models:
+                raise EventOrderReviewError(
+                    "Enter a revised quantity for every product in this combined offer"
+                )
+            for model, quantity in revised.items():
+                if model not in variants:
+                    raise EventOrderReviewError(f"Unknown product variant: {model}")
+                minimum = int(variants[model].get("minimum_order_quantity", 1))
+                if quantity > 0 and quantity < minimum:
+                    raise EventOrderReviewError(f"{model} requires a minimum quantity of {minimum}")
+            resulting_quantity = sum(revised.values())
+            if resulting_quantity < 1:
+                raise EventOrderReviewError("At least one product quantity must remain")
+            order.variant_quantities = {
+                model: quantity for model, quantity in revised.items() if quantity > 0
+            }
+            order.quantity = resulting_quantity
             order.total_cost = sum(
                 Decimal(str(variants[model]["event_unit_cost"])) * quantity
                 for model, quantity in order.variant_quantities.items()
             )
             order.unit_cost = order.total_cost / resulting_quantity
         else:
+            if payload.revised_quantity is None:
+                raise EventOrderReviewError("Revised quantity is required")
+            resulting_quantity = payload.revised_quantity
+            if resulting_quantity < slide.minimum_order_quantity:
+                raise EventOrderReviewError(
+                    "Quantity must meet the minimum order quantity of "
+                    f"{slide.minimum_order_quantity}"
+                )
+            order.quantity = resulting_quantity
             order.total_cost = Decimal(resulting_quantity) * order.unit_cost
     order.review_status = "rejected" if payload.decision == "reject" else "approved"
     order.reviewed_by = actor

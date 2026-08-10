@@ -6,14 +6,23 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class EventOrderReviewDecision(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     decision: Literal["approve", "reject", "revise"]
     revised_quantity: int | None = Field(default=None, ge=1)
+    revised_variant_quantities: dict[str, int] = Field(default_factory=dict, max_length=50)
     reason: str | None = Field(default=None, max_length=2000)
 
     @model_validator(mode="after")
     def valid_decision(self) -> "EventOrderReviewDecision":
-        if self.decision == "revise" and self.revised_quantity is None:
-            raise ValueError("Revised quantity is required")
+        if any(quantity < 0 for quantity in self.revised_variant_quantities.values()):
+            raise ValueError("Revised product quantities cannot be negative")
+        if (
+            self.decision == "revise"
+            and self.revised_quantity is None
+            and not self.revised_variant_quantities
+        ):
+            raise ValueError("A revised quantity is required")
         if self.decision in {"reject", "revise"} and not (self.reason or "").strip():
             raise ValueError("A reason is required for rejection or revision")
         return self
@@ -52,6 +61,7 @@ class EventOrderReviewItem(BaseModel):
     review_status: str
     reviewed_by: str | None
     reviewed_at: datetime | None
+    is_combined_offer: bool = False
     variant_lines: list[EventOrderVariantLine] = Field(default_factory=list)
     purchasing_requests: list[EventOrderPurchasingLink] = Field(default_factory=list)
 

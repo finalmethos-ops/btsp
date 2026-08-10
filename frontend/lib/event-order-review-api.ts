@@ -20,6 +20,7 @@ export type EventOrderReviewItem = {
   review_status: string;
   reviewed_by: string | null;
   reviewed_at: string | null;
+  is_combined_offer: boolean;
   variant_lines: Array<{
     model_number: string;
     product_name: string;
@@ -78,6 +79,7 @@ export const decideEventOrder = (
   payload: {
     decision: "approve" | "reject" | "revise";
     revised_quantity?: number | null;
+    revised_variant_quantities?: Record<string, number>;
     reason?: string | null;
   },
 ) =>
