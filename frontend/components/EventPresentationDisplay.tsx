@@ -508,10 +508,17 @@ export function EventPresentationDisplay({
                           presentation?.variant_units_ordered?.[
                             variant.model_number
                           ] ?? 0;
-                        const limits = [
-                          variant.max_event_units,
-                          variant.available_inventory,
-                        ].filter((value): value is number => value !== null);
+                        const hasProductCapacity =
+                          variant.max_event_units !== null ||
+                          variant.available_inventory !== null;
+                        const limits = (
+                          hasProductCapacity
+                            ? [
+                                variant.max_event_units,
+                                variant.available_inventory,
+                              ]
+                            : [slide.max_event_units, slide.available_inventory]
+                        ).filter((value): value is number => value !== null);
                         const limit = limits.length
                           ? Math.min(...limits)
                           : null;

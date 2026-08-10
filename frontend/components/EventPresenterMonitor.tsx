@@ -340,10 +340,20 @@ export function EventPresenterMonitor({
                               product.model_number
                             ] ?? 0)
                           : (presentation?.total_units_ordered ?? 0);
-                        const limits = [
-                          product.max_event_units,
-                          product.available_inventory,
-                        ].filter((value): value is number => value !== null);
+                        const hasProductCapacity =
+                          product.max_event_units !== null ||
+                          product.available_inventory !== null;
+                        const limits = (
+                          hasProductCapacity
+                            ? [
+                                product.max_event_units,
+                                product.available_inventory,
+                              ]
+                            : [
+                                currentSlide.max_event_units,
+                                currentSlide.available_inventory,
+                              ]
+                        ).filter((value): value is number => value !== null);
                         const limit = limits.length
                           ? Math.min(...limits)
                           : null;

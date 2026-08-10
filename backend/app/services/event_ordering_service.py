@@ -44,12 +44,21 @@ def _order_capacity(slide: EventProductSlide | None) -> int | None:
     return min(limits) if limits else None
 
 
-def _variant_capacity(variant: dict) -> int | None:
-    limits = [
-        int(value)
-        for value in (variant.get("max_event_units"), variant.get("available_inventory"))
-        if value is not None
-    ]
+def _variant_capacity(
+    variant: dict,
+    *,
+    fallback_available_inventory: int | None = None,
+    fallback_max_event_units: int | None = None,
+) -> int | None:
+    has_product_capacity = any(
+        variant.get(field) is not None for field in ("max_event_units", "available_inventory")
+    )
+    capacity_values = (
+        (variant.get("max_event_units"), variant.get("available_inventory"))
+        if has_product_capacity
+        else (fallback_max_event_units, fallback_available_inventory)
+    )
+    limits = [int(value) for value in capacity_values if value is not None]
     return min(limits) if limits else None
 
 
@@ -170,10 +179,20 @@ def _ordering_workspace_response(
         variant_units_remaining={
             variant["model_number"]: (
                 max(
-                    _variant_capacity(variant) - confirmed_variants.get(variant["model_number"], 0),
+                    _variant_capacity(
+                        variant,
+                        fallback_available_inventory=slide.available_inventory,
+                        fallback_max_event_units=slide.max_event_units,
+                    )
+                    - confirmed_variants.get(variant["model_number"], 0),
                     0,
                 )
-                if _variant_capacity(variant) is not None
+                if _variant_capacity(
+                    variant,
+                    fallback_available_inventory=slide.available_inventory,
+                    fallback_max_event_units=slide.max_event_units,
+                )
+                is not None
                 else None
             )
             for variant in (slide.product_variants or [])
@@ -323,7 +342,14 @@ def submit_entity_order(
     over_cap = cap is not None and confirmed_other + requested_quantity > cap
     if variants:
         over_cap = any(
-            (variant_cap := _variant_capacity(variants[model])) is not None
+            (
+                variant_cap := _variant_capacity(
+                    variants[model],
+                    fallback_available_inventory=slide.available_inventory,
+                    fallback_max_event_units=slide.max_event_units,
+                )
+            )
+            is not None
             and confirmed_variants_other.get(model, 0) + quantity > variant_cap
             for model, quantity in variant_quantities.items()
         )

@@ -599,7 +599,18 @@ export function EventProductSlideBuilder({
                       slide.product_variants.length ? "multiple" : "single",
                     );
                     setCatalogCode(slide.catalog_product_code ?? "");
-                    setSlideProducts(slide.product_variants);
+                    setSlideProducts(
+                      slide.product_variants.map((product) =>
+                        product.available_inventory !== null ||
+                        product.max_event_units !== null
+                          ? product
+                          : {
+                              ...product,
+                              available_inventory: slide.available_inventory,
+                              max_event_units: slide.max_event_units,
+                            },
+                      ),
+                    );
                   }}
                   type="button"
                 >
