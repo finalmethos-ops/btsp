@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 
 from app.core.config import settings
 from app.db.session import SessionLocal
+from app.models import registry  # noqa: F401
 from app.models.event_snapshot import EventSnapshot
 from app.models.identity import User
 from app.models.purchase_order import PurchaseOrderTransmissionEvent

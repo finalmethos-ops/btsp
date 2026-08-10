@@ -5,6 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db.session import SessionLocal
+from app.models import registry  # noqa: F401
 from app.models.event_snapshot import EventSnapshot
 from app.models.identity import Role
 from app.models.workflow import WorkflowDefinition

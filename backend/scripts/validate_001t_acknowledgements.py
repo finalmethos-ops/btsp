@@ -5,6 +5,7 @@ from decimal import Decimal
 from sqlalchemy import func, select
 
 from app.db.session import SessionLocal
+from app.models import registry  # noqa: F401
 from app.models.catalog import CatalogVendor
 from app.models.event_snapshot import EventSnapshot
 from app.models.purchase_order import PurchaseOrder

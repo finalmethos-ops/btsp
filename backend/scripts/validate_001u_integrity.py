@@ -4,6 +4,7 @@ from decimal import Decimal
 from sqlalchemy import select
 
 from app.db.session import SessionLocal
+from app.models import registry  # noqa: F401
 from app.models.receiving import (
     InvoiceReconciliation,
     PurchaseBackorder,

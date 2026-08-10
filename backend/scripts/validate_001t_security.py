@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 
 from app.db.session import SessionLocal
+from app.models import registry  # noqa: F401
 from app.models.identity import Role
 from app.models.vendor_integration import VendorConnectorExecution, VendorEndpoint
 from app.services.vendor_connector_security import configuration_contains_secret
