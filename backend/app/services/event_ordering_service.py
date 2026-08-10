@@ -36,12 +36,37 @@ def _ordering_enabled(sub_event: ManagedSubEvent) -> None:
 
 
 def _order_capacity(slide: EventProductSlide | None) -> int | None:
-    if slide is None:
+    if slide is None or slide.product_variants:
         return None
     limits = [
         value for value in (slide.max_event_units, slide.available_inventory) if value is not None
     ]
     return min(limits) if limits else None
+
+
+def _variant_capacity(variant: dict) -> int | None:
+    limits = [
+        int(value)
+        for value in (variant.get("max_event_units"), variant.get("available_inventory"))
+        if value is not None
+    ]
+    return min(limits) if limits else None
+
+
+def _confirmed_variant_quantities(
+    db: Session, slide_id: str, *, exclude_order_id: str | None = None
+) -> dict[str, int]:
+    statement = select(EventEntityOrder.variant_quantities).where(
+        EventEntityOrder.slide_id == slide_id,
+        EventEntityOrder.status == "confirmed",
+    )
+    if exclude_order_id:
+        statement = statement.where(EventEntityOrder.id != exclude_order_id)
+    totals: dict[str, int] = {}
+    for quantities in db.scalars(statement):
+        for model_number, quantity in (quantities or {}).items():
+            totals[model_number] = totals.get(model_number, 0) + int(quantity)
+    return totals
 
 
 def list_ordering_assignments(db: Session, user: User) -> list[EventOrderingAssignmentResponse]:
@@ -101,6 +126,7 @@ def _ordering_workspace_response(
     slide: EventProductSlide | None,
     order: EventEntityOrder | None,
     confirmed: int,
+    confirmed_variants: dict[str, int],
     *,
     operations_locked: bool,
 ) -> EventOrderingWorkspaceResponse:
@@ -141,6 +167,19 @@ def _ordering_workspace_response(
         ),
         existing_order=EventEntityOrderResponse.model_validate(order) if order else None,
         units_remaining=max(cap - confirmed, 0) if cap is not None else None,
+        variant_units_remaining={
+            variant["model_number"]: (
+                max(
+                    _variant_capacity(variant) - confirmed_variants.get(variant["model_number"], 0),
+                    0,
+                )
+                if _variant_capacity(variant) is not None
+                else None
+            )
+            for variant in (slide.product_variants or [])
+        }
+        if slide
+        else {},
         entity_sub_event_spend=entity_sub_event_spend,
     )
 
@@ -174,6 +213,7 @@ def ordering_workspace(
             )
         )
     confirmed = 0
+    confirmed_variants: dict[str, int] = {}
     if slide:
         confirmed = (
             db.scalar(
@@ -184,6 +224,7 @@ def ordering_workspace(
             )
             or 0
         )
+        confirmed_variants = _confirmed_variant_quantities(db, slide.id)
     return _ordering_workspace_response(
         db,
         sub_event,
@@ -193,6 +234,7 @@ def ordering_workspace(
         slide,
         order,
         confirmed,
+        confirmed_variants,
         operations_locked=event_operations_are_locked(db, sub_event.event_id),
     )
 
@@ -274,8 +316,17 @@ def submit_entity_order(
         )
         or 0
     )
+    confirmed_variants_other = _confirmed_variant_quantities(
+        db, slide.id, exclude_order_id=order.id if order else None
+    )
     cap = _order_capacity(slide)
     over_cap = cap is not None and confirmed_other + requested_quantity > cap
+    if variants:
+        over_cap = any(
+            (variant_cap := _variant_capacity(variants[model])) is not None
+            and confirmed_variants_other.get(model, 0) + quantity > variant_cap
+            for model, quantity in variant_quantities.items()
+        )
     if over_cap and not slide.allow_waitlist:
         raise EventOrderingError("Requested quantity exceeds remaining event availability")
     status = "waitlisted" if over_cap else "confirmed"
@@ -312,6 +363,7 @@ def submit_entity_order(
             order_id=order.id,
             revision=revision + 1,
             quantity=requested_quantity,
+            variant_quantities=variant_quantities,
             requested_delivery_start=slide.delivery_window_start,
             requested_delivery_end=slide.delivery_window_end,
             status=status,
@@ -320,6 +372,10 @@ def submit_entity_order(
     )
     db.commit()
     confirmed = confirmed_other + (requested_quantity if status == "confirmed" else 0)
+    confirmed_variants = dict(confirmed_variants_other)
+    if status == "confirmed":
+        for model, quantity in variant_quantities.items():
+            confirmed_variants[model] = confirmed_variants.get(model, 0) + quantity
     return _ordering_workspace_response(
         db,
         sub_event,
@@ -329,5 +385,6 @@ def submit_entity_order(
         slide,
         order,
         confirmed,
+        confirmed_variants,
         operations_locked=False,
     )

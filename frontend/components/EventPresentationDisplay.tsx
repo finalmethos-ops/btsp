@@ -91,7 +91,9 @@ export function EventPresentationDisplay({
       : undefined,
     brandingUrl,
   );
-  const offerLimit = slide?.max_event_units ?? slide?.available_inventory;
+  const offerLimit = isMultiProduct
+    ? null
+    : (slide?.max_event_units ?? slide?.available_inventory);
   const unitsRemaining =
     offerLimit == null
       ? null
@@ -425,15 +427,17 @@ export function EventPresentationDisplay({
                 <dl className="divide-y divide-slate-700 text-sm">
                   <div className="flex justify-between gap-4 px-5 py-4">
                     <dt className="font-bold uppercase text-slate-400">
-                      Max available units
+                      {isMultiProduct ? "Availability" : "Max available units"}
                     </dt>
                     <dd className="font-black">
-                      {offerLimit?.toLocaleString() ?? "Unlimited"} EA
+                      {isMultiProduct
+                        ? "By model"
+                        : `${offerLimit?.toLocaleString() ?? "Unlimited"} EA`}
                     </dd>
                   </div>
                   <div className="flex justify-between gap-4 px-5 py-4">
                     <dt className="font-bold uppercase text-slate-400">
-                      Units ordered
+                      {isMultiProduct ? "Total units ordered" : "Units ordered"}
                     </dt>
                     <dd className="font-black">
                       {(
@@ -444,10 +448,12 @@ export function EventPresentationDisplay({
                   </div>
                   <div className="flex justify-between gap-4 px-5 py-4">
                     <dt className="font-bold uppercase text-slate-400">
-                      Units remaining
+                      {isMultiProduct ? "Remaining units" : "Units remaining"}
                     </dt>
                     <dd className="font-black text-green-400">
-                      {unitsRemaining?.toLocaleString() ?? "Unlimited"} EA
+                      {isMultiProduct
+                        ? "See models below"
+                        : `${unitsRemaining?.toLocaleString() ?? "Unlimited"} EA`}
                     </dd>
                   </div>
                   <div className="px-5 py-4">
@@ -497,22 +503,34 @@ export function EventPresentationDisplay({
                       Model sales
                     </h4>
                     <ul className="mt-3 space-y-2 text-sm">
-                      {slide.product_variants.slice(0, 8).map((variant) => (
-                        <li
-                          className="flex items-center justify-between gap-3 border-b border-slate-700/70 pb-2"
-                          key={`sales-${variant.model_number}`}
-                        >
-                          <span className="min-w-0 truncate font-bold">
-                            {variant.model_number}
-                          </span>
-                          <strong className="shrink-0 text-amber-300">
-                            {presentation?.variant_units_ordered?.[
-                              variant.model_number
-                            ] ?? 0}{" "}
-                            sold
-                          </strong>
-                        </li>
-                      ))}
+                      {slide.product_variants.slice(0, 8).map((variant) => {
+                        const sold =
+                          presentation?.variant_units_ordered?.[
+                            variant.model_number
+                          ] ?? 0;
+                        const limits = [
+                          variant.max_event_units,
+                          variant.available_inventory,
+                        ].filter((value): value is number => value !== null);
+                        const limit = limits.length
+                          ? Math.min(...limits)
+                          : null;
+                        const remaining =
+                          limit === null ? null : Math.max(limit - sold, 0);
+                        return (
+                          <li
+                            className="flex items-center justify-between gap-3 border-b border-slate-700/70 pb-2"
+                            key={`sales-${variant.model_number}`}
+                          >
+                            <span className="min-w-0 truncate font-bold">
+                              {variant.model_number}
+                            </span>
+                            <strong className="shrink-0 text-amber-300">
+                              {sold} sold · {remaining ?? "Unlimited"} remaining
+                            </strong>
+                          </li>
+                        );
+                      })}
                     </ul>
                     {slide.product_variants.length > 8 ? (
                       <p className="mt-2 text-xs text-slate-400">

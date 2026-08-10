@@ -122,7 +122,9 @@ export function EventOrderingPortal({ subEventId }: { subEventId: string }) {
         0,
       );
       const updated = await submitEventOrder(subEventId, {
-        quantity: variantTotal || Number(data.get("quantity")),
+        quantity: slide?.product_variants.length
+          ? Math.max(variantTotal, 1)
+          : Number(data.get("quantity")),
         variant_quantities: variantQuantities,
       });
       setWorkspace(updated);
@@ -300,7 +302,10 @@ export function EventOrderingPortal({ subEventId }: { subEventId: string }) {
                         <strong>{variant.name}</strong>
                         <small className="block text-slate-500">
                           {variant.model_number} · ${variant.event_unit_cost} ·
-                          MOQ {variant.minimum_order_quantity}
+                          MOQ {variant.minimum_order_quantity} · Remaining{" "}
+                          {workspace.variant_units_remaining[
+                            variant.model_number
+                          ] ?? "Not limited"}
                         </small>
                         {variant.standard_cost &&
                         Number(variant.standard_cost) >

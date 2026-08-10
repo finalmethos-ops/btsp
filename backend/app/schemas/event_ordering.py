@@ -46,6 +46,7 @@ class EventOrderingWorkspaceResponse(BaseModel):
     current_slide: EventProductSlideResponse | None
     existing_order: EventEntityOrderResponse | None
     units_remaining: int | None
+    variant_units_remaining: dict[str, int | None] = Field(default_factory=dict)
     entity_sub_event_spend: Decimal = Decimal("0.00")
 
 

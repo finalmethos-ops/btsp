@@ -180,6 +180,8 @@ export function EventPresenterMonitor({
               event_unit_cost: currentSlide.event_unit_cost ?? "0.00",
               standard_cost: currentSlide.standard_cost,
               minimum_order_quantity: currentSlide.minimum_order_quantity,
+              available_inventory: currentSlide.available_inventory,
+              max_event_units: currentSlide.max_event_units,
             },
           ]
         : []
@@ -333,6 +335,20 @@ export function EventPresenterMonitor({
                           product.standard_cost,
                           product.event_unit_cost,
                         );
+                        const sold = currentSlide.product_variants.length
+                          ? (presentation?.variant_units_ordered?.[
+                              product.model_number
+                            ] ?? 0)
+                          : (presentation?.total_units_ordered ?? 0);
+                        const limits = [
+                          product.max_event_units,
+                          product.available_inventory,
+                        ].filter((value): value is number => value !== null);
+                        const limit = limits.length
+                          ? Math.min(...limits)
+                          : null;
+                        const remaining =
+                          limit === null ? null : Math.max(limit - sold, 0);
                         return (
                           <div
                             className="rounded-xl border border-slate-700 bg-slate-950/70 p-3"
@@ -350,16 +366,10 @@ export function EventPresenterMonitor({
                               </span>
                             </div>
                             <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm font-bold">
-                              {currentSlide.product_variants.length ? (
-                                <span className="text-green-300">
-                                  {presentation?.variant_units_ordered?.[
-                                    product.model_number
-                                  ] ?? 0}{" "}
-                                  sold
-                                </span>
-                              ) : (
-                                <span />
-                              )}
+                              <span className="text-green-300">
+                                {sold} sold · {remaining ?? "Unlimited"}{" "}
+                                remaining
+                              </span>
                               {savings > 0 ? (
                                 <span className="text-teal-200">
                                   Save ${formatMoney(savings)} / EA

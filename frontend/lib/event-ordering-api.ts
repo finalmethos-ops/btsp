@@ -28,6 +28,7 @@ export type EventOrderingWorkspace = {
   current_slide: EventProductSlide | null;
   existing_order: EventOrder | null;
   units_remaining: number | null;
+  variant_units_remaining: Record<string, number | null>;
   entity_sub_event_spend: string;
 };
 

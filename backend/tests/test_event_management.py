@@ -1519,12 +1519,16 @@ def test_event_product_lineup_snapshots_catalog_controls_and_reorders() -> None:
                         "event_unit_cost": "50.00",
                         "standard_cost": "65.00",
                         "minimum_order_quantity": 1,
+                        "available_inventory": 8,
+                        "max_event_units": 6,
                     },
                     {
                         "model_number": "SPECIAL-KING",
                         "name": "King",
                         "event_unit_cost": "75.00",
                         "minimum_order_quantity": 1,
+                        "available_inventory": 5,
+                        "max_event_units": 4,
                     },
                 ],
                 delivery_window_start=date(2027, 6, 1),
@@ -1589,6 +1593,10 @@ def test_event_product_lineup_snapshots_catalog_controls_and_reorders() -> None:
         assert workspace.existing_order is not None
         assert workspace.existing_order.total_cost == Decimal("300.00")
         assert workspace.existing_order.variant_quantities["SPECIAL-KING"] == 2
+        assert workspace.variant_units_remaining == {
+            "SPECIAL-TWIN": 3,
+            "SPECIAL-KING": 2,
+        }
         assert workspace.existing_order.requested_delivery_start == date(2027, 6, 1)
         assert workspace.existing_order.requested_delivery_end == date(2027, 6, 30)
         assert "entity_event_spend" not in workspace.model_dump()
@@ -1596,6 +1604,20 @@ def test_event_product_lineup_snapshots_catalog_controls_and_reorders() -> None:
         assert shared_workspace is not None
         assert shared_workspace.existing_order is not None
         assert shared_workspace.existing_order.id == workspace.existing_order.id
+        assert shared_workspace.variant_units_remaining == {
+            "SPECIAL-TWIN": 3,
+            "SPECIAL-KING": 2,
+        }
+        with pytest.raises(EventOrderingError, match="exceeds remaining"):
+            submit_entity_order(
+                db,
+                sub_event_id,
+                EventEntityOrderWrite(
+                    quantity=8,
+                    variant_quantities={"SPECIAL-TWIN": 3, "SPECIAL-KING": 5},
+                ),
+                second_buyer,
+            )
         shared_workspace = submit_entity_order(
             db,
             sub_event_id,
@@ -1622,6 +1644,10 @@ def test_event_product_lineup_snapshots_catalog_controls_and_reorders() -> None:
             .where(EventEntityOrderRevision.order_id == workspace.existing_order.id)
             .order_by(EventEntityOrderRevision.revision)
         ).all()
+        assert revisions[0].variant_quantities == {
+            "SPECIAL-TWIN": 3,
+            "SPECIAL-KING": 2,
+        }
         assert [item.changed_by for item in revisions] == [
             "buyer@example.com",
             "second-buyer@example.com",

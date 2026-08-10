@@ -23,6 +23,18 @@ class EventProductVariant(BaseModel):
     event_unit_cost: Decimal = Field(ge=0, max_digits=14, decimal_places=2)
     standard_cost: Decimal | None = Field(default=None, ge=0, max_digits=14, decimal_places=2)
     minimum_order_quantity: int = Field(default=1, ge=1)
+    available_inventory: int | None = Field(default=None, ge=0)
+    max_event_units: int | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def valid_capacity(self) -> "EventProductVariant":
+        if (
+            self.max_event_units is not None
+            and self.available_inventory is not None
+            and self.max_event_units > self.available_inventory
+        ):
+            raise ValueError("Product maximum event units cannot exceed available inventory")
+        return self
 
 
 class EventProductSlideWrite(BaseModel):

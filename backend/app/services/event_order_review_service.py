@@ -276,6 +276,7 @@ def decide_order(
             order_id=order.id,
             revision=revision + 1,
             quantity=order.quantity,
+            variant_quantities=order.variant_quantities or {},
             requested_delivery_start=order.requested_delivery_start,
             requested_delivery_end=order.requested_delivery_end,
             status=f"review_{order.review_status}",

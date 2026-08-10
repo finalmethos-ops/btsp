@@ -330,6 +330,7 @@ class EventEntityOrderRevision(Base):
     )
     revision: Mapped[int]
     quantity: Mapped[int]
+    variant_quantities: Mapped[dict[str, int]] = mapped_column(JSON, default=dict)
     requested_delivery_start: Mapped[date]
     requested_delivery_end: Mapped[date]
     status: Mapped[str] = mapped_column(String(24))

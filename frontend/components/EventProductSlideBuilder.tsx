@@ -37,6 +37,8 @@ const emptySlideProduct = (): SlideProduct => ({
   event_unit_cost: "",
   standard_cost: null,
   minimum_order_quantity: 1,
+  available_inventory: null,
+  max_event_units: null,
 });
 
 export function EventProductSlideBuilder({
@@ -297,10 +299,14 @@ export function EventProductSlideBuilder({
           : Number(data.get("minimum_order_quantity")),
       available_inventory: filler
         ? null
-        : optionalNumber(data.get("available_inventory")),
+        : multipleProducts
+          ? null
+          : optionalNumber(data.get("available_inventory")),
       max_event_units: filler
         ? null
-        : optionalNumber(data.get("max_event_units")),
+        : multipleProducts
+          ? null
+          : optionalNumber(data.get("max_event_units")),
       allow_waitlist: !filler && data.get("allow_waitlist") === "on",
       delivery_window_start: filler
         ? null
@@ -323,6 +329,8 @@ export function EventProductSlideBuilder({
                 ? String(product.standard_cost)
                 : null,
               minimum_order_quantity: Number(product.minimum_order_quantity),
+              available_inventory: product.available_inventory,
+              max_event_units: product.max_event_units,
             })),
       status: String(data.get("status")) as "draft" | "ready" | "archived",
     };
@@ -789,6 +797,12 @@ export function EventProductSlideBuilder({
                         minimum_order_quantity: Number(
                           data?.get("minimum_order_quantity") ?? 1,
                         ),
+                        available_inventory: optionalNumber(
+                          data?.get("available_inventory") ?? null,
+                        ),
+                        max_event_units: optionalNumber(
+                          data?.get("max_event_units") ?? null,
+                        ),
                       },
                       emptySlideProduct(),
                     ]);
@@ -1045,6 +1059,12 @@ export function EventProductSlideBuilder({
                             minimum_order_quantity: Number(
                               data?.get("minimum_order_quantity") ?? 1,
                             ),
+                            available_inventory: optionalNumber(
+                              data?.get("available_inventory") ?? null,
+                            ),
+                            max_event_units: optionalNumber(
+                              data?.get("max_event_units") ?? null,
+                            ),
                           },
                           emptySlideProduct(),
                         ];
@@ -1087,6 +1107,8 @@ export function EventProductSlideBuilder({
                                       minimum_order_quantity: Number(
                                         selected.minimum_order_quantity ?? 1,
                                       ),
+                                      available_inventory: null,
+                                      max_event_units: null,
                                     }
                                   : item,
                               ),
@@ -1113,6 +1135,8 @@ export function EventProductSlideBuilder({
                         ["Event price", "event_unit_cost", "number"],
                         ["Standard Cost", "standard_cost", "number"],
                         ["MOQ", "minimum_order_quantity", "number"],
+                        ["Available quantity", "available_inventory", "number"],
+                        ["Maximum event quantity", "max_event_units", "number"],
                       ].map(([label, field, type]) => (
                         <label
                           className={`text-xs font-semibold ${field === "name" ? "sm:col-span-2" : ""}`}
@@ -1123,7 +1147,8 @@ export function EventProductSlideBuilder({
                             className="mt-1 w-full rounded-lg border bg-white p-2"
                             min={
                               type === "number"
-                                ? field === "minimum_order_quantity"
+                                ? field === "minimum_order_quantity" ||
+                                  field === "max_event_units"
                                   ? 1
                                   : 0
                                 : undefined
@@ -1137,16 +1162,28 @@ export function EventProductSlideBuilder({
                                         [field]:
                                           field === "minimum_order_quantity"
                                             ? Number(event.target.value)
-                                            : event.target.value,
+                                            : field === "available_inventory" ||
+                                                field === "max_event_units"
+                                              ? event.target.value === ""
+                                                ? null
+                                                : Number(event.target.value)
+                                              : event.target.value,
                                       }
                                     : item,
                                 ),
                               )
                             }
-                            required
+                            required={
+                              field === "model_number" ||
+                              field === "name" ||
+                              field === "event_unit_cost" ||
+                              field === "minimum_order_quantity"
+                            }
                             step={
                               type === "number" &&
-                              field !== "minimum_order_quantity"
+                              field !== "minimum_order_quantity" &&
+                              field !== "available_inventory" &&
+                              field !== "max_event_units"
                                 ? "0.01"
                                 : undefined
                             }
@@ -1239,7 +1276,11 @@ export function EventProductSlideBuilder({
                 type="number"
               />
             </label>
-            <label className="text-sm font-semibold">
+            <label
+              className={
+                productMode === "single" ? "text-sm font-semibold" : "hidden"
+              }
+            >
               Available inventory
               <input
                 className="mt-1 w-full rounded-lg border bg-white p-2"
@@ -1249,7 +1290,11 @@ export function EventProductSlideBuilder({
                 type="number"
               />
             </label>
-            <label className="text-sm font-semibold">
+            <label
+              className={
+                productMode === "single" ? "text-sm font-semibold" : "hidden"
+              }
+            >
               Maximum event units
               <input
                 className="mt-1 w-full rounded-lg border bg-white p-2"

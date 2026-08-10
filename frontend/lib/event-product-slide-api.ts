@@ -40,6 +40,8 @@ export type EventProductSlide = {
     event_unit_cost: string;
     standard_cost: string | null;
     minimum_order_quantity: number;
+    available_inventory: number | null;
+    max_event_units: number | null;
   }>;
   status: "draft" | "ready" | "archived";
   has_image: boolean;
