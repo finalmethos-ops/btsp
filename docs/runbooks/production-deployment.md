@@ -69,11 +69,11 @@ pins source revision, release version, and build time into OCI labels and writes
 a non-sensitive local manifest; it never publishes or deploys images:
 
 ```bash
-BTSP_RELEASE_VERSION=v1.0.0-rc.23 \
+BTSP_RELEASE_VERSION=v1.0.0-rc.51 \
   ./scripts/build-btsp-release-images.sh
 ```
 
-Inspect `.runtime/releases/v1.0.0-rc.23-manifest.json`, complete the release
+Inspect `.runtime/releases/v1.0.0-rc.51-manifest.json`, complete the release
 checks, then publish and promote the resulting images through separately
 approved steps.
 
@@ -97,7 +97,7 @@ docker compose -f docker-compose.yml -f docker-compose.production.yml exec backe
 docker compose -f docker-compose.yml -f docker-compose.production.yml exec backend alembic current
 ```
 
-Expected Alembic head: `0116_notification_action_href`.
+Expected Alembic head: `0119_event_slide_vendor_logos`.
 
 The production override removes source bind mounts, disables backend reload, and starts the prebuilt Next.js production server. Do not deploy the base development Compose file alone.
 
