@@ -136,10 +136,12 @@ from app.services.event_presentation_service import (
 from app.services.event_product_slide_service import (
     EventProductSlideError,
     create_slide,
+    delete_slide,
     list_slides,
     reorder_slides,
     save_slide_image,
     save_slide_vendor_logo,
+    update_slide,
 )
 from app.services.event_staff_task_report_service import export_event_staff_tasks
 from app.services.event_staff_task_service import (
@@ -1652,6 +1654,26 @@ def test_event_product_lineup_snapshots_catalog_controls_and_reorders() -> None:
             "buyer@example.com",
             "second-buyer@example.com",
         ]
+        editable_slide = EventProductSlideWrite.model_validate(second.model_dump())
+        updated_slide = update_slide(
+            db,
+            second.id,
+            editable_slide.model_copy(update={"description": "Updated presenter description"}),
+        )
+        assert updated_slide is not None
+        assert updated_slide.description == "Updated presenter description"
+        changed_variants = list(editable_slide.product_variants)
+        changed_variants[0] = changed_variants[0].model_copy(
+            update={"event_unit_cost": Decimal("51.00")}
+        )
+        with pytest.raises(EventProductSlideError, match="pricing.*locked"):
+            update_slide(
+                db,
+                second.id,
+                editable_slide.model_copy(update={"product_variants": changed_variants}),
+            )
+        with pytest.raises(EventProductSlideError, match="cannot be deleted"):
+            delete_slide(db, second.id)
         live_presentation = get_presentation(db, sub_event_id)
         assert live_presentation is not None
         assert live_presentation.variant_units_ordered == {

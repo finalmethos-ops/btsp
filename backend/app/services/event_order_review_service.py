@@ -448,7 +448,7 @@ def export_review_csv(db: Session, event_id: str) -> str | None:
         )
     )
     for item in summary.items:
-        lines = item.variant_lines if len(item.variant_lines) > 1 else [item]
+        lines = item.variant_lines if item.is_combined_offer else [item]
         for line in lines:
             writer.writerow(
                 spreadsheet_safe_row(

@@ -1,8 +1,11 @@
+from decimal import Decimal
+
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.catalog import CatalogProduct, CatalogVendor
 from app.models.event_management import (
+    EventEntityOrder,
     EventPresentationState,
     EventProductSlide,
     EventProductSlideImage,
@@ -25,6 +28,42 @@ from app.services.upload_validation import content_matches_declared_type
 
 class EventProductSlideError(ValueError):
     pass
+
+
+def _order_contract(slide: EventProductSlide, values: dict | None = None) -> tuple:
+    def value(field: str):
+        return values[field] if values is not None else getattr(slide, field)
+
+    variants = value("product_variants") or []
+    variant_contract = tuple(
+        sorted(
+            (
+                str(item["model_number"]),
+                Decimal(str(item["event_unit_cost"])),
+                int(item.get("minimum_order_quantity", 1)),
+            )
+            for item in variants
+        )
+    )
+    event_unit_cost = value("event_unit_cost")
+    return (
+        value("slide_type"),
+        value("catalog_product_code"),
+        value("model_number"),
+        value("vendor_code"),
+        Decimal(str(event_unit_cost)) if event_unit_cost is not None else None,
+        value("currency"),
+        int(value("minimum_order_quantity")),
+        variant_contract,
+    )
+
+
+def _slide_has_orders(db: Session, slide_id: str) -> bool:
+    return bool(
+        db.scalar(
+            select(func.count(EventEntityOrder.id)).where(EventEntityOrder.slide_id == slide_id)
+        )
+    )
 
 
 def purge_event_slide_images(db: Session, event_id: str) -> int:
@@ -172,6 +211,11 @@ def update_slide(
     _slides_enabled(db.get(ManagedSubEvent, slide.sub_event_id))
     _validate_product(db, payload)
     values = _slide_values(payload)
+    if _slide_has_orders(db, slide.id) and _order_contract(slide) != _order_contract(slide, values):
+        raise EventProductSlideError(
+            "Product identity, vendor, pricing, currency, and minimum quantities are locked "
+            "after an order is submitted"
+        )
     for field, value in values.items():
         setattr(slide, field, value)
     db.commit()
@@ -186,6 +230,8 @@ def delete_slide(db: Session, slide_id: str) -> bool | None:
         raise EventProductSlideError(
             "Product slides are locked because the event is cancelled or settlement is closed"
         )
+    if _slide_has_orders(db, slide.id):
+        raise EventProductSlideError("Slides with submitted orders cannot be deleted")
     remaining = db.scalars(
         _slide_query()
         .where(EventProductSlide.sub_event_id == slide.sub_event_id)
