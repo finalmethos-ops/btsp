@@ -49,6 +49,11 @@ python scripts/stress-test-live-ordering.py \
   --min-orders-per-second 2
 ```
 
-The harness fails unless every user order, distinct entity, quantity, and audit
-revision reconciles exactly. Optional latency and throughput thresholds also
-make major performance regressions fail CI without relaxing order correctness.
+The harness creates a three-product combined slide with different prices,
+minimum quantities, and exact per-product capacity limits. Every simulated
+entity submits its own product-specific quantity mix. It fails unless each
+saved order and revision, weighted order value, per-model projector total, and
+combined total reconcile exactly. It also attempts one order beyond a filled
+product limit and verifies that the order is rejected without changing the
+previously committed order. Optional latency and throughput thresholds make
+major performance regressions fail CI without relaxing order correctness.
