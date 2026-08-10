@@ -14,6 +14,12 @@ from app.schemas.event_product_slide import (
     EventProductSlideWrite,
 )
 from app.services.event_access_service import event_operations_are_locked
+from app.services.presentation_image_service import (
+    VENDOR_LOGO_SIZE,
+    PresentationImageError,
+    normalize_presentation_image,
+    normalized_image_filename,
+)
 from app.services.upload_validation import content_matches_declared_type
 
 
@@ -248,11 +254,15 @@ def save_slide_image(
         raise EventProductSlideError("Product image must be between 1 byte and 8 MB")
     if not content_matches_declared_type(content, content_type):
         raise EventProductSlideError("Product image content does not match its declared type")
+    try:
+        content_type, content = normalize_presentation_image(content, content_type)
+    except PresentationImageError as exc:
+        raise EventProductSlideError(str(exc)) from exc
     image = db.get(EventProductSlideImage, slide_id)
     if image is None:
         image = EventProductSlideImage(slide_id=slide_id)
         db.add(image)
-    image.filename = filename[:255]
+    image.filename = normalized_image_filename(filename, content_type)
     image.content_type = content_type
     image.content = content
     image.uploaded_by = actor
@@ -284,11 +294,20 @@ def save_slide_vendor_logo(
         raise EventProductSlideError("Vendor logo must be between 1 byte and 4 MB")
     if not content_matches_declared_type(content, content_type):
         raise EventProductSlideError("Vendor logo content does not match its declared type")
+    try:
+        content_type, content = normalize_presentation_image(
+            content,
+            content_type,
+            max_size=VENDOR_LOGO_SIZE,
+            lossless=True,
+        )
+    except PresentationImageError as exc:
+        raise EventProductSlideError(str(exc)) from exc
     logo = db.get(EventProductSlideVendorLogo, slide_id)
     if logo is None:
         logo = EventProductSlideVendorLogo(slide_id=slide_id)
         db.add(logo)
-    logo.filename = filename[:255]
+    logo.filename = normalized_image_filename(filename, content_type)
     logo.content_type = content_type
     logo.content = content
     logo.uploaded_by = actor

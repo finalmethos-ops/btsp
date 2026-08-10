@@ -134,7 +134,7 @@ def put_slide_order(
 
 
 @router.post("/{slide_id}/image", response_model=EventProductSlideResponse)
-async def post_slide_image(
+def post_slide_image(
     slide_id: str,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
@@ -146,7 +146,7 @@ async def post_slide_image(
             slide_id,
             file.filename or "product-image",
             file.content_type or "application/octet-stream",
-            await file.read(8 * 1024 * 1024 + 1),
+            file.file.read(8 * 1024 * 1024 + 1),
             user.email,
         )
     except EventProductSlideError as exc:
@@ -157,7 +157,7 @@ async def post_slide_image(
 
 
 @router.post("/{slide_id}/vendor-logo", response_model=EventProductSlideResponse)
-async def post_slide_vendor_logo(
+def post_slide_vendor_logo(
     slide_id: str,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
@@ -169,7 +169,7 @@ async def post_slide_vendor_logo(
             slide_id,
             file.filename or "vendor-logo",
             file.content_type or "application/octet-stream",
-            await file.read(4 * 1024 * 1024 + 1),
+            file.file.read(4 * 1024 * 1024 + 1),
             user.email,
         )
     except EventProductSlideError as exc:

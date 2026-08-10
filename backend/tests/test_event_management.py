@@ -4,6 +4,7 @@ from io import BytesIO
 
 import pytest
 from openpyxl import load_workbook
+from PIL import Image
 from sqlalchemy import create_engine, func, select
 from sqlalchemy import event as sqlalchemy_event
 from sqlalchemy.orm import Session
@@ -158,6 +159,12 @@ from app.services.event_vendor_booth_service import (
     vendor_update_booth,
 )
 from app.services.notification_service import list_user_notification_events
+
+
+def _png_bytes(size: tuple[int, int] = (32, 24)) -> bytes:
+    output = BytesIO()
+    Image.new("RGB", size, "navy").save(output, "PNG")
+    return output.getvalue()
 
 
 def _event() -> EventWrite:
@@ -1531,7 +1538,7 @@ def test_event_product_lineup_snapshots_catalog_controls_and_reorders() -> None:
             first.id,
             "product.png",
             "image/png",
-            b"\x89PNG\r\n\x1a\nproduct-image",
+            _png_bytes(),
             "admin@example.com",
         )
         first = save_slide_vendor_logo(
@@ -1539,7 +1546,7 @@ def test_event_product_lineup_snapshots_catalog_controls_and_reorders() -> None:
             first.id,
             "vendor-logo.png",
             "image/png",
-            b"\x89PNG\r\n\x1a\nvendor-logo",
+            _png_bytes(),
             "admin@example.com",
         )
         assert first is not None
