@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import {
   EventOrderingWorkspace,
   getEventOrderingWorkspace,
@@ -11,6 +11,11 @@ import { downloadPresentationImage } from "@/lib/event-presentation-api";
 import { subscribeEventRealtime } from "@/lib/event-realtime";
 import { EventAccessUnavailable } from "@/components/EventAccessUnavailable";
 import { EventLivePoll } from "@/components/EventLivePoll";
+import {
+  buildEventOrderPayload,
+  eventOrderEstimatedSpend,
+  initialEventOrderQuantities,
+} from "@/lib/event-order-quantities";
 
 export function EventOrderingPortal({ subEventId }: { subEventId: string }) {
   const [workspace, setWorkspace] = useState<EventOrderingWorkspace | null>(
@@ -25,6 +30,8 @@ export function EventOrderingPortal({ subEventId }: { subEventId: string }) {
   const [draftQuantities, setDraftQuantities] = useState<
     Record<string, number>
   >({});
+  const draftSourceKey = `${workspace?.current_slide?.id ?? "none"}:${workspace?.existing_order?.updated_at ?? "new"}`;
+  const hydratedDraftSource = useRef("");
 
   useEffect(() => {
     let active = true;
@@ -56,38 +63,18 @@ export function EventOrderingPortal({ subEventId }: { subEventId: string }) {
 
   const slide = workspace?.current_slide;
   useEffect(() => {
+    if (hydratedDraftSource.current === draftSourceKey) return;
+    hydratedDraftSource.current = draftSourceKey;
     if (!slide) {
       setDraftQuantities({});
       return;
     }
-    if (slide.product_variants.length) {
-      setDraftQuantities(
-        Object.fromEntries(
-          slide.product_variants.map((variant) => [
-            variant.model_number,
-            workspace?.existing_order?.variant_quantities[
-              variant.model_number
-            ] ?? 0,
-          ]),
-        ),
-      );
-    } else {
-      setDraftQuantities({
-        __primary:
-          workspace?.existing_order?.quantity ?? slide.minimum_order_quantity,
-      });
-    }
-  }, [slide?.id, slide, workspace?.existing_order]);
+    setDraftQuantities(
+      initialEventOrderQuantities(slide, workspace?.existing_order ?? null),
+    );
+  }, [draftSourceKey, slide, workspace?.existing_order]);
   const estimatedSpend = slide
-    ? slide.product_variants.length
-      ? slide.product_variants.reduce(
-          (total, variant) =>
-            total +
-            (draftQuantities[variant.model_number] ?? 0) *
-              Number(variant.event_unit_cost),
-          0,
-        )
-      : (draftQuantities.__primary ?? 0) * Number(slide.event_unit_cost)
+    ? eventOrderEstimatedSpend(slide, draftQuantities)
     : 0;
   useEffect(() => {
     let url: string | null = null;
@@ -104,29 +91,15 @@ export function EventOrderingPortal({ subEventId }: { subEventId: string }) {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const data = new FormData(event.currentTarget);
     setBusy(true);
     setOrderError(null);
     setMessage(null);
     try {
-      const variantQuantities = Object.fromEntries(
-        [...data.entries()]
-          .filter(([key]) => key.startsWith("variant__"))
-          .map(([key, value]) => [
-            key.slice("variant__".length),
-            Number(value),
-          ]),
+      if (!slide) throw new Error("No current product is available.");
+      const updated = await submitEventOrder(
+        subEventId,
+        buildEventOrderPayload(slide, draftQuantities),
       );
-      const variantTotal = Object.values(variantQuantities).reduce(
-        (total, quantity) => total + quantity,
-        0,
-      );
-      const updated = await submitEventOrder(subEventId, {
-        quantity: slide?.product_variants.length
-          ? Math.max(variantTotal, 1)
-          : Number(data.get("quantity")),
-        variant_quantities: variantQuantities,
-      });
       setWorkspace(updated);
       setMessage(
         updated.existing_order?.status === "waitlisted"
@@ -250,39 +223,44 @@ export function EventOrderingPortal({ subEventId }: { subEventId: string }) {
             <h2 className="text-2xl font-bold sm:text-3xl">{slide.name}</h2>
             <p className="text-xl text-slate-600">{slide.model_number}</p>
             <p className="mt-4">{slide.description}</p>
-            <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
-              <div>
-                <dt>Event cost</dt>
-                <dd className="text-xl font-bold">${slide.event_unit_cost}</dd>
-              </div>
-              <div>
-                <dt>Standard Cost</dt>
-                <dd className="text-xl font-bold">
-                  ${slide.standard_cost ?? "—"}
-                </dd>
-                {slide.standard_cost &&
-                Number(slide.standard_cost) > Number(slide.event_unit_cost) ? (
-                  <dd className="mt-1 font-black text-amber-700">
-                    You save ${" "}
-                    {(
-                      Number(slide.standard_cost) -
-                      Number(slide.event_unit_cost)
-                    ).toFixed(2)}{" "}
-                    per unit
+            {!slide.product_variants.length ? (
+              <dl className="mt-5 grid gap-3 text-sm sm:grid-cols-2">
+                <div>
+                  <dt>Event cost</dt>
+                  <dd className="text-xl font-bold">
+                    ${slide.event_unit_cost}
                   </dd>
-                ) : null}
-              </div>
-              <div>
-                <dt>MOQ</dt>
-                <dd className="font-bold">{slide.minimum_order_quantity}</dd>
-              </div>
-              <div>
-                <dt>Remaining</dt>
-                <dd className="font-bold">
-                  {workspace.units_remaining ?? "Not limited"}
-                </dd>
-              </div>
-            </dl>
+                </div>
+                <div>
+                  <dt>Standard Cost</dt>
+                  <dd className="text-xl font-bold">
+                    ${slide.standard_cost ?? "—"}
+                  </dd>
+                  {slide.standard_cost &&
+                  Number(slide.standard_cost) >
+                    Number(slide.event_unit_cost) ? (
+                    <dd className="mt-1 font-black text-amber-700">
+                      You save ${" "}
+                      {(
+                        Number(slide.standard_cost) -
+                        Number(slide.event_unit_cost)
+                      ).toFixed(2)}{" "}
+                      per unit
+                    </dd>
+                  ) : null}
+                </div>
+                <div>
+                  <dt>MOQ</dt>
+                  <dd className="font-bold">{slide.minimum_order_quantity}</dd>
+                </div>
+                <div>
+                  <dt>Remaining</dt>
+                  <dd className="font-bold">
+                    {workspace.units_remaining ?? "Not limited"}
+                  </dd>
+                </div>
+              </dl>
+            ) : null}
             <form
               className="mt-6 grid gap-3"
               key={`${slide.id}-${workspace.existing_order?.updated_at ?? "new"}`}
@@ -295,10 +273,10 @@ export function EventOrderingPortal({ subEventId }: { subEventId: string }) {
                   </legend>
                   {slide.product_variants.map((variant) => (
                     <label
-                      className="event-order-variant-row grid grid-cols-[1fr_100px] items-center gap-3"
+                      className="event-order-variant-row grid min-w-0 grid-cols-1 items-center gap-3 sm:grid-cols-[minmax(0,1fr)_100px]"
                       key={variant.model_number}
                     >
-                      <span>
+                      <span className="min-w-0 break-words">
                         <strong>{variant.name}</strong>
                         <small className="block text-slate-500">
                           {variant.model_number} · ${variant.event_unit_cost} ·
@@ -321,7 +299,9 @@ export function EventOrderingPortal({ subEventId }: { subEventId: string }) {
                         ) : null}
                       </span>
                       <input
-                        className="rounded-lg border p-3"
+                        aria-label={`${variant.name} quantity`}
+                        className="w-full rounded-lg border p-3"
+                        inputMode="numeric"
                         min="0"
                         name={`variant__${variant.model_number}`}
                         onChange={(input) =>
@@ -333,6 +313,16 @@ export function EventOrderingPortal({ subEventId }: { subEventId: string }) {
                         type="number"
                         value={draftQuantities[variant.model_number] ?? 0}
                       />
+                      <small className="event-order-variant-total text-left font-bold text-slate-700 sm:col-span-2 sm:text-right">
+                        Line total: ${" "}
+                        {(
+                          (draftQuantities[variant.model_number] ?? 0) *
+                          Number(variant.event_unit_cost)
+                        ).toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </small>
                     </label>
                   ))}
                 </fieldset>
@@ -341,6 +331,7 @@ export function EventOrderingPortal({ subEventId }: { subEventId: string }) {
                   Quantity
                   <input
                     className="mt-1 w-full rounded-lg border p-3"
+                    inputMode="numeric"
                     min={slide.minimum_order_quantity}
                     name="quantity"
                     onChange={(input) =>
