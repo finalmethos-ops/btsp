@@ -78,6 +78,8 @@ export function EventOrderingPortal({ subEventId }: { subEventId: string }) {
     : 0;
 
   function setDraftQuantity(key: string, rawValue: string) {
+    setMessage(null);
+    setOrderError(null);
     setDraftQuantities((current) => {
       const updated = { ...current };
       if (rawValue === "") delete updated[key];
@@ -165,11 +167,6 @@ export function EventOrderingPortal({ subEventId }: { subEventId: string }) {
           </strong>
         </div>
       </section>
-      {message ? (
-        <p className="mb-4 rounded-xl bg-green-50 p-3 text-green-800">
-          {message}
-        </p>
-      ) : null}
       {error ? (
         <p className="mb-4 rounded-xl bg-red-50 p-3 text-red-800">{error}</p>
       ) : null}
@@ -380,7 +377,11 @@ export function EventOrderingPortal({ subEventId }: { subEventId: string }) {
               ) : null}
               <button
                 aria-describedby={
-                  orderError ? "event-order-submit-error" : undefined
+                  orderError
+                    ? "event-order-submit-error"
+                    : message
+                      ? "event-order-submit-confirmation"
+                      : undefined
                 }
                 className="rounded-xl bg-blue-800 p-3 font-bold text-white disabled:bg-slate-400"
                 disabled={busy || workspace.ordering_status !== "open"}
@@ -393,6 +394,16 @@ export function EventOrderingPortal({ subEventId }: { subEventId: string }) {
                       : "Submit entity order"
                   : "Ordering is closed"}
               </button>
+              {message ? (
+                <p
+                  aria-live="polite"
+                  className="event-order-submit-confirmation rounded-xl border border-green-300 bg-green-50 p-3 text-center font-bold text-green-900"
+                  id="event-order-submit-confirmation"
+                  role="status"
+                >
+                  ✓ {message}
+                </p>
+              ) : null}
             </form>
           </div>
         </section>
