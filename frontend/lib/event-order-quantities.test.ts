@@ -35,6 +35,16 @@ const slide = {
 } as EventProductSlide;
 
 describe("combined-slide order quantities", () => {
+  it("starts new orders with blank quantity fields", () => {
+    expect(initialEventOrderQuantities(slide, null)).toEqual({});
+    expect(
+      initialEventOrderQuantities(
+        { ...slide, product_variants: [] } as EventProductSlide,
+        null,
+      ),
+    ).toEqual({});
+  });
+
   it("restores each saved product quantity independently", () => {
     const existingOrder = {
       quantity: 5,

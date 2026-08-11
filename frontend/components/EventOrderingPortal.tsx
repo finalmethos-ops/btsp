@@ -76,6 +76,16 @@ export function EventOrderingPortal({ subEventId }: { subEventId: string }) {
   const estimatedSpend = slide
     ? eventOrderEstimatedSpend(slide, draftQuantities)
     : 0;
+
+  function setDraftQuantity(key: string, rawValue: string) {
+    setDraftQuantities((current) => {
+      const updated = { ...current };
+      if (rawValue === "") delete updated[key];
+      else updated[key] = Number(rawValue);
+      return updated;
+    });
+  }
+
   useEffect(() => {
     let url: string | null = null;
     setImageUrl(null);
@@ -305,13 +315,15 @@ export function EventOrderingPortal({ subEventId }: { subEventId: string }) {
                         min="0"
                         name={`variant__${variant.model_number}`}
                         onChange={(input) =>
-                          setDraftQuantities((current) => ({
-                            ...current,
-                            [variant.model_number]: Number(input.target.value),
-                          }))
+                          setDraftQuantity(
+                            variant.model_number,
+                            input.target.value,
+                          )
                         }
+                        placeholder="Qty"
+                        step="1"
                         type="number"
-                        value={draftQuantities[variant.model_number] ?? 0}
+                        value={draftQuantities[variant.model_number] ?? ""}
                       />
                       <small className="event-order-variant-total text-left font-bold text-slate-700 sm:col-span-2 sm:text-right">
                         Line total: ${" "}
@@ -335,15 +347,13 @@ export function EventOrderingPortal({ subEventId }: { subEventId: string }) {
                     min={slide.minimum_order_quantity}
                     name="quantity"
                     onChange={(input) =>
-                      setDraftQuantities({
-                        __primary: Number(input.target.value),
-                      })
+                      setDraftQuantity("__primary", input.target.value)
                     }
+                    placeholder="Enter quantity"
                     required
+                    step="1"
                     type="number"
-                    value={
-                      draftQuantities.__primary ?? slide.minimum_order_quantity
-                    }
+                    value={draftQuantities.__primary ?? ""}
                   />
                 </label>
               )}

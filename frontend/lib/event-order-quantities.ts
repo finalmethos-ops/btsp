@@ -12,16 +12,23 @@ export function initialEventOrderQuantities(
   slide: EventProductSlide,
   existingOrder: Pick<EventOrder, "quantity" | "variant_quantities"> | null,
 ): EventOrderQuantities {
+  if (!existingOrder) return {};
   if (slide.product_variants.length) {
     return Object.fromEntries(
-      slide.product_variants.map((variant) => [
-        variant.model_number,
-        existingOrder?.variant_quantities[variant.model_number] ?? 0,
-      ]),
+      slide.product_variants
+        .filter(
+          (variant) =>
+            existingOrder.variant_quantities[variant.model_number] !==
+            undefined,
+        )
+        .map((variant) => [
+          variant.model_number,
+          existingOrder.variant_quantities[variant.model_number],
+        ]),
     );
   }
   return {
-    __primary: existingOrder?.quantity ?? slide.minimum_order_quantity,
+    __primary: existingOrder.quantity,
   };
 }
 
