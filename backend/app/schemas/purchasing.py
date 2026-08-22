@@ -51,7 +51,9 @@ class PurchaseRequestResponse(BaseModel):
     order_number: str
     workflow_code: str
     workflow_instance_id: int | None
-    store_number: str
+    store_number: str | None
+    target_entity_code: str | None = None
+    target_region_code: str | None = None
     vendor_code: str
     status: str
     currency: str

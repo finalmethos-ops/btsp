@@ -10,17 +10,13 @@ from app.schemas.purchasing import PurchaseRequestResponse
 
 class EventBuyFairOrderCreate(BaseModel):
     requester_id: int = Field(gt=0)
-    target_scope: Literal["entity", "region"] | None = None
+    target_scope: Literal["entity", "region"]
     target_region_code: str | None = Field(default=None, max_length=64)
-    # Retained temporarily for API compatibility with drafts created by older clients.
-    store_numbers: list[str] = Field(default_factory=list, max_length=500)
     expected_delivery_date: date
     line_items: list[LifecycleLineWrite] = Field(min_length=1, max_length=500)
 
     @model_validator(mode="after")
     def valid_target(self) -> "EventBuyFairOrderCreate":
-        if self.target_scope is None and not self.store_numbers:
-            raise ValueError("Select an entity or region")
         if self.target_scope == "region" and not (self.target_region_code or "").strip():
             raise ValueError("Select a region")
         if self.target_scope == "entity" and self.target_region_code:
@@ -38,15 +34,6 @@ class EventBuyFairModel(BaseModel):
     currency: str
     minimum_order_quantity: Decimal
     is_booth_model: bool
-
-
-class EventBuyFairStore(BaseModel):
-    store_number: str
-    name: str
-    entity_code: str | None
-    region_code: str
-    city: str | None
-    state_code: str | None
 
 
 class EventBuyFairRequester(BaseModel):
@@ -68,7 +55,6 @@ class EventBuyFairWorkspace(BaseModel):
     sub_event_name: str
     vendor_code: str
     models: list[EventBuyFairModel]
-    stores: list[EventBuyFairStore]
     requesters: list[EventBuyFairRequester]
     ordering_scopes: list[EventBuyFairOrderingScope] = Field(default_factory=list)
     orders: list[PurchaseRequestResponse]
@@ -103,7 +89,11 @@ class EventBuyFairOrderSummary(BaseModel):
     id: str
     order_number: str
     vendor_code: str
-    store_number: str
+    target_scope: Literal["entity", "region", "store"]
+    target_entity_code: str | None = None
+    target_region_code: str | None = None
+    legacy_store_number: str | None = None
+    destination_label: str
     requester_name: str | None = None
     requester_email: str | None = None
     requester_entity_code: str | None = None

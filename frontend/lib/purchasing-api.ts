@@ -45,7 +45,9 @@ export type PurchaseRequest = {
   order_number: string;
   workflow_code: string;
   workflow_instance_id: number | null;
-  store_number: string;
+  store_number: string | null;
+  target_entity_code: string | null;
+  target_region_code: string | null;
   vendor_code: string;
   status: string;
   currency: string;

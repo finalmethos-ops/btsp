@@ -1,6 +1,6 @@
 import { apiDownloadWithFilename, apiFetch } from "./api";
 import { LifecycleLinePayload } from "./order-lifecycle-api";
-import { EligibleStore, PurchaseRequest } from "./purchasing-api";
+import { PurchaseRequest } from "./purchasing-api";
 
 export type EventBuyFairModel = {
   product_code: string;
@@ -19,7 +19,6 @@ export type EventBuyFairWorkspace = {
   sub_event_name: string;
   vendor_code: string;
   models: EventBuyFairModel[];
-  stores: EligibleStore[];
   requesters: Array<{
     id: number;
     display_name: string;
@@ -57,7 +56,11 @@ export type EventBuyFairSummary = {
     id: string;
     order_number: string;
     vendor_code: string;
-    store_number: string;
+    target_scope: "entity" | "region" | "store";
+    target_entity_code: string | null;
+    target_region_code: string | null;
+    legacy_store_number: string | null;
+    destination_label: string;
     requester_name: string | null;
     requester_email: string | null;
     requester_entity_code: string | null;

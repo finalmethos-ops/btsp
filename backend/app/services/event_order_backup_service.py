@@ -278,9 +278,15 @@ def export_event_order_backup(db: Session, event_id: str) -> tuple[ManagedEvent,
     buy_fair_spend = Decimal("0")
     for request in buy_fair_requests:
         store = stores.get(request.store_number)
-        entity_code = (store.entity_code if store else None) or str(
-            request.context.get("entity_code") or "Unassigned"
+        entity_code = request.target_entity_code or (
+            (store.entity_code if store else None)
+            or str(
+                request.context.get("requester_entity_code")
+                or request.context.get("entity_code")
+                or "Unassigned"
+            )
         )
+        region_code = request.target_region_code or (store.region_code if store else "")
         for line in request.line_items:
             product = products.get(line.product_code)
             buy_fair_units += line.quantity
@@ -296,8 +302,8 @@ def export_event_order_backup(db: Session, event_id: str) -> tuple[ManagedEvent,
                         or ""
                     ),
                     entity_code,
-                    store.region_code if store else "",
-                    request.store_number,
+                    region_code,
+                    request.store_number or "",
                     request.vendor_code,
                     product.model_number if product and product.model_number else line.product_code,
                     line.product_name,

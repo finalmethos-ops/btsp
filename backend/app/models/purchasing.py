@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
-from sqlalchemy import JSON, Date, DateTime, ForeignKey, Numeric, String, func
+from sqlalchemy import JSON, CheckConstraint, Date, DateTime, ForeignKey, Numeric, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
@@ -14,6 +14,16 @@ if TYPE_CHECKING:
 
 class PurchaseRequest(Base):
     __tablename__ = "purchase_requests"
+    __table_args__ = (
+        CheckConstraint(
+            "store_number IS NOT NULL OR target_entity_code IS NOT NULL",
+            name="ck_purchase_request_destination",
+        ),
+        CheckConstraint(
+            "target_region_code IS NULL OR target_entity_code IS NOT NULL",
+            name="ck_purchase_request_region_entity",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
     order_number: Mapped[str] = mapped_column(String(255), index=True)
@@ -21,7 +31,11 @@ class PurchaseRequest(Base):
     workflow_instance_id: Mapped[int | None] = mapped_column(
         ForeignKey("workflow_instances.id"), nullable=True, unique=True
     )
-    store_number: Mapped[str] = mapped_column(ForeignKey("stores.store_number"), index=True)
+    store_number: Mapped[str | None] = mapped_column(
+        ForeignKey("stores.store_number"), nullable=True, index=True
+    )
+    target_entity_code: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    target_region_code: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     vendor_code: Mapped[str] = mapped_column(ForeignKey("catalog_vendors.vendor_code"), index=True)
     status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
     currency: Mapped[str] = mapped_column(String(3), default="USD")

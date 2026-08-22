@@ -547,6 +547,11 @@ export function OrderRequestLifecycleWorkspace({
                       {selected.context.sub_event_name
                         ? ` · ${String(selected.context.sub_event_name)}`
                         : ""}
+                      {selected.target_region_code
+                        ? ` · Region ${selected.target_region_code}`
+                        : selected.target_entity_code
+                          ? ` · Entity ${selected.target_entity_code}`
+                          : ""}
                     </p>
                   ) : null}
                   {selected.context.source === "event_live_order_release" ? (

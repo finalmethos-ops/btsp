@@ -298,6 +298,11 @@ def decide_request(
         return None
     if not request.line_items:
         raise OrderLifecycleError("Order request cannot be approved without models")
+    if request.store_number is None:
+        raise OrderLifecycleError(
+            "This event order is recorded at the entity or region level and cannot be converted "
+            "into a store purchase order until Purchasing completes post-event allocation"
+        )
     if expected_delivery_date is not None:
         request.expected_delivery_date = expected_delivery_date
     if request.expected_delivery_date is None:

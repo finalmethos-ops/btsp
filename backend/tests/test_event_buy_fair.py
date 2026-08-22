@@ -50,10 +50,14 @@ from app.services.event_buy_fair_service import (
     sub_event_buy_fair_summary,
 )
 from app.services.event_order_backup_service import export_event_order_backup
-from app.services.order_lifecycle_service import submit_vendor_request
+from app.services.order_lifecycle_service import (
+    OrderLifecycleError,
+    decide_request,
+    submit_vendor_request,
+)
 
 
-def test_vendor_buy_fair_prioritizes_booth_models_and_creates_standard_requests() -> None:
+def test_vendor_buy_fair_prioritizes_booth_models_and_creates_scoped_requests() -> None:
     engine = create_engine("sqlite+pysqlite:///:memory:")
     Base.metadata.create_all(engine)
     with Session(engine) as db:
@@ -212,15 +216,17 @@ def test_vendor_buy_fair_prioritizes_booth_models_and_creates_standard_requests(
             user,
         )
         assert [item.order_number for item in created] == [
-            "Summer Buy Fair-101-FAIR-VENDOR-001",
-            "Summer Buy Fair-102-FAIR-VENDOR-002",
+            "Summer Buy Fair-ENTITY-SOUTH-FAIR-VENDOR-001"
         ]
         assert all(item.workflow_code == "VENDOR_ORDER" for item in created)
+        assert created[0].store_number is None
+        assert created[0].target_entity_code == "ENTITY-SOUTH"
+        assert created[0].target_region_code is None
+        assert created[0].line_items[0].quantity == 2
         assert created[0].context["event_id"] == event.id
 
-        # “All Stores” is scoped to the requester’s entity, not the whole
-        # company. A BEBE/ENTITY-SOUTH requester may use every store in that
-        # entity, but cannot submit against another entity.
+        # Entity and region selection is validated against vendor coverage, but
+        # does not expand into individual store orders.
         db.add(
             Store(
                 store_number="999",
@@ -233,13 +239,14 @@ def test_vendor_buy_fair_prioritizes_booth_models_and_creates_standard_requests(
             )
         )
         db.commit()
-        with pytest.raises(EventBuyFairError, match="not authorized"):
+        with pytest.raises(EventBuyFairError, match="No active vendor ordering coverage"):
             create_buy_fair_orders(
                 db,
                 sub_event.id,
                 EventBuyFairOrderCreate(
                     requester_id=requester.id,
-                    store_numbers=["999"],
+                    target_scope="region",
+                    target_region_code="NORTH",
                     expected_delivery_date=date(2027, 8, 1),
                     line_items=[LifecycleLineWrite(product_code="BOOTH-1", quantity=1)],
                 ),
@@ -247,19 +254,36 @@ def test_vendor_buy_fair_prioritizes_booth_models_and_creates_standard_requests(
             )
 
         submit_vendor_request(db, created[0], user.email)
-        cancel_buy_fair_order(db, created[1], user.email)
-        replacement = create_buy_fair_orders(
+        with pytest.raises(OrderLifecycleError, match="post-event allocation"):
+            decide_request(db, created[0], "approve", None, "purchasing@example.com")
+        cancelled = create_buy_fair_orders(
             db,
             sub_event.id,
             EventBuyFairOrderCreate(
                 requester_id=requester.id,
-                store_numbers=["102"],
+                target_scope="region",
+                target_region_code="SOUTH",
                 expected_delivery_date=date(2027, 8, 1),
                 line_items=[LifecycleLineWrite(product_code="BOOTH-1", quantity=2)],
             ),
             user,
         )
-        assert replacement[0].order_number == "Summer Buy Fair-102-FAIR-VENDOR-003"
+        cancel_buy_fair_order(db, cancelled[0], user.email)
+        replacement = create_buy_fair_orders(
+            db,
+            sub_event.id,
+            EventBuyFairOrderCreate(
+                requester_id=requester.id,
+                target_scope="region",
+                target_region_code="SOUTH",
+                expected_delivery_date=date(2027, 8, 1),
+                line_items=[LifecycleLineWrite(product_code="BOOTH-1", quantity=2)],
+            ),
+            user,
+        )
+        assert replacement[0].order_number == ("Summer Buy Fair-ENTITY-SOUTH-SOUTH-FAIR-VENDOR-003")
+        assert replacement[0].store_number is None
+        assert replacement[0].target_region_code == "SOUTH"
         second_sub_event = ManagedSubEvent(
             event_id=event.id,
             name="Second Vendor Buy Fair",
@@ -276,13 +300,15 @@ def test_vendor_buy_fair_prioritizes_booth_models_and_creates_standard_requests(
             second_sub_event.id,
             EventBuyFairOrderCreate(
                 requester_id=requester.id,
-                store_numbers=["101"],
+                target_scope="entity",
                 expected_delivery_date=date(2027, 8, 1),
                 line_items=[LifecycleLineWrite(product_code="CAT-1", quantity=1)],
             ),
             user,
         )
-        assert other_sub_event_orders[0].order_number == ("Summer Buy Fair-101-FAIR-VENDOR-004")
+        assert other_sub_event_orders[0].order_number == (
+            "Summer Buy Fair-ENTITY-SOUTH-FAIR-VENDOR-004"
+        )
         workspace = buy_fair_workspace(db, sub_event.id, user)
         assert workspace.order_count == 2
         assert workspace.total_units == 4
@@ -305,15 +331,17 @@ def test_vendor_buy_fair_prioritizes_booth_models_and_creates_standard_requests(
         assert summary.vendors[0].vendor_code == "FAIR-VENDOR"
         assert summary.vendors[0].submitted_count == 1
         assert [item.order_number for item in summary.orders] == [
-            "Summer Buy Fair-102-FAIR-VENDOR-003",
-            "Summer Buy Fair-101-FAIR-VENDOR-001",
+            "Summer Buy Fair-ENTITY-SOUTH-SOUTH-FAIR-VENDOR-003",
+            "Summer Buy Fair-ENTITY-SOUTH-FAIR-VENDOR-001",
         ]
+        assert summary.orders[0].destination_label == "Region SOUTH"
+        assert summary.orders[1].destination_label == "Entity ENTITY-SOUTH"
         export = event_buy_fair_export_rows(db, event.id)
         assert export is not None
         exported_event, rows = export
         assert exported_event.id == event.id
         assert rows[0][1] == "order_number"
-        assert rows[1][1] == "Summer Buy Fair-102-FAIR-VENDOR-003"
+        assert rows[1][1] == "Summer Buy Fair-ENTITY-SOUTH-SOUTH-FAIR-VENDOR-003"
 
         backup = export_event_order_backup(db, event.id)
         assert backup is not None
@@ -322,8 +350,8 @@ def test_vendor_buy_fair_prioritizes_booth_models_and_creates_standard_requests(
         assert "Entity ENTITY-SOUTH" in workbook.sheetnames
         entity_rows = list(workbook["Entity ENTITY-SOUTH"].iter_rows(min_row=2, values_only=True))
         assert len(entity_rows) == 3
-        assert [row[6] for row in entity_rows] == ["101", "102", "102"]
-        assert {row[5] for row in entity_rows} == {"SOUTH"}
+        assert {row[6] for row in entity_rows} == {None}
+        assert {row[5] for row in entity_rows} == {None, "SOUTH"}
         assert {row[7] for row in entity_rows} == {"FAIR-VENDOR"}
         assert {row[15] for row in entity_rows} == {
             "cancelled_by_vendor",
@@ -344,7 +372,7 @@ def test_vendor_buy_fair_prioritizes_booth_models_and_creates_standard_requests(
                 sub_event.id,
                 EventBuyFairOrderCreate(
                     requester_id=requester.id,
-                    store_numbers=["101"],
+                    target_scope="entity",
                     expected_delivery_date=date(2027, 8, 1),
                     line_items=[LifecycleLineWrite(product_code="BOOTH-1", quantity=1)],
                 ),

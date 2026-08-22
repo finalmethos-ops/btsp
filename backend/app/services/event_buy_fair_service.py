@@ -12,15 +12,13 @@ from app.models.event_management import (
     VendorHallInventoryItem,
 )
 from app.models.identity import Role, User
-from app.models.purchasing import PurchaseRequest
-from app.models.store import Store
+from app.models.purchasing import PurchaseRequest, PurchaseRequestLineItem
 from app.schemas.event_buy_fair import (
     EventBuyFairModel,
     EventBuyFairOrderCreate,
     EventBuyFairOrderingScope,
     EventBuyFairOrderSummary,
     EventBuyFairRequester,
-    EventBuyFairStore,
     EventBuyFairSummary,
     EventBuyFairVendorSummary,
     EventBuyFairWorkspace,
@@ -30,7 +28,6 @@ from app.services.event_access_service import (
     event_operations_are_locked,
     membership_has_sub_event_access,
 )
-from app.services.order_lifecycle_service import create_vendor_requests
 from app.services.vendor_geography_service import eligible_stores
 
 
@@ -127,6 +124,17 @@ def _vendor_workspace_order(item: PurchaseRequest) -> PurchaseRequestResponse:
     return response
 
 
+def _order_destination(item: PurchaseRequest) -> tuple[str, str | None, str | None, str]:
+    scope = str(item.context.get("order_target_scope") or "").strip().lower()
+    entity_code = item.target_entity_code or item.context.get("requester_entity_code")
+    region_code = item.target_region_code or item.context.get("order_target_region_code")
+    if scope == "region" and entity_code and region_code:
+        return "region", str(entity_code), str(region_code), f"Region {region_code}"
+    if scope == "entity" and entity_code:
+        return "entity", str(entity_code), None, f"Entity {entity_code}"
+    return "store", None, None, f"Legacy store {item.store_number or 'unassigned'}"
+
+
 def event_buy_fair_summary(
     db: Session, event_id: str, sub_event_id: str | None = None
 ) -> EventBuyFairSummary | None:
@@ -159,7 +167,11 @@ def event_buy_fair_summary(
             id=item.id,
             order_number=item.order_number,
             vendor_code=item.vendor_code,
-            store_number=item.store_number,
+            target_scope=_order_destination(item)[0],
+            target_entity_code=_order_destination(item)[1],
+            target_region_code=_order_destination(item)[2],
+            legacy_store_number=item.store_number,
+            destination_label=_order_destination(item)[3],
             requester_name=item.context.get("requester_name"),
             requester_email=item.context.get("requester_email"),
             requester_entity_code=item.context.get("requester_entity_code"),
@@ -225,7 +237,10 @@ def event_buy_fair_export_rows(
             "event_name",
             "order_number",
             "vendor_code",
-            "store_number",
+            "target_scope",
+            "target_entity_code",
+            "target_region_code",
+            "legacy_store_number",
             "requester_name",
             "requester_email",
             "requester_entity_code",
@@ -242,7 +257,10 @@ def event_buy_fair_export_rows(
             event.name,
             item.order_number,
             item.vendor_code,
-            item.store_number,
+            item.target_scope,
+            item.target_entity_code or "",
+            item.target_region_code or "",
+            item.legacy_store_number or "",
             item.requester_name or "",
             item.requester_email or "",
             item.requester_entity_code or "",
@@ -274,7 +292,10 @@ def sub_event_buy_fair_export_rows(
             "sub_event_name",
             "order_number",
             "vendor_code",
-            "store_number",
+            "target_scope",
+            "target_entity_code",
+            "target_region_code",
+            "legacy_store_number",
             "requester_name",
             "requester_email",
             "requester_entity_code",
@@ -292,7 +313,10 @@ def sub_event_buy_fair_export_rows(
             sub_event.name,
             item.order_number,
             item.vendor_code,
-            item.store_number,
+            item.target_scope,
+            item.target_entity_code or "",
+            item.target_region_code or "",
+            item.legacy_store_number or "",
             item.requester_name or "",
             item.requester_email or "",
             item.requester_entity_code or "",
@@ -361,10 +385,6 @@ def buy_fair_workspace(db: Session, sub_event_id: str, user: User) -> EventBuyFa
         sub_event_name=sub_event.name,
         vendor_code=vendor_code,
         models=models,
-        stores=[
-            EventBuyFairStore.model_validate(item, from_attributes=True)
-            for item in available_stores
-        ],
         ordering_scopes=[
             EventBuyFairOrderingScope(
                 entity_code=entity_code,
@@ -420,95 +440,104 @@ def create_buy_fair_orders(
         raise EventBuyFairError("Select an active Buddy’s requester")
     requester_entity = (requester.entity_code or "").strip().upper()
     requester_region = (requester.region_code or "").strip().upper()
-    vendor_stores = eligible_stores(db, vendor_code)
-    if payload.target_scope:
-        if not requester_entity:
-            raise EventBuyFairError("The selected requester does not have an assigned entity")
-        target_region = (payload.target_region_code or "").strip().upper()
-        if payload.target_scope == "region":
-            if requester_region not in {"", "ALL_STORES", target_region}:
-                raise EventBuyFairError("The selected requester is not authorized for that region")
-        elif requester_region not in {"", "ALL_STORES"}:
-            raise EventBuyFairError(
-                "This requester is region-scoped; select their authorized region"
-            )
-        stores = [
-            store
-            for store in vendor_stores
-            if (store.entity_code or "").strip().upper() == requester_entity
-            and (
-                payload.target_scope == "entity"
-                or (store.region_code or "").strip().upper() == target_region
-            )
-        ]
-        if not stores:
-            scope_label = requester_entity if payload.target_scope == "entity" else target_region
-            raise EventBuyFairError(
-                f"No active stores eligible for this vendor were found in {scope_label}"
-            )
-        store_numbers = [store.store_number for store in stores]
-    else:
-        # Compatibility path for an older client already open during deployment.
-        store_numbers = list(dict.fromkeys(payload.store_numbers))
-        stores = list(db.scalars(select(Store).where(Store.store_number.in_(store_numbers))).all())
-        if len(stores) != len(store_numbers):
-            raise EventBuyFairError("One or more selected stores no longer exist")
-    # “All Stores” means every store in the requester’s assigned entity, not
-    # every company/entity in the database. A region-specific approval remains
-    # additionally constrained to that region.
-    invalid_stores = [
-        store.store_number
-        for store in stores
-        if (requester_entity and (store.entity_code or "").strip().upper() != requester_entity)
-        or (
-            requester_region
-            and requester_region != "ALL_STORES"
-            and (store.region_code or "").strip().upper() != requester_region
+    if not requester_entity:
+        raise EventBuyFairError("The selected requester does not have an assigned entity")
+    target_region = (payload.target_region_code or "").strip().upper()
+    if payload.target_scope == "region":
+        if requester_region not in {"", "ALL_STORES", target_region}:
+            raise EventBuyFairError("The selected requester is not authorized for that region")
+    elif requester_region not in {"", "ALL_STORES"}:
+        raise EventBuyFairError("This requester is region-scoped; select their authorized region")
+    eligible_scope_stores = [
+        store
+        for store in eligible_stores(db, vendor_code)
+        if (store.entity_code or "").strip().upper() == requester_entity
+        and (
+            payload.target_scope == "entity"
+            or (store.region_code or "").strip().upper() == target_region
         )
-        or (not requester_entity and not requester_region)
     ]
-    if invalid_stores:
-        raise EventBuyFairError(
-            "Requester is not authorized for stores: " + ", ".join(sorted(invalid_stores))
+    if not eligible_scope_stores:
+        scope_label = requester_entity if payload.target_scope == "entity" else target_region
+        raise EventBuyFairError(f"No active vendor ordering coverage was found for {scope_label}")
+    product_codes = [line.product_code for line in payload.line_items]
+    if len(product_codes) != len(set(product_codes)):
+        raise EventBuyFairError("Each model may appear only once in the cart")
+    products = {
+        product.product_code: product
+        for product in db.scalars(
+            select(CatalogProduct).where(
+                CatalogProduct.product_code.in_(product_codes),
+                CatalogProduct.vendor_code == vendor_code,
+                CatalogProduct.is_active.is_(True),
+                CatalogProduct.is_available.is_(True),
+            )
         )
+    }
+    missing = [code for code in product_codes if code not in products]
+    if missing:
+        raise EventBuyFairError(f"Model is not available for this vendor: {missing[0]}")
     existing = _event_orders(db, event.id, vendor_code, include_cancelled=True)
     sequence = max(
         (int(item.context.get("event_order_sequence", 0)) for item in existing),
         default=0,
     )
 
-    def metadata(store_number: str) -> tuple[str, dict[str, object]]:
-        nonlocal sequence
-        sequence += 1
-        return (
-            f"{event.name.strip()}-{store_number.strip()}-{vendor_code.strip()}-{sequence:03d}",
-            {
-                "source": "event_vendor_buy_fair",
-                "event_id": event.id,
-                "event_name": event.name,
-                "sub_event_id": sub_event.id,
-                "sub_event_name": sub_event.name,
-                "event_order_sequence": sequence,
-                "requester_email": requester.email,
-                "requester_name": requester.display_name,
-                "requester_entity_code": requester.entity_code,
-                "requester_region_code": requester.region_code,
-                "order_target_scope": payload.target_scope or "stores",
-                "order_target_region_code": (
-                    (payload.target_region_code or "").strip().upper() or None
-                ),
-            },
-        )
-
-    return create_vendor_requests(
-        db,
-        vendor_code,
-        store_numbers,
-        user.email,
-        payload.expected_delivery_date,
-        payload.line_items,
-        order_metadata_factory=metadata,
+    sequence += 1
+    destination_code = (
+        requester_entity
+        if payload.target_scope == "entity"
+        else f"{requester_entity}-{target_region}"
     )
+    request = PurchaseRequest(
+        order_number=(
+            f"{event.name.strip()}-{destination_code}-{vendor_code.strip()}-{sequence:03d}"
+        ),
+        workflow_code="VENDOR_ORDER",
+        store_number=None,
+        target_entity_code=requester_entity,
+        target_region_code=target_region if payload.target_scope == "region" else None,
+        vendor_code=vendor_code,
+        status="vendor_draft",
+        expected_delivery_date=payload.expected_delivery_date,
+        context={
+            "source": "event_vendor_buy_fair",
+            "event_id": event.id,
+            "event_name": event.name,
+            "sub_event_id": sub_event.id,
+            "sub_event_name": sub_event.name,
+            "event_order_sequence": sequence,
+            "requester_email": requester.email,
+            "requester_name": requester.display_name,
+            "requester_entity_code": requester_entity,
+            "requester_region_code": requester.region_code,
+            "order_target_scope": payload.target_scope,
+            "order_target_region_code": target_region or None,
+        },
+        created_by=user.email,
+        updated_by=user.email,
+    )
+    for line in payload.line_items:
+        product = products[line.product_code]
+        request.line_items.append(
+            PurchaseRequestLineItem(
+                product_code=product.product_code,
+                product_name=product.name,
+                quantity=line.quantity,
+                unit_price=product.unit_price,
+                freight_amount=Decimal("0"),
+                tax_amount=Decimal("0"),
+                extended_amount=line.quantity * product.unit_price,
+                notes=line.notes,
+                requested_delivery_date=payload.expected_delivery_date,
+            )
+        )
+    request.subtotal = sum((line.extended_amount for line in request.line_items), Decimal("0"))
+    request.total = request.subtotal
+    db.add(request)
+    db.commit()
+    db.refresh(request)
+    return [request]
 
 
 def require_buy_fair_order(

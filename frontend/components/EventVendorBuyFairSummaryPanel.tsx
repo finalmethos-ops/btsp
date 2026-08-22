@@ -144,7 +144,7 @@ export function EventVendorBuyFairSummaryPanel({
                   key={order.id}
                 >
                   <strong className="break-words">{order.order_number}</strong>
-                  <span>Store {order.store_number}</span>
+                  <span>{order.destination_label}</span>
                   <span>{order.status.replaceAll("_", " ")}</span>
                   <span className="font-bold">{money(order.total_volume)}</span>
                 </div>
@@ -154,9 +154,9 @@ export function EventVendorBuyFairSummaryPanel({
         </div>
       ) : null}
       <p className="mt-3 text-xs text-slate-500">
-        Submitted orders automatically appear in the standard Purchasing review
-        queue. Vendors open the branded buying workspace from their event
-        landing page.
+        Submitted aggregate orders appear in the standard Purchasing review
+        queue for post-event allocation. Vendors open the branded buying
+        workspace from their event landing page.
       </p>
     </section>
   );

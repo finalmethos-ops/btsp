@@ -1025,7 +1025,13 @@ def _order_closeout_export_rows(
                 )
     for request in _event_buy_fair_requests(db, event.id):
         store = db.scalar(select(Store).where(Store.store_number == request.store_number))
-        entity_code = (store.entity_code if store else None) or request.store_number
+        entity_code = (
+            request.target_entity_code
+            or (store.entity_code if store else None)
+            or request.context.get("requester_entity_code")
+            or request.store_number
+            or "Unassigned"
+        )
         for line in request.line_items:
             product = db.scalar(
                 select(CatalogProduct).where(CatalogProduct.product_code == line.product_code)
@@ -1048,7 +1054,7 @@ def _order_closeout_export_rows(
                     _dt(request.updated_at),
                     "vendor_buy_fair",
                     request.order_number,
-                    request.store_number,
+                    request.store_number or "",
                     request.id,
                 ]
             )

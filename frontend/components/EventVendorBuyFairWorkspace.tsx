@@ -187,11 +187,7 @@ export function EventVendorBuyFairWorkspace({
       setDeliveryDate("");
       await load();
       setSelectedId(created[0]?.id ?? null);
-      setNotice(
-        created.length === 1
-          ? "Event order draft created."
-          : `${created.length} event order drafts created.`,
-      );
+      setNotice("Aggregate event order draft created.");
     }, "order");
   }
 
@@ -374,8 +370,8 @@ export function EventVendorBuyFairWorkspace({
           {availableScope ? (
             <>
               <p className="text-sm text-slate-600">
-                Quantities apply to every eligible store in the selected scope;
-                BTSP creates the individual purchasing drafts automatically.
+                Quantities are recorded once for the selected entity or region.
+                No individual store orders are created during the event.
               </p>
               {availableScope.can_order_entity ? (
                 <label className="event-selectable flex gap-3 rounded-xl border p-3">
@@ -393,7 +389,7 @@ export function EventVendorBuyFairWorkspace({
                       Entire entity — {availableScope.entity_code}
                     </strong>
                     <small className="block text-slate-500">
-                      Order for every eligible store in this entity
+                      Record one aggregate order request for this entity
                     </small>
                   </span>
                 </label>
@@ -432,8 +428,8 @@ export function EventVendorBuyFairWorkspace({
             </>
           ) : requesterId ? (
             <p className="rounded-lg border border-dashed p-3 text-sm text-slate-500">
-              No active stores eligible for this vendor are assigned to the
-              requester&apos;s entity and region.
+              This vendor has no active ordering coverage for the
+              requester&apos;s entity or region.
             </p>
           ) : (
             <p className="text-sm text-slate-500">
@@ -454,7 +450,7 @@ export function EventVendorBuyFairWorkspace({
             />
           </label>
           <span className="font-bold">
-            Cart total per eligible store: {money(String(cartTotal))}
+            Aggregate order total: {money(String(cartTotal))}
           </span>
           {orderError ? (
             <p
@@ -474,7 +470,7 @@ export function EventVendorBuyFairWorkspace({
               (targetScope === "region" && !targetRegion)
             }
           >
-            Create scoped order drafts
+            Create order request
           </button>
         </div>
       </form>
@@ -493,7 +489,14 @@ export function EventVendorBuyFairWorkspace({
             >
               <strong className="break-words">{order.order_number}</strong>
               <span className="block text-xs text-slate-500">
-                Store {order.store_number} · {order.status.replaceAll("_", " ")}
+                {order.target_region_code
+                  ? `Region ${order.target_region_code}`
+                  : order.target_entity_code
+                    ? `Entity ${order.target_entity_code}`
+                    : order.store_number
+                      ? `Legacy store ${order.store_number}`
+                      : "Unassigned scope"}{" "}
+                · {order.status.replaceAll("_", " ")}
               </span>
               <span className="font-semibold">{money(order.total)}</span>
             </button>
@@ -507,7 +510,14 @@ export function EventVendorBuyFairWorkspace({
                   {selected.order_number}
                 </h2>
                 <p>
-                  Store {selected.store_number} · {money(selected.total)}
+                  {selected.target_region_code
+                    ? `Region ${selected.target_region_code}`
+                    : selected.target_entity_code
+                      ? `Entity ${selected.target_entity_code}`
+                      : selected.store_number
+                        ? `Legacy store ${selected.store_number}`
+                        : "Unassigned scope"}{" "}
+                  · {money(selected.total)}
                 </p>
               </div>
               <div className="text-right">
