@@ -97,7 +97,7 @@ docker compose -f docker-compose.yml -f docker-compose.production.yml exec backe
 docker compose -f docker-compose.yml -f docker-compose.production.yml exec backend alembic current
 ```
 
-Expected Alembic head: `0121_event_order_partial_waitlist`.
+Expected Alembic head: `0121_event_order_allocations`.
 
 The production override removes source bind mounts, disables backend reload, and starts the prebuilt Next.js production server. Do not deploy the base development Compose file alone.
 
