@@ -5,7 +5,7 @@ from io import BytesIO
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 MAX_PRESENTATION_PIXELS = 40_000_000
-PRESENTATION_IMAGE_SIZE = (1920, 1080)
+PRESENTATION_IMAGE_SIZE = (3840, 2160)
 VENDOR_LOGO_SIZE = (1200, 600)
 
 
@@ -67,7 +67,7 @@ def normalize_presentation_image(
     if lossless:
         save_options["lossless"] = True
     else:
-        save_options["quality"] = 92
+        save_options["quality"] = 96
     try:
         image.save(output, **save_options)
     except (OSError, ValueError) as exc:

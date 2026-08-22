@@ -113,11 +113,27 @@ export function EventOrderingPortal({ subEventId }: { subEventId: string }) {
         buildEventOrderPayload(slide, draftQuantities),
       );
       setWorkspace(updated);
-      setMessage(
-        updated.existing_order?.status === "waitlisted"
-          ? "Quantity recorded on the waitlist."
-          : "Order confirmed for your entity.",
-      );
+      const savedOrder = updated.existing_order;
+      if (savedOrder?.waitlisted_quantity) {
+        const confirmedModels = Object.entries(
+          savedOrder.confirmed_variant_quantities,
+        )
+          .map(([model, quantity]) => `${model}: ${quantity}`)
+          .join(", ");
+        const waitlistedModels = Object.entries(
+          savedOrder.waitlisted_variant_quantities,
+        )
+          .map(([model, quantity]) => `${model}: ${quantity}`)
+          .join(", ");
+        setMessage(
+          savedOrder.variant_quantities &&
+            Object.keys(savedOrder.variant_quantities).length
+            ? `Order recorded. Confirmed — ${confirmedModels || "none"}. Waitlisted — ${waitlistedModels}.`
+            : `Order recorded: ${savedOrder.confirmed_quantity} confirmed and ${savedOrder.waitlisted_quantity} waitlisted.`,
+        );
+      } else {
+        setMessage("Order confirmed for your entity.");
+      }
     } catch (caught) {
       setOrderError(
         caught instanceof Error

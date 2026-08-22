@@ -1256,6 +1256,35 @@ td {
   overflow: hidden;
 }
 
+.event-presentation-display {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
+}
+
+.event-presentation-display img {
+  image-rendering: auto;
+}
+
+.projector-fullscreen-control {
+  position: fixed;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 100;
+  min-height: 0 !important;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 0.6rem;
+  padding: 0.45rem 0.7rem;
+  color: #ffffff;
+  background: rgba(7, 20, 44, 0.9);
+  font-size: 0.75rem;
+  font-weight: 800;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.projector-fullscreen-control:hover {
+  background: #123a73;
+}
+
 @media (min-width: 1024px) and (min-height: 620px) {
   .event-presentation-display {
     width: 100vw;

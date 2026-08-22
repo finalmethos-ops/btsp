@@ -28,8 +28,14 @@ class EventEntityOrderResponse(BaseModel):
     requested_delivery_end: date
     unit_cost: Decimal
     total_cost: Decimal
-    status: Literal["confirmed", "waitlisted"]
+    status: Literal["confirmed", "partially_waitlisted", "waitlisted"]
     variant_quantities: dict[str, int] = Field(default_factory=dict)
+    confirmed_quantity: int = 0
+    waitlisted_quantity: int = 0
+    confirmed_total_cost: Decimal = Decimal("0.00")
+    waitlisted_total_cost: Decimal = Decimal("0.00")
+    confirmed_variant_quantities: dict[str, int] = Field(default_factory=dict)
+    waitlisted_variant_quantities: dict[str, int] = Field(default_factory=dict)
     submitted_at: datetime
     updated_at: datetime
 

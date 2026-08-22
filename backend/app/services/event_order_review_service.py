@@ -30,6 +30,11 @@ from app.schemas.event_order_review import (
 )
 from app.services.catalog_product_identity_service import allocate_product_code
 from app.services.event_access_service import event_operations_are_locked
+from app.services.event_order_allocation import (
+    confirmed_quantity,
+    confirmed_total_cost,
+    confirmed_variant_quantities,
+)
 from app.services.spreadsheet_security import spreadsheet_safe_row
 
 
@@ -39,7 +44,8 @@ class EventOrderReviewError(ValueError):
 
 def _variant_release_lines(order: EventEntityOrder, slide: EventProductSlide):
     variants = {str(item["model_number"]): item for item in (slide.product_variants or [])}
-    if variants and order.variant_quantities:
+    allocated_variants = confirmed_variant_quantities(order)
+    if variants and allocated_variants:
         return [
             (
                 model,
@@ -47,10 +53,15 @@ def _variant_release_lines(order: EventEntityOrder, slide: EventProductSlide):
                 Decimal(str(variants[model]["event_unit_cost"])),
                 Decimal(str(variants[model]["event_unit_cost"])) * quantity,
             )
-            for model, quantity in order.variant_quantities.items()
+            for model, quantity in allocated_variants.items()
             if quantity > 0 and model in variants
         ]
-    return [(slide.model_number, order.quantity, order.unit_cost, order.total_cost)]
+    quantity = confirmed_quantity(order)
+    return (
+        [(slide.model_number, quantity, order.unit_cost, confirmed_total_cost(order))]
+        if quantity
+        else []
+    )
 
 
 def _release_store(db: Session, order: EventEntityOrder) -> str:
@@ -147,9 +158,9 @@ def review_summary(db: Session, event_id: str) -> EventOrderReviewSummary | None
             vendor_code=slide.vendor_code,
             model_number=slide.model_number,
             product_name=slide.name,
-            quantity=order.quantity,
+            quantity=confirmed_quantity(order),
             unit_cost=order.unit_cost,
-            total_cost=order.total_cost,
+            total_cost=confirmed_total_cost(order),
             requested_delivery_start=order.requested_delivery_start,
             requested_delivery_end=order.requested_delivery_end,
             live_status=order.status,
@@ -186,6 +197,7 @@ def review_summary(db: Session, event_id: str) -> EventOrderReviewSummary | None
             ],
         )
         for order, slide, sub_event in rows
+        if confirmed_quantity(order) > 0
     ]
     approved = [item for item in items if item.review_status == "approved"]
     return EventOrderReviewSummary(
@@ -218,13 +230,16 @@ def decide_order(
         )
     if order.review_status == "released":
         raise EventOrderReviewError("Released orders cannot be changed")
+    if confirmed_quantity(order) < 1:
+        raise EventOrderReviewError("Fully waitlisted orders have no confirmed units to review")
     slide = db.get(EventProductSlide, order.slide_id)
-    previous_quantity = order.quantity
+    previous_quantity = confirmed_quantity(order)
     if payload.decision == "revise":
-        if order.variant_quantities and slide.product_variants:
+        allocated_variants = confirmed_variant_quantities(order)
+        if allocated_variants and slide.product_variants:
             variants = {str(item["model_number"]): item for item in slide.product_variants}
             revised = payload.revised_variant_quantities
-            expected_models = set(order.variant_quantities)
+            expected_models = set(allocated_variants)
             if not revised or set(revised) != expected_models:
                 raise EventOrderReviewError(
                     "Enter a revised quantity for every product in this combined offer"
@@ -238,15 +253,25 @@ def decide_order(
             resulting_quantity = sum(revised.values())
             if resulting_quantity < 1:
                 raise EventOrderReviewError("At least one product quantity must remain")
-            order.variant_quantities = {
+            order.confirmed_variant_quantities = {
                 model: quantity for model, quantity in revised.items() if quantity > 0
             }
-            order.quantity = resulting_quantity
-            order.total_cost = sum(
+            order.confirmed_quantity = resulting_quantity
+            order.confirmed_total_cost = sum(
                 Decimal(str(variants[model]["event_unit_cost"])) * quantity
-                for model, quantity in order.variant_quantities.items()
+                for model, quantity in order.confirmed_variant_quantities.items()
             )
-            order.unit_cost = order.total_cost / resulting_quantity
+            requested_models = set(order.confirmed_variant_quantities) | set(
+                order.waitlisted_variant_quantities or {}
+            )
+            order.variant_quantities = {
+                model: order.confirmed_variant_quantities.get(model, 0)
+                + (order.waitlisted_variant_quantities or {}).get(model, 0)
+                for model in requested_models
+            }
+            order.quantity = order.confirmed_quantity + order.waitlisted_quantity
+            order.total_cost = order.confirmed_total_cost + order.waitlisted_total_cost
+            order.unit_cost = order.confirmed_total_cost / resulting_quantity
         else:
             if payload.revised_quantity is None:
                 raise EventOrderReviewError("Revised quantity is required")
@@ -256,8 +281,10 @@ def decide_order(
                     "Quantity must meet the minimum order quantity of "
                     f"{slide.minimum_order_quantity}"
                 )
-            order.quantity = resulting_quantity
-            order.total_cost = Decimal(resulting_quantity) * order.unit_cost
+            order.confirmed_quantity = resulting_quantity
+            order.confirmed_total_cost = Decimal(resulting_quantity) * order.unit_cost
+            order.quantity = order.confirmed_quantity + order.waitlisted_quantity
+            order.total_cost = order.confirmed_total_cost + order.waitlisted_total_cost
     order.review_status = "rejected" if payload.decision == "reject" else "approved"
     order.reviewed_by = actor
     order.reviewed_at = datetime.now(UTC)
@@ -266,7 +293,7 @@ def decide_order(
             order_id=order.id,
             decision=payload.decision,
             previous_quantity=previous_quantity,
-            resulting_quantity=order.quantity,
+            resulting_quantity=order.confirmed_quantity,
             reason=(payload.reason or "").strip() or None,
             actor=actor,
         )
@@ -285,6 +312,10 @@ def decide_order(
             revision=revision + 1,
             quantity=order.quantity,
             variant_quantities=order.variant_quantities or {},
+            confirmed_quantity=order.confirmed_quantity,
+            waitlisted_quantity=order.waitlisted_quantity,
+            confirmed_variant_quantities=order.confirmed_variant_quantities or {},
+            waitlisted_variant_quantities=order.waitlisted_variant_quantities or {},
             requested_delivery_start=order.requested_delivery_start,
             requested_delivery_end=order.requested_delivery_end,
             status=f"review_{order.review_status}",
@@ -415,8 +446,8 @@ def release_approved_orders(
         order_count=len(rows),
         vendor_count=len({slide.vendor_code for _, slide in rows}),
         entity_count=len({order.entity_code for order, _ in rows}),
-        total_units=sum(order.quantity for order, _ in rows),
-        total_spend=sum((order.total_cost for order, _ in rows), Decimal("0")),
+        total_units=sum(confirmed_quantity(order) for order, _ in rows),
+        total_spend=sum((confirmed_total_cost(order) for order, _ in rows), Decimal("0")),
         purchase_request_count=len(grouped_requests),
         status=batch.status,
         created_at=batch.created_at,

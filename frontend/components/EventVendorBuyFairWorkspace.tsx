@@ -32,7 +32,8 @@ export function EventVendorBuyFairWorkspace({
   );
   const branding = useEventBrandAsset(workspace?.event_id);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [selectedStores, setSelectedStores] = useState<string[]>([]);
+  const [targetScope, setTargetScope] = useState<"entity" | "region">("entity");
+  const [targetRegion, setTargetRegion] = useState("");
   const [requesterId, setRequesterId] = useState("");
   const [cart, setCart] = useState<LifecycleLinePayload[]>([]);
   const [modelCode, setModelCode] = useState("");
@@ -91,28 +92,38 @@ export function EventVendorBuyFairWorkspace({
   const selectedRequester = workspace?.requesters.find(
     (requester) => requester.id === Number(requesterId),
   );
-  const availableStores = useMemo(() => {
-    if (!selectedRequester) return workspace?.stores ?? [];
+  const availableScope = useMemo(() => {
+    if (!selectedRequester) return null;
     const entity = selectedRequester.entity_code?.trim().toUpperCase() ?? "";
     const region = selectedRequester.region_code?.trim().toUpperCase() ?? "";
-    if (!entity && !region) return [];
-    return (workspace?.stores ?? []).filter((store) => {
-      const storeEntity = store.entity_code?.trim().toUpperCase() ?? "";
-      const storeRegion = store.region_code.trim().toUpperCase();
-      return (
-        (!entity || storeEntity === entity) &&
-        (region === "ALL_STORES" || !region || storeRegion === region)
-      );
-    });
-  }, [selectedRequester, workspace?.stores]);
+    if (!entity) return null;
+    const scope = workspace?.ordering_scopes.find(
+      (item) => item.entity_code.toUpperCase() === entity,
+    );
+    if (!scope) return null;
+    return {
+      entity_code: scope.entity_code,
+      region_codes:
+        region && region !== "ALL_STORES"
+          ? scope.region_codes.filter((item) => item.toUpperCase() === region)
+          : scope.region_codes,
+      can_order_entity: !region || region === "ALL_STORES",
+    };
+  }, [selectedRequester, workspace?.ordering_scopes]);
 
   useEffect(() => {
-    setSelectedStores((current) =>
-      current.filter((storeNumber) =>
-        availableStores.some((store) => store.store_number === storeNumber),
-      ),
-    );
-  }, [availableStores]);
+    if (!availableScope) {
+      setTargetRegion("");
+      return;
+    }
+    if (!availableScope.can_order_entity) {
+      setTargetScope("region");
+      setTargetRegion(availableScope.region_codes[0] ?? "");
+      return;
+    }
+    setTargetScope("entity");
+    setTargetRegion("");
+  }, [availableScope]);
   const cartTotal = useMemo(
     () =>
       cart.reduce((total, line) => {
@@ -166,12 +177,13 @@ export function EventVendorBuyFairWorkspace({
       const created = await createEventBuyFairOrders(
         subEventId,
         Number(requesterId),
-        selectedStores,
+        targetScope,
+        targetScope === "region" ? targetRegion : null,
         deliveryDate,
         cart,
       );
       setCart([]);
-      setSelectedStores([]);
+      setTargetRegion("");
       setDeliveryDate("");
       await load();
       setSelectedId(created[0]?.id ?? null);
@@ -357,39 +369,79 @@ export function EventVendorBuyFairWorkspace({
             );
           })}
         </div>
-        <h2 className="mt-5 font-bold">Choose stores</h2>
-        <div className="event-buy-fair-store-list mt-2 grid max-h-56 gap-2 overflow-auto rounded-xl border p-3 sm:grid-cols-2 lg:grid-cols-3">
-          {availableStores.map((store) => (
-            <label
-              className={`event-selectable flex gap-2 rounded-lg border p-3 ${selectedStores.includes(store.store_number) ? "is-selected" : ""}`}
-              key={store.store_number}
-            >
-              <input
-                checked={selectedStores.includes(store.store_number)}
-                onChange={(event) =>
-                  setSelectedStores((current) =>
-                    event.target.checked
-                      ? [...current, store.store_number]
-                      : current.filter((item) => item !== store.store_number),
-                  )
-                }
-                type="checkbox"
-              />
-              <span>
-                <strong>{store.store_number}</strong> — {store.name}
-                <small className="block text-slate-500">
-                  {store.city}, {store.state_code}
-                </small>
-              </span>
-            </label>
-          ))}
-          {requesterId && !availableStores.length ? (
+        <fieldset className="mt-5 grid gap-3 rounded-xl border p-4">
+          <legend className="px-2 font-bold">Order destination</legend>
+          {availableScope ? (
+            <>
+              <p className="text-sm text-slate-600">
+                Quantities apply to every eligible store in the selected scope;
+                BTSP creates the individual purchasing drafts automatically.
+              </p>
+              {availableScope.can_order_entity ? (
+                <label className="event-selectable flex gap-3 rounded-xl border p-3">
+                  <input
+                    checked={targetScope === "entity"}
+                    name="target_scope"
+                    onChange={() => {
+                      setTargetScope("entity");
+                      setTargetRegion("");
+                    }}
+                    type="radio"
+                  />
+                  <span>
+                    <strong>
+                      Entire entity — {availableScope.entity_code}
+                    </strong>
+                    <small className="block text-slate-500">
+                      Order for every eligible store in this entity
+                    </small>
+                  </span>
+                </label>
+              ) : null}
+              <label className="event-selectable grid gap-2 rounded-xl border p-3 sm:grid-cols-[auto_1fr]">
+                <input
+                  checked={targetScope === "region"}
+                  name="target_scope"
+                  onChange={() => {
+                    setTargetScope("region");
+                    setTargetRegion(
+                      (current) =>
+                        current || availableScope.region_codes[0] || "",
+                    );
+                  }}
+                  type="radio"
+                />
+                <span>
+                  <strong>Specific region</strong>
+                  <select
+                    className="mt-2 w-full rounded-xl border p-3"
+                    disabled={targetScope !== "region"}
+                    onChange={(event) => setTargetRegion(event.target.value)}
+                    required={targetScope === "region"}
+                    value={targetRegion}
+                  >
+                    <option value="">Select region</option>
+                    {availableScope.region_codes.map((region) => (
+                      <option key={region} value={region}>
+                        {region}
+                      </option>
+                    ))}
+                  </select>
+                </span>
+              </label>
+            </>
+          ) : requesterId ? (
             <p className="rounded-lg border border-dashed p-3 text-sm text-slate-500">
-              No active stores are assigned to this requester&apos;s entity and
-              region.
+              No active stores eligible for this vendor are assigned to the
+              requester&apos;s entity and region.
             </p>
-          ) : null}
-        </div>
+          ) : (
+            <p className="text-sm text-slate-500">
+              Select the requesting Buddy&apos;s user to load authorized entity
+              and region choices.
+            </p>
+          )}
+        </fieldset>
         <div className="event-buy-fair-submit-row mt-3 flex flex-wrap items-end gap-3">
           <label className="font-bold">
             Requested Delivery Date
@@ -402,7 +454,7 @@ export function EventVendorBuyFairWorkspace({
             />
           </label>
           <span className="font-bold">
-            Cart total per store: {money(String(cartTotal))}
+            Cart total per eligible store: {money(String(cartTotal))}
           </span>
           {orderError ? (
             <p
@@ -415,11 +467,14 @@ export function EventVendorBuyFairWorkspace({
           <button
             className="rounded-xl bg-blue-900 px-5 py-3 font-bold text-white disabled:bg-slate-400"
             disabled={
-              busy || !cart.length || !selectedStores.length || !requesterId
+              busy ||
+              !cart.length ||
+              !requesterId ||
+              !availableScope ||
+              (targetScope === "region" && !targetRegion)
             }
           >
-            Create {selectedStores.length || ""} order draft
-            {selectedStores.length === 1 ? "" : "s"}
+            Create scoped order drafts
           </button>
         </div>
       </form>

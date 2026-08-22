@@ -1371,7 +1371,7 @@ export function EventProductSlideBuilder({
             />
             <span className="mt-1 block font-normal text-slate-500">
               {fillerCategory === "full_screen_image"
-                ? "Use a high-resolution 16:9 image (ideally 1920 × 1080). The projector shows only this image, without headers or overlays."
+                ? "Use a high-resolution 16:9 image (ideally 3840 × 2160; minimum 1920 × 1080). The projector shows only this image, without headers or overlays."
                 : "Upload an image now. Product slides can also use Web Fill."}
             </span>
           </label>

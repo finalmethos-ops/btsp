@@ -75,7 +75,7 @@ def test_vendor_buy_fair_prioritizes_booth_models_and_creates_standard_requests(
             display_name="Buddy's Requester",
             password_hash="test",
             entity_code="ENTITY-SOUTH",
-            region_code="SOUTH",
+            region_code="ALL_STORES",
             is_active=True,
             roles=[Role(code="FRANCHISE_OPERATOR", name="Franchise Operator")],
         )
@@ -197,13 +197,15 @@ def test_vendor_buy_fair_prioritizes_booth_models_and_creates_standard_requests(
         assert workspace.models[0].is_booth_model is True
         assert workspace.requesters[0].display_name == "Buddy's Requester"
         assert not hasattr(workspace.requesters[0], "email")
+        assert workspace.ordering_scopes[0].entity_code == "ENTITY-SOUTH"
+        assert workspace.ordering_scopes[0].region_codes == ["SOUTH"]
 
         created = create_buy_fair_orders(
             db,
             sub_event.id,
             EventBuyFairOrderCreate(
                 requester_id=requester.id,
-                store_numbers=["101", "102"],
+                target_scope="entity",
                 expected_delivery_date=date(2027, 8, 1),
                 line_items=[LifecycleLineWrite(product_code="BOOTH-1", quantity=2)],
             ),
@@ -219,7 +221,6 @@ def test_vendor_buy_fair_prioritizes_booth_models_and_creates_standard_requests(
         # “All Stores” is scoped to the requester’s entity, not the whole
         # company. A BEBE/ENTITY-SOUTH requester may use every store in that
         # entity, but cannot submit against another entity.
-        requester.region_code = "ALL_STORES"
         db.add(
             Store(
                 store_number="999",

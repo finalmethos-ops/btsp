@@ -33,6 +33,14 @@ from app.schemas.event_settlement import (
     EventSettlementWrite,
 )
 from app.services.event_access_service import event_operations_are_locked
+from app.services.event_order_allocation import (
+    confirmed_quantity,
+    confirmed_total_cost,
+    confirmed_variant_quantities,
+    waitlisted_quantity,
+    waitlisted_total_cost,
+    waitlisted_variant_quantities,
+)
 from app.services.event_order_backup_service import archive_event_order_backup
 from app.services.event_product_slide_service import purge_event_slide_images
 
@@ -511,15 +519,16 @@ def _order_loadout_match_rows(
         )
     ):
         variants = {str(item["model_number"]): item for item in (slide.product_variants or [])}
-        if variants and order.variant_quantities:
-            for model_number, quantity in order.variant_quantities.items():
+        allocated_variants = confirmed_variant_quantities(order)
+        if variants and allocated_variants:
+            for model_number, quantity in allocated_variants.items():
                 if quantity > 0 and model_number in variants:
                     order_quantities[(order.entity_code, slide.vendor_code, model_number)] += (
                         quantity
                     )
         else:
             order_quantities[(order.entity_code, slide.vendor_code, slide.model_number)] += (
-                order.quantity
+                confirmed_quantity(order)
             )
     for assignment, item in db.execute(
         select(StoreLoadoutAssignment, StoreLoadoutItem)
@@ -655,15 +664,13 @@ def _order_count(db: Session, event_id: str, review_status: str | None = None) -
 
 
 def _approved_units(db: Session, event_id: str) -> int:
-    live_units = (
-        db.scalar(
-            select(func.coalesce(func.sum(EventEntityOrder.quantity), 0)).where(
-                EventEntityOrder.event_id == event_id,
-                EventEntityOrder.review_status.in_(["approved", "released"]),
-            )
+    live_orders = db.scalars(
+        select(EventEntityOrder).where(
+            EventEntityOrder.event_id == event_id,
+            EventEntityOrder.review_status.in_(["approved", "released"]),
         )
-        or 0
-    )
+    ).all()
+    live_units = sum(confirmed_quantity(order) for order in live_orders)
     buy_fair_units = sum(
         (
             line.quantity
@@ -676,12 +683,13 @@ def _approved_units(db: Session, event_id: str) -> int:
 
 
 def _approved_spend(db: Session, event_id: str) -> Decimal:
-    live_spend = db.scalar(
-        select(func.coalesce(func.sum(EventEntityOrder.total_cost), 0)).where(
+    live_orders = db.scalars(
+        select(EventEntityOrder).where(
             EventEntityOrder.event_id == event_id,
             EventEntityOrder.review_status.in_(["approved", "released"]),
         )
-    ) or Decimal("0")
+    ).all()
+    live_spend = sum((confirmed_total_cost(order) for order in live_orders), Decimal("0"))
     return live_spend + sum(
         (request.total for request in _submitted_buy_fair_requests(db, event_id)),
         Decimal("0"),
@@ -954,50 +962,67 @@ def _order_closeout_export_rows(
             if slide
             else {}
         )
-        product_lines = (
-            [
-                (
-                    model,
-                    str(variants[model]["name"]),
-                    quantity,
-                    Decimal(str(variants[model]["event_unit_cost"])),
-                )
-                for model, quantity in order.variant_quantities.items()
-                if quantity > 0 and model in variants
-            ]
-            if variants and order.variant_quantities
-            else [
-                (
-                    slide.model_number if slide else "",
-                    slide.name if slide else "",
-                    order.quantity,
-                    order.unit_cost,
-                )
-            ]
+        allocations = (
+            (
+                "confirmed",
+                confirmed_variant_quantities(order),
+                confirmed_quantity(order),
+                confirmed_total_cost(order),
+            ),
+            (
+                "waitlisted",
+                waitlisted_variant_quantities(order),
+                waitlisted_quantity(order),
+                waitlisted_total_cost(order),
+            ),
         )
-        for model_number, item_name, quantity, unit_cost in product_lines:
-            rows.append(
+        for allocation_status, allocation_variants, scalar_quantity, scalar_total in allocations:
+            product_lines = (
                 [
-                    event.name,
-                    order.entity_code,
-                    slide.vendor_code if slide else "",
-                    model_number,
-                    item_name,
-                    str(quantity),
-                    str(unit_cost),
-                    str(unit_cost * quantity),
-                    order.status,
-                    order.review_status,
-                    _dt(order.reviewed_at),
-                    order.reviewed_by or "",
-                    _dt(order.submitted_at),
-                    _dt(order.updated_at),
-                    "live_presentation",
-                    "",
-                    "",
-                    order.id,
+                    (
+                        model,
+                        str(variants[model]["name"]),
+                        quantity,
+                        Decimal(str(variants[model]["event_unit_cost"])),
+                    )
+                    for model, quantity in allocation_variants.items()
+                    if quantity > 0 and model in variants
+                ]
+                if variants and allocation_variants
+                else [
+                    (
+                        slide.model_number if slide else "",
+                        slide.name if slide else "",
+                        scalar_quantity,
+                        scalar_total / scalar_quantity if scalar_quantity else order.unit_cost,
+                    )
                 ]
             )
+            for model_number, item_name, quantity, unit_cost in product_lines:
+                if quantity < 1:
+                    continue
+                rows.append(
+                    [
+                        event.name,
+                        order.entity_code,
+                        slide.vendor_code if slide else "",
+                        model_number,
+                        item_name,
+                        str(quantity),
+                        str(unit_cost),
+                        str(unit_cost * quantity),
+                        f"{order.status}:{allocation_status}",
+                        order.review_status,
+                        _dt(order.reviewed_at),
+                        order.reviewed_by or "",
+                        _dt(order.submitted_at),
+                        _dt(order.updated_at),
+                        "live_presentation",
+                        "",
+                        "",
+                        order.id,
+                    ]
+                )
     for request in _event_buy_fair_requests(db, event.id):
         store = db.scalar(select(Store).where(Store.store_number == request.store_number))
         entity_code = (store.entity_code if store else None) or request.store_number

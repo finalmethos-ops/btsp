@@ -26,6 +26,10 @@ export type EventBuyFairWorkspace = {
     entity_code: string | null;
     region_code: string | null;
   }>;
+  ordering_scopes: Array<{
+    entity_code: string;
+    region_codes: string[];
+  }>;
   orders: PurchaseRequest[];
   order_count: number;
   total_units: string;
@@ -109,7 +113,8 @@ export async function downloadSubEventBuyFairOrders(subEventId: string) {
 export const createEventBuyFairOrders = (
   subEventId: string,
   requester_id: number,
-  store_numbers: string[],
+  target_scope: "entity" | "region",
+  target_region_code: string | null,
   expected_delivery_date: string,
   line_items: LifecycleLinePayload[],
 ) =>
@@ -117,7 +122,8 @@ export const createEventBuyFairOrders = (
     method: "POST",
     body: JSON.stringify({
       requester_id,
-      store_numbers,
+      target_scope,
+      target_region_code,
       expected_delivery_date,
       line_items,
     }),

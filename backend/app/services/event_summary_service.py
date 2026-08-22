@@ -17,6 +17,7 @@ from app.models.identity import User
 from app.models.purchasing import PurchaseRequest
 from app.schemas.event_summary import EventSummaryBreakdown, EventSummaryResponse, EventSummaryRow
 from app.services.event_access_service import event_window_open_for_user
+from app.services.event_order_allocation import confirmed_quantity, confirmed_total_cost
 
 
 class EventSummaryError(ValueError):
@@ -71,7 +72,7 @@ def event_summary(db: Session, event_id: str, user: User) -> EventSummaryRespons
             CatalogProduct,
             CatalogProduct.product_code == EventProductSlide.catalog_product_code,
         )
-        .where(EventEntityOrder.event_id == event_id, EventEntityOrder.status == "confirmed")
+        .where(EventEntityOrder.event_id == event_id)
     )
     if vendor_code:
         statement = statement.where(EventProductSlide.vendor_code == vendor_code)
@@ -87,11 +88,12 @@ def event_summary(db: Session, event_id: str, user: User) -> EventSummaryRespons
             sub_event_id=order.sub_event_id,
             vendor_code=order_vendor,
             entity_code=order.entity_code,
-            units=order.quantity,
-            spend=order.total_cost,
+            units=confirmed_quantity(order),
+            spend=confirmed_total_cost(order),
             department=department or "UNASSIGNED",
         )
         for order, order_vendor, department in rows
+        if confirmed_quantity(order) > 0
     ]
     # Vendor Buy Fair orders flow through the standard PurchaseRequest table.
     # Include them in the same event totals while applying the same scope.

@@ -53,6 +53,7 @@ export function EventPresentationDisplay({
   const [error, setError] = useState<string | null>(null);
   const [brandingUrl, setBrandingUrl] = useState<string | null>(null);
   const [imageFit, setImageFit] = useState<"contain" | "cover">("contain");
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const slide = presentation?.current_slide;
   const isFiller = slide?.slide_type === "filler";
   const isFullScreenImage =
@@ -102,6 +103,31 @@ export function EventPresentationDisplay({
     slide?.standard_cost,
     slide?.event_unit_cost,
   );
+
+  useEffect(() => {
+    const updateFullscreenState = () =>
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    updateFullscreenState();
+    document.addEventListener("fullscreenchange", updateFullscreenState);
+    return () =>
+      document.removeEventListener("fullscreenchange", updateFullscreenState);
+  }, []);
+
+  const enterFullscreen = () => {
+    if (!document.fullscreenElement) {
+      void document.documentElement.requestFullscreen().catch(() => undefined);
+    }
+  };
+
+  const fullscreenControl = !isFullscreen ? (
+    <button
+      className="projector-fullscreen-control"
+      onClick={enterFullscreen}
+      type="button"
+    >
+      Enter full screen for sharpest output
+    </button>
+  ) : null;
 
   useEffect(() => {
     const apply = () => {
@@ -188,6 +214,7 @@ export function EventPresentationDisplay({
   if (isFullScreenImage)
     return (
       <main className="relative flex h-screen w-screen items-center justify-center overflow-hidden bg-black">
+        {fullscreenControl}
         {error ? (
           <p className="absolute inset-x-4 top-4 z-10 rounded-xl border border-red-400 bg-red-950/95 p-3 text-center font-bold text-red-100">
             {error}
@@ -214,6 +241,7 @@ export function EventPresentationDisplay({
       className={`event-ui event-presentation-display event-branded-surface flex min-h-screen flex-col bg-slate-950 p-4 text-white ${presentation ? "has-event-theme" : ""} ${brandingUrl ? "has-event-branding-image" : ""}`}
       style={brandedStyle}
     >
+      {fullscreenControl}
       {error ? (
         <p className="mb-4 rounded-xl border border-red-400 bg-red-950/90 p-3 text-center font-bold text-red-100">
           {error}

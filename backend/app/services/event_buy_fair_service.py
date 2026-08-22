@@ -17,6 +17,7 @@ from app.models.store import Store
 from app.schemas.event_buy_fair import (
     EventBuyFairModel,
     EventBuyFairOrderCreate,
+    EventBuyFairOrderingScope,
     EventBuyFairOrderSummary,
     EventBuyFairRequester,
     EventBuyFairStore,
@@ -344,6 +345,15 @@ def buy_fair_workspace(db: Session, sub_event_id: str, user: User) -> EventBuyFa
     ]
     models.sort(key=lambda item: (not item.is_booth_model, item.model_identifier.casefold()))
     orders = _event_orders(db, event.id, vendor_code, sub_event_id=sub_event.id)
+    available_stores = eligible_stores(db, vendor_code)
+    scopes: dict[str, set[str]] = {}
+    for store in available_stores:
+        entity_code = (store.entity_code or "").strip().upper()
+        region_code = (store.region_code or "").strip().upper()
+        if entity_code:
+            scopes.setdefault(entity_code, set())
+            if region_code:
+                scopes[entity_code].add(region_code)
     return EventBuyFairWorkspace(
         event_id=event.id,
         event_name=event.name,
@@ -353,7 +363,14 @@ def buy_fair_workspace(db: Session, sub_event_id: str, user: User) -> EventBuyFa
         models=models,
         stores=[
             EventBuyFairStore.model_validate(item, from_attributes=True)
-            for item in eligible_stores(db, vendor_code)
+            for item in available_stores
+        ],
+        ordering_scopes=[
+            EventBuyFairOrderingScope(
+                entity_code=entity_code,
+                region_codes=sorted(region_codes),
+            )
+            for entity_code, region_codes in sorted(scopes.items())
         ],
         requesters=[
             EventBuyFairRequester(
@@ -401,13 +418,41 @@ def create_buy_fair_orders(
     )
     if requester is None:
         raise EventBuyFairError("Select an active Buddy’s requester")
-    stores = list(
-        db.scalars(select(Store).where(Store.store_number.in_(payload.store_numbers))).all()
-    )
-    if len(stores) != len(set(payload.store_numbers)):
-        raise EventBuyFairError("One or more selected stores no longer exist")
     requester_entity = (requester.entity_code or "").strip().upper()
     requester_region = (requester.region_code or "").strip().upper()
+    vendor_stores = eligible_stores(db, vendor_code)
+    if payload.target_scope:
+        if not requester_entity:
+            raise EventBuyFairError("The selected requester does not have an assigned entity")
+        target_region = (payload.target_region_code or "").strip().upper()
+        if payload.target_scope == "region":
+            if requester_region not in {"", "ALL_STORES", target_region}:
+                raise EventBuyFairError("The selected requester is not authorized for that region")
+        elif requester_region not in {"", "ALL_STORES"}:
+            raise EventBuyFairError(
+                "This requester is region-scoped; select their authorized region"
+            )
+        stores = [
+            store
+            for store in vendor_stores
+            if (store.entity_code or "").strip().upper() == requester_entity
+            and (
+                payload.target_scope == "entity"
+                or (store.region_code or "").strip().upper() == target_region
+            )
+        ]
+        if not stores:
+            scope_label = requester_entity if payload.target_scope == "entity" else target_region
+            raise EventBuyFairError(
+                f"No active stores eligible for this vendor were found in {scope_label}"
+            )
+        store_numbers = [store.store_number for store in stores]
+    else:
+        # Compatibility path for an older client already open during deployment.
+        store_numbers = list(dict.fromkeys(payload.store_numbers))
+        stores = list(db.scalars(select(Store).where(Store.store_number.in_(store_numbers))).all())
+        if len(stores) != len(store_numbers):
+            raise EventBuyFairError("One or more selected stores no longer exist")
     # “All Stores” means every store in the requester’s assigned entity, not
     # every company/entity in the database. A region-specific approval remains
     # additionally constrained to that region.
@@ -448,13 +493,17 @@ def create_buy_fair_orders(
                 "requester_name": requester.display_name,
                 "requester_entity_code": requester.entity_code,
                 "requester_region_code": requester.region_code,
+                "order_target_scope": payload.target_scope or "stores",
+                "order_target_region_code": (
+                    (payload.target_region_code or "").strip().upper() or None
+                ),
             },
         )
 
     return create_vendor_requests(
         db,
         vendor_code,
-        payload.store_numbers,
+        store_numbers,
         user.email,
         payload.expected_delivery_date,
         payload.line_items,

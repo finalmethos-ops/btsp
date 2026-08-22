@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from decimal import Decimal
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
@@ -24,6 +25,12 @@ from app.schemas.event_presentation import (
 )
 from app.schemas.event_product_slide import EventProductSlideResponse
 from app.services.event_access_service import event_operations_are_locked
+from app.services.event_order_allocation import (
+    confirmed_quantity,
+    confirmed_total_cost,
+    confirmed_variant_quantities,
+    waitlisted_quantity,
+)
 
 
 class EventPresentationError(ValueError):
@@ -73,8 +80,9 @@ def get_live_analytics(db: Session, sub_event_id: str) -> EventLiveAnalyticsResp
                 .order_by(EventEntityOrder.updated_at.desc())
             ).all()
         )
-    confirmed = [order for order in orders if order.status == "confirmed"]
-    waitlisted = [order for order in orders if order.status == "waitlisted"]
+    confirmed = [order for order in orders if confirmed_quantity(order) > 0]
+    waitlisted = [order for order in orders if waitlisted_quantity(order) > 0]
+    confirmed_spend = sum((confirmed_total_cost(order) for order in confirmed), Decimal("0"))
     return EventLiveAnalyticsResponse(
         sub_event_id=sub_event_id,
         current_slide_id=slide_id,
@@ -83,9 +91,9 @@ def get_live_analytics(db: Session, sub_event_id: str) -> EventLiveAnalyticsResp
         confirmed_entities=len(confirmed),
         waitlisted_entities=len(waitlisted),
         entities_remaining=max(assigned - len(orders), 0),
-        confirmed_units=sum(order.quantity for order in confirmed),
-        confirmed_spend=f"{sum(order.total_cost for order in confirmed):.2f}",
-        waitlisted_units=sum(order.quantity for order in waitlisted),
+        confirmed_units=sum(confirmed_quantity(order) for order in confirmed),
+        confirmed_spend=f"{confirmed_spend:.2f}",
+        waitlisted_units=sum(waitlisted_quantity(order) for order in waitlisted),
         orders=[
             EventLiveEntityOrder(
                 entity_code=order.entity_code,
@@ -177,24 +185,26 @@ def get_presentation(
             db.scalars(
                 select(EventEntityOrder).where(
                     EventEntityOrder.slide_id == current.id,
-                    EventEntityOrder.status == "confirmed",
+                    EventEntityOrder.confirmed_quantity > 0,
                 )
             ).all()
         )
-        total_units = sum(order.quantity for order in current_orders)
-        total_spend = f"{sum(order.total_cost for order in current_orders):.2f}"
+        total_units = sum(confirmed_quantity(order) for order in current_orders)
+        total_spend = (
+            f"{sum((confirmed_total_cost(order) for order in current_orders), Decimal('0')):.2f}"
+        )
         for order in current_orders:
-            for model_number, quantity in (order.variant_quantities or {}).items():
+            for model_number, quantity in confirmed_variant_quantities(order).items():
                 variant_units_ordered[model_number] = variant_units_ordered.get(
                     model_number, 0
                 ) + int(quantity)
     sub_event_totals = db.execute(
         select(
-            func.coalesce(func.sum(EventEntityOrder.quantity), 0),
-            func.coalesce(func.sum(EventEntityOrder.total_cost), 0),
+            func.coalesce(func.sum(EventEntityOrder.confirmed_quantity), 0),
+            func.coalesce(func.sum(EventEntityOrder.confirmed_total_cost), 0),
         ).where(
             EventEntityOrder.sub_event_id == sub_event.id,
-            EventEntityOrder.status == "confirmed",
+            EventEntityOrder.confirmed_quantity > 0,
         )
     ).one()
     current_index = (

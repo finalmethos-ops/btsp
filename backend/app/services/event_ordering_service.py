@@ -65,9 +65,9 @@ def _variant_capacity(
 def _confirmed_variant_quantities(
     db: Session, slide_id: str, *, exclude_order_id: str | None = None
 ) -> dict[str, int]:
-    statement = select(EventEntityOrder.variant_quantities).where(
+    statement = select(EventEntityOrder.confirmed_variant_quantities).where(
         EventEntityOrder.slide_id == slide_id,
-        EventEntityOrder.status == "confirmed",
+        EventEntityOrder.confirmed_quantity > 0,
     )
     if exclude_order_id:
         statement = statement.where(EventEntityOrder.id != exclude_order_id)
@@ -141,10 +141,10 @@ def _ordering_workspace_response(
 ) -> EventOrderingWorkspaceResponse:
     cap = _order_capacity(slide)
     entity_sub_event_spend = db.scalar(
-        select(func.coalesce(func.sum(EventEntityOrder.total_cost), 0)).where(
+        select(func.coalesce(func.sum(EventEntityOrder.confirmed_total_cost), 0)).where(
             EventEntityOrder.sub_event_id == sub_event.id,
             EventEntityOrder.entity_code == membership.entity_code,
-            EventEntityOrder.status.in_(["confirmed", "waitlisted"]),
+            EventEntityOrder.confirmed_quantity > 0,
         )
     ) or Decimal("0.00")
     return EventOrderingWorkspaceResponse(
@@ -236,9 +236,9 @@ def ordering_workspace(
     if slide:
         confirmed = (
             db.scalar(
-                select(func.coalesce(func.sum(EventEntityOrder.quantity), 0)).where(
+                select(func.coalesce(func.sum(EventEntityOrder.confirmed_quantity), 0)).where(
                     EventEntityOrder.slide_id == slide.id,
-                    EventEntityOrder.status == "confirmed",
+                    EventEntityOrder.confirmed_quantity > 0,
                 )
             )
             or 0
@@ -327,9 +327,9 @@ def submit_entity_order(
     )
     confirmed_other = (
         db.scalar(
-            select(func.coalesce(func.sum(EventEntityOrder.quantity), 0)).where(
+            select(func.coalesce(func.sum(EventEntityOrder.confirmed_quantity), 0)).where(
                 EventEntityOrder.slide_id == slide.id,
-                EventEntityOrder.status == "confirmed",
+                EventEntityOrder.confirmed_quantity > 0,
                 EventEntityOrder.id != (order.id if order else ""),
             )
         )
@@ -339,23 +339,55 @@ def submit_entity_order(
         db, slide.id, exclude_order_id=order.id if order else None
     )
     cap = _order_capacity(slide)
-    over_cap = cap is not None and confirmed_other + requested_quantity > cap
+    confirmed_quantity = 0
+    waitlisted_quantity = 0
+    confirmed_variant_quantities: dict[str, int] = {}
+    waitlisted_variant_quantities: dict[str, int] = {}
     if variants:
-        over_cap = any(
-            (
-                variant_cap := _variant_capacity(
-                    variants[model],
-                    fallback_available_inventory=slide.available_inventory,
-                    fallback_max_event_units=slide.max_event_units,
-                )
+        for model, quantity in variant_quantities.items():
+            variant_cap = _variant_capacity(
+                variants[model],
+                fallback_available_inventory=slide.available_inventory,
+                fallback_max_event_units=slide.max_event_units,
             )
-            is not None
-            and confirmed_variants_other.get(model, 0) + quantity > variant_cap
-            for model, quantity in variant_quantities.items()
-        )
-    if over_cap and not slide.allow_waitlist:
+            available = (
+                max(variant_cap - confirmed_variants_other.get(model, 0), 0)
+                if variant_cap is not None
+                else quantity
+            )
+            allocated = min(quantity, available)
+            overage = quantity - allocated
+            if allocated:
+                confirmed_variant_quantities[model] = allocated
+                confirmed_quantity += allocated
+            if overage:
+                waitlisted_variant_quantities[model] = overage
+                waitlisted_quantity += overage
+    else:
+        available = max(cap - confirmed_other, 0) if cap is not None else requested_quantity
+        confirmed_quantity = min(requested_quantity, available)
+        waitlisted_quantity = requested_quantity - confirmed_quantity
+    if waitlisted_quantity and not slide.allow_waitlist:
         raise EventOrderingError("Requested quantity exceeds remaining event availability")
-    status = "waitlisted" if over_cap else "confirmed"
+    status = (
+        "confirmed"
+        if waitlisted_quantity == 0
+        else "waitlisted"
+        if confirmed_quantity == 0
+        else "partially_waitlisted"
+    )
+    if variants:
+        confirmed_total = sum(
+            Decimal(str(variants[model]["event_unit_cost"])) * quantity
+            for model, quantity in confirmed_variant_quantities.items()
+        )
+        waitlisted_total = sum(
+            Decimal(str(variants[model]["event_unit_cost"])) * quantity
+            for model, quantity in waitlisted_variant_quantities.items()
+        )
+    else:
+        confirmed_total = Decimal(confirmed_quantity) * slide.event_unit_cost
+        waitlisted_total = Decimal(waitlisted_quantity) * slide.event_unit_cost
     if order is None:
         order = EventEntityOrder(
             event_id=sub_event.event_id,
@@ -368,6 +400,12 @@ def submit_entity_order(
         db.add(order)
     order.quantity = requested_quantity
     order.variant_quantities = variant_quantities
+    order.confirmed_quantity = confirmed_quantity
+    order.waitlisted_quantity = waitlisted_quantity
+    order.confirmed_total_cost = confirmed_total
+    order.waitlisted_total_cost = waitlisted_total
+    order.confirmed_variant_quantities = confirmed_variant_quantities
+    order.waitlisted_variant_quantities = waitlisted_variant_quantities
     # Franchise representatives choose quantities only. The vendor-scoped
     # delivery window remains authoritative for downstream review and release.
     order.requested_delivery_start = slide.delivery_window_start
@@ -390,6 +428,10 @@ def submit_entity_order(
             revision=revision + 1,
             quantity=requested_quantity,
             variant_quantities=variant_quantities,
+            confirmed_quantity=confirmed_quantity,
+            waitlisted_quantity=waitlisted_quantity,
+            confirmed_variant_quantities=confirmed_variant_quantities,
+            waitlisted_variant_quantities=waitlisted_variant_quantities,
             requested_delivery_start=slide.delivery_window_start,
             requested_delivery_end=slide.delivery_window_end,
             status=status,
@@ -397,11 +439,10 @@ def submit_entity_order(
         )
     )
     db.commit()
-    confirmed = confirmed_other + (requested_quantity if status == "confirmed" else 0)
+    confirmed = confirmed_other + confirmed_quantity
     confirmed_variants = dict(confirmed_variants_other)
-    if status == "confirmed":
-        for model, quantity in variant_quantities.items():
-            confirmed_variants[model] = confirmed_variants.get(model, 0) + quantity
+    for model, quantity in confirmed_variant_quantities.items():
+        confirmed_variants[model] = confirmed_variants.get(model, 0) + quantity
     return _ordering_workspace_response(
         db,
         sub_event,

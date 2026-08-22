@@ -24,7 +24,7 @@ def _image_bytes(
 
 
 def test_presentation_image_is_resized_and_converted_to_webp() -> None:
-    source = _image_bytes((3000, 2000))
+    source = _image_bytes((5000, 3000))
 
     content_type, content = normalize_presentation_image(source, "image/png")
 
@@ -32,8 +32,8 @@ def test_presentation_image_is_resized_and_converted_to_webp() -> None:
     assert len(content) < len(source)
     with Image.open(BytesIO(content)) as image:
         assert image.format == "WEBP"
-        assert image.width <= 1920
-        assert image.height <= 1080
+        assert image.width <= 3840
+        assert image.height <= 2160
 
 
 def test_lossless_logo_preserves_alpha_channel() -> None:

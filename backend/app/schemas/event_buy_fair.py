@@ -1,7 +1,8 @@
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.schemas.order_lifecycle import LifecycleLineWrite
 from app.schemas.purchasing import PurchaseRequestResponse
@@ -9,9 +10,22 @@ from app.schemas.purchasing import PurchaseRequestResponse
 
 class EventBuyFairOrderCreate(BaseModel):
     requester_id: int = Field(gt=0)
-    store_numbers: list[str] = Field(min_length=1, max_length=500)
+    target_scope: Literal["entity", "region"] | None = None
+    target_region_code: str | None = Field(default=None, max_length=64)
+    # Retained temporarily for API compatibility with drafts created by older clients.
+    store_numbers: list[str] = Field(default_factory=list, max_length=500)
     expected_delivery_date: date
     line_items: list[LifecycleLineWrite] = Field(min_length=1, max_length=500)
+
+    @model_validator(mode="after")
+    def valid_target(self) -> "EventBuyFairOrderCreate":
+        if self.target_scope is None and not self.store_numbers:
+            raise ValueError("Select an entity or region")
+        if self.target_scope == "region" and not (self.target_region_code or "").strip():
+            raise ValueError("Select a region")
+        if self.target_scope == "entity" and self.target_region_code:
+            raise ValueError("Entity orders cannot include a region")
+        return self
 
 
 class EventBuyFairModel(BaseModel):
@@ -42,6 +56,11 @@ class EventBuyFairRequester(BaseModel):
     region_code: str | None
 
 
+class EventBuyFairOrderingScope(BaseModel):
+    entity_code: str
+    region_codes: list[str]
+
+
 class EventBuyFairWorkspace(BaseModel):
     event_id: str
     event_name: str
@@ -51,6 +70,7 @@ class EventBuyFairWorkspace(BaseModel):
     models: list[EventBuyFairModel]
     stores: list[EventBuyFairStore]
     requesters: list[EventBuyFairRequester]
+    ordering_scopes: list[EventBuyFairOrderingScope] = Field(default_factory=list)
     orders: list[PurchaseRequestResponse]
     order_count: int
     total_units: Decimal

@@ -1,6 +1,6 @@
 from decimal import Decimal
 
-from sqlalchemy import distinct, func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.permissions import user_has_permission
@@ -20,6 +20,11 @@ from app.schemas.event_live_insights import (
     VendorLiveVendorMetric,
 )
 from app.services.event_access_service import membership_has_sub_event_access
+from app.services.event_order_allocation import (
+    confirmed_quantity,
+    confirmed_total_cost,
+    confirmed_variant_quantities,
+)
 
 
 class EventLiveInsightsError(ValueError):
@@ -102,22 +107,18 @@ def live_insights(db: Session, sub_event_id: str, user: User) -> EventLiveInsigh
     )
 
     def totals(*conditions):
-        return db.execute(
-            select(
-                func.coalesce(func.sum(EventEntityOrder.quantity), 0),
-                func.coalesce(func.sum(EventEntityOrder.total_cost), 0),
-            ).where(EventEntityOrder.status == "confirmed", *conditions)
-        ).one()
+        orders = db.scalars(select(EventEntityOrder).where(*conditions)).all()
+        return (
+            sum(confirmed_quantity(order) for order in orders),
+            sum((confirmed_total_cost(order) for order in orders), Decimal("0")),
+        )
 
     sub_totals = totals(EventEntityOrder.sub_event_id == sub_event_id)
-    responding = (
-        db.scalar(
-            select(func.count(distinct(EventEntityOrder.entity_code))).where(
-                EventEntityOrder.sub_event_id == sub_event_id,
-                EventEntityOrder.status == "confirmed",
-            )
-        )
-        or 0
+    responding_orders = db.scalars(
+        select(EventEntityOrder).where(EventEntityOrder.sub_event_id == sub_event_id)
+    ).all()
+    responding = len(
+        {order.entity_code for order in responding_orders if confirmed_quantity(order) > 0}
     )
     product_metrics: list[VendorLiveProductMetric] = []
     vendor_metrics: list[VendorLiveVendorMetric] = []
@@ -129,16 +130,10 @@ def live_insights(db: Session, sub_event_id: str, user: User) -> EventLiveInsigh
     franchise_units = 0
     franchise_spend = Decimal("0.00")
     if entity_code:
-        franchise_totals = db.execute(
-            select(
-                func.coalesce(func.sum(EventEntityOrder.quantity), 0),
-                func.coalesce(func.sum(EventEntityOrder.total_cost), 0),
-            ).where(
-                EventEntityOrder.sub_event_id == sub_event_id,
-                EventEntityOrder.entity_code == entity_code,
-                EventEntityOrder.status.in_(["confirmed", "waitlisted"]),
-            )
-        ).one()
+        franchise_totals = totals(
+            EventEntityOrder.sub_event_id == sub_event_id,
+            EventEntityOrder.entity_code == entity_code,
+        )
         franchise_units = int(franchise_totals[0])
         franchise_spend = franchise_totals[1]
     if vendor_codes:
@@ -148,7 +143,6 @@ def live_insights(db: Session, sub_event_id: str, user: User) -> EventLiveInsigh
                 db.scalars(
                     select(EventEntityOrder).where(
                         EventEntityOrder.slide_id.in_([slide.id for slide in vendor_slides]),
-                        EventEntityOrder.status == "confirmed",
                     )
                 ).all()
             )
@@ -157,7 +151,8 @@ def live_insights(db: Session, sub_event_id: str, user: User) -> EventLiveInsigh
         )
         orders_by_slide: dict[str, list[EventEntityOrder]] = {}
         for order in vendor_orders:
-            orders_by_slide.setdefault(order.slide_id, []).append(order)
+            if confirmed_quantity(order) > 0:
+                orders_by_slide.setdefault(order.slide_id, []).append(order)
         units_by_vendor = dict.fromkeys(vendor_codes, 0)
         spend_by_vendor = dict.fromkeys(vendor_codes, Decimal("0.00"))
         for slide in vendor_slides:
@@ -168,7 +163,7 @@ def live_insights(db: Session, sub_event_id: str, user: User) -> EventLiveInsigh
                 for variant in slide.product_variants:
                     model = str(variant["model_number"])
                     units = sum(
-                        (order.variant_quantities or {}).get(model, 0) for order in slide_orders
+                        confirmed_variant_quantities(order).get(model, 0) for order in slide_orders
                     )
                     spend = Decimal(str(variant["event_unit_cost"])) * units
                     vendor_units += units
@@ -188,8 +183,11 @@ def live_insights(db: Session, sub_event_id: str, user: User) -> EventLiveInsigh
                         )
                     )
             else:
-                units = sum(order.quantity for order in slide_orders)
-                spend = sum((order.total_cost for order in slide_orders), Decimal("0.00"))
+                units = sum(confirmed_quantity(order) for order in slide_orders)
+                spend = sum(
+                    (confirmed_total_cost(order) for order in slide_orders),
+                    Decimal("0.00"),
+                )
                 vendor_units += int(units)
                 vendor_spend += spend
                 units_by_vendor[slide_vendor_code] += int(units)

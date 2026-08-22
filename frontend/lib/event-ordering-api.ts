@@ -10,8 +10,14 @@ export type EventOrder = {
   requested_delivery_end: string;
   unit_cost: string;
   total_cost: string;
-  status: "confirmed" | "waitlisted";
+  status: "confirmed" | "partially_waitlisted" | "waitlisted";
   variant_quantities: Record<string, number>;
+  confirmed_quantity: number;
+  waitlisted_quantity: number;
+  confirmed_total_cost: string;
+  waitlisted_total_cost: string;
+  confirmed_variant_quantities: Record<string, number>;
+  waitlisted_variant_quantities: Record<string, number>;
   submitted_at: string;
   updated_at: string;
 };

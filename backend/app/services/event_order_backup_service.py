@@ -21,6 +21,14 @@ from app.models.identity import User
 from app.models.purchase_order import PurchaseOrder, PurchaseOrderSource
 from app.models.purchasing import PurchaseRequest
 from app.models.store import Store
+from app.services.event_order_allocation import (
+    confirmed_quantity,
+    confirmed_total_cost,
+    confirmed_variant_quantities,
+    waitlisted_quantity,
+    waitlisted_total_cost,
+    waitlisted_variant_quantities,
+)
 from app.services.spreadsheet_security import spreadsheet_safe_row
 
 HEADER_FILL = PatternFill("solid", fgColor="123A73")
@@ -73,9 +81,15 @@ def _sheet_name(entity: str, used: set[str]) -> str:
     return name
 
 
-def _variants(order: EventEntityOrder, slide: EventProductSlide):
+def _variants(
+    order: EventEntityOrder,
+    slide: EventProductSlide,
+    quantities: dict[str, int],
+    scalar_quantity: int,
+    scalar_total: Decimal,
+):
     variants = {str(item["model_number"]): item for item in (slide.product_variants or [])}
-    if variants and order.variant_quantities:
+    if variants and quantities:
         return [
             (
                 model,
@@ -83,10 +97,13 @@ def _variants(order: EventEntityOrder, slide: EventProductSlide):
                 quantity,
                 Decimal(str(variants[model]["event_unit_cost"])),
             )
-            for model, quantity in order.variant_quantities.items()
+            for model, quantity in quantities.items()
             if quantity > 0 and model in variants
         ]
-    return [(slide.model_number, slide.name, order.quantity, order.unit_cost)]
+    if scalar_quantity < 1:
+        return []
+    unit_cost = scalar_total / scalar_quantity
+    return [(slide.model_number, slide.name, scalar_quantity, unit_cost)]
 
 
 def _style_table(sheet, widths: list[int], money_columns: tuple[int, ...] = ()) -> None:
@@ -210,34 +227,52 @@ def export_event_order_backup(db: Session, event_id: str) -> tuple[ManagedEvent,
         store = stores.get(user.home_store_number or "")
         if store is None and len(stores_by_entity.get(order.entity_code, [])) == 1:
             store = stores_by_entity[order.entity_code][0]
-        for model, name, quantity, unit_cost in _variants(order, slide):
-            total = unit_cost * quantity
-            live_units += quantity
-            live_spend += total
-            order_records.append(
-                [
-                    "Live presentation",
-                    order.id,
-                    "",
-                    sub_event.name,
-                    order.entity_code,
-                    store.region_code if store else "",
-                    store.store_number if store else "",
-                    slide.vendor_code,
-                    model,
-                    name,
-                    quantity,
-                    unit_cost,
-                    total,
-                    order.requested_delivery_start,
-                    order.requested_delivery_end,
-                    order.status,
-                    order.review_status,
-                    user.email,
-                    _datetime_text(order.submitted_at),
-                    _datetime_text(order.updated_at),
-                ]
-            )
+        allocations = (
+            (
+                "confirmed",
+                confirmed_variant_quantities(order),
+                confirmed_quantity(order),
+                confirmed_total_cost(order),
+            ),
+            (
+                "waitlisted",
+                waitlisted_variant_quantities(order),
+                waitlisted_quantity(order),
+                waitlisted_total_cost(order),
+            ),
+        )
+        for allocation_status, quantities, scalar_quantity, scalar_total in allocations:
+            for model, name, quantity, unit_cost in _variants(
+                order, slide, quantities, scalar_quantity, scalar_total
+            ):
+                total = unit_cost * quantity
+                if allocation_status == "confirmed":
+                    live_units += quantity
+                    live_spend += total
+                order_records.append(
+                    [
+                        "Live presentation",
+                        order.id,
+                        "",
+                        sub_event.name,
+                        order.entity_code,
+                        store.region_code if store else "",
+                        store.store_number if store else "",
+                        slide.vendor_code,
+                        model,
+                        name,
+                        quantity,
+                        unit_cost,
+                        total,
+                        order.requested_delivery_start,
+                        order.requested_delivery_end,
+                        f"{order.status}:{allocation_status}",
+                        order.review_status,
+                        user.email,
+                        _datetime_text(order.submitted_at),
+                        _datetime_text(order.updated_at),
+                    ]
+                )
 
     buy_fair_units = Decimal("0")
     buy_fair_spend = Decimal("0")

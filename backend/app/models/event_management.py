@@ -310,6 +310,12 @@ class EventEntityOrder(Base):
     total_cost: Mapped[Decimal] = mapped_column(Numeric(16, 2))
     status: Mapped[str] = mapped_column(String(24), index=True)
     variant_quantities: Mapped[dict[str, int]] = mapped_column(JSON, default=dict)
+    confirmed_quantity: Mapped[int] = mapped_column(default=0)
+    waitlisted_quantity: Mapped[int] = mapped_column(default=0)
+    confirmed_total_cost: Mapped[Decimal] = mapped_column(Numeric(16, 2), default=0)
+    waitlisted_total_cost: Mapped[Decimal] = mapped_column(Numeric(16, 2), default=0)
+    confirmed_variant_quantities: Mapped[dict[str, int]] = mapped_column(JSON, default=dict)
+    waitlisted_variant_quantities: Mapped[dict[str, int]] = mapped_column(JSON, default=dict)
     review_status: Mapped[str] = mapped_column(String(24), default="pending", index=True)
     reviewed_by: Mapped[str | None] = mapped_column(String(320), nullable=True)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -331,6 +337,10 @@ class EventEntityOrderRevision(Base):
     revision: Mapped[int]
     quantity: Mapped[int]
     variant_quantities: Mapped[dict[str, int]] = mapped_column(JSON, default=dict)
+    confirmed_quantity: Mapped[int] = mapped_column(default=0)
+    waitlisted_quantity: Mapped[int] = mapped_column(default=0)
+    confirmed_variant_quantities: Mapped[dict[str, int]] = mapped_column(JSON, default=dict)
+    waitlisted_variant_quantities: Mapped[dict[str, int]] = mapped_column(JSON, default=dict)
     requested_delivery_start: Mapped[date]
     requested_delivery_end: Mapped[date]
     status: Mapped[str] = mapped_column(String(24))

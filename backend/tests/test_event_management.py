@@ -1516,6 +1516,7 @@ def test_event_product_lineup_snapshots_catalog_controls_and_reorders() -> None:
                 event_unit_cost=Decimal("50.00"),
                 available_inventory=20,
                 max_event_units=10,
+                allow_waitlist=True,
                 product_variants=[
                     {
                         "model_number": "SPECIAL-TWIN",
@@ -1610,16 +1611,25 @@ def test_event_product_lineup_snapshots_catalog_controls_and_reorders() -> None:
             "SPECIAL-TWIN": 3,
             "SPECIAL-KING": 8,
         }
-        with pytest.raises(EventOrderingError, match="exceeds remaining"):
-            submit_entity_order(
-                db,
-                sub_event_id,
-                EventEntityOrderWrite(
-                    quantity=14,
-                    variant_quantities={"SPECIAL-TWIN": 3, "SPECIAL-KING": 11},
-                ),
-                second_buyer,
-            )
+        partial_workspace = submit_entity_order(
+            db,
+            sub_event_id,
+            EventEntityOrderWrite(
+                quantity=14,
+                variant_quantities={"SPECIAL-TWIN": 3, "SPECIAL-KING": 11},
+            ),
+            second_buyer,
+        )
+        assert partial_workspace is not None
+        assert partial_workspace.existing_order is not None
+        assert partial_workspace.existing_order.status == "partially_waitlisted"
+        assert partial_workspace.existing_order.confirmed_variant_quantities == {
+            "SPECIAL-TWIN": 3,
+            "SPECIAL-KING": 10,
+        }
+        assert partial_workspace.existing_order.waitlisted_variant_quantities == {"SPECIAL-KING": 1}
+        assert partial_workspace.existing_order.confirmed_quantity == 13
+        assert partial_workspace.existing_order.waitlisted_quantity == 1
         shared_workspace = submit_entity_order(
             db,
             sub_event_id,
@@ -1652,6 +1662,7 @@ def test_event_product_lineup_snapshots_catalog_controls_and_reorders() -> None:
         }
         assert [item.changed_by for item in revisions] == [
             "buyer@example.com",
+            "second-buyer@example.com",
             "second-buyer@example.com",
         ]
         editable_slide = EventProductSlideWrite.model_validate(second.model_dump())
