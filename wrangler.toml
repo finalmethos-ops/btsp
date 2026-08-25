@@ -4,5 +4,6 @@ name = "pem-buddys"
 site = { bucket = "public" }
 
 # If Cloudflare project requires an account_id or other settings, add them in the dashboard or here.
-# account_id = "your-account-id"
+account_id = "09af4e2d332aa82ae7ad5f6fbdb1e1c0"
+# Set workers_dev = true to deploy to a workers.dev subdomain when appropriate
 # workers_dev = true
