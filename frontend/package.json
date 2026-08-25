@@ -6,7 +6,7 @@
     "dev": "next dev --webpack -H 0.0.0.0",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint . || true",
+    "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check app components lib *.json *.mjs *.ts",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
