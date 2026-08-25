@@ -1,4 +1,4 @@
-import { apiDownload, apiFetch } from "@/lib/api";
+import { apiDownload, apiFetch } from "./http-client";
 
 export type OperationalDashboard = {
   purchasing: {

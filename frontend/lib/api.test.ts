@@ -1,12 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  apiDownload,
-  apiDownloadWithFilename,
-  apiFetch,
-  clearToken,
-  getStoredToken,
-  storeToken,
-} from "./api";
+import { apiDownload, apiDownloadWithFilename, apiFetch, clearToken, getStoredToken, storeToken } from "./http-client";
 
 class MemoryStorage {
   private values = new Map<string, string>();

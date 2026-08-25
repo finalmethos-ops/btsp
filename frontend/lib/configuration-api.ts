@@ -1,6 +1,4 @@
-import { getStoredToken } from "./api";
-
-import { getApiBaseUrl } from "./api-origin";
+import { apiFetch } from "./http-client";
 
 export type ConfigEntry = {
   id: number;
@@ -44,7 +42,7 @@ async function configFetch<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const token = getStoredToken();
+  return apiFetch<T>(path, options);
   const response = await fetch(`${getApiBaseUrl()}/api/v1${path}`, {
     ...options,
     headers: {

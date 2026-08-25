@@ -1,4 +1,4 @@
-import { apiDownloadWithFilename, apiFetch } from "./api";
+import { apiDownloadWithFilename, apiFetch } from "./http-client";
 
 export type EventStaffTaskStatus =
   | "open"

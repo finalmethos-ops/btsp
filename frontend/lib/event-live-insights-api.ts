@@ -1,4 +1,4 @@
-import { apiFetch } from "./api";
+import { apiFetch } from "./http-client";
 
 export type VendorLiveProductMetric = {
   slide_id: string;

@@ -1,4 +1,4 @@
-import { apiFetch } from "@/lib/api";
+import { apiFetch } from "./http-client";
 
 export type VendorInvoice = {
   id: string;

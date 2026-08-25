@@ -1,8 +1,4 @@
-import {
-  apiDownloadWithFilename,
-  apiFetch,
-  sanitizeDownloadFilename,
-} from "./api";
+import { apiDownloadWithFilename, apiFetch, sanitizeDownloadFilename } from "./http-client";
 
 export type EventOrderReviewItem = {
   order_id: string;

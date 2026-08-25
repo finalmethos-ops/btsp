@@ -1,4 +1,4 @@
-import { getStoredToken } from "./api";
+import { getStoredToken } from "./http-client";
 import { getApiBaseUrl } from "./api-origin";
 
 export function subscribeEventRealtime(

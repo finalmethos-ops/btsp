@@ -1,4 +1,4 @@
-import { apiFetch } from "./api";
+import { apiFetch } from "./http-client";
 import { EventProductSlide } from "./event-product-slide-api";
 
 export type EventOrder = {

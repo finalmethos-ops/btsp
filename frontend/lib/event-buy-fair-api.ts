@@ -1,4 +1,4 @@
-import { apiDownloadWithFilename, apiFetch } from "./api";
+import { apiDownloadWithFilename, apiFetch } from "./http-client";
 import { LifecycleLinePayload } from "./order-lifecycle-api";
 import { EligibleStore, PurchaseRequest } from "./purchasing-api";
 
