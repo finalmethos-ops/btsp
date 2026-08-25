@@ -244,11 +244,6 @@ export type AuditFilters = {
   date_to?: string;
 };
 
-
-
-
-
-
 export async function apiFetch<T>(
   path: string,
   options: RequestInit = {},
@@ -309,9 +304,6 @@ export async function apiDownloadWithFilename(
     ),
   };
 }
-
-
-
 
 export async function login(
   email: string,

@@ -25,7 +25,9 @@ export function storeToken(token: string): void {
     window.sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
     window.localStorage.removeItem(TOKEN_STORAGE_KEY);
   } catch {
-    throw new Error("Browser storage is unavailable; enable site storage to sign in");
+    throw new Error(
+      "Browser storage is unavailable; enable site storage to sign in",
+    );
   }
 }
 
@@ -35,7 +37,9 @@ export function storeRefreshToken(token: string | null | undefined): void {
     window.sessionStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, token);
     window.localStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY);
   } catch {
-    throw new Error("Browser storage is unavailable; enable site storage to sign in");
+    throw new Error(
+      "Browser storage is unavailable; enable site storage to sign in",
+    );
   }
 }
 
@@ -68,7 +72,8 @@ export async function apiFetch<T>(
   allowRefresh = true,
 ): Promise<T> {
   const token = getStoredToken();
-  const usesFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
+  const usesFormData =
+    typeof FormData !== "undefined" && options.body instanceof FormData;
   const response = await fetch(`${getApiBaseUrl()}/api/v1${path}`, {
     ...options,
     headers: {
@@ -93,7 +98,10 @@ export async function apiFetch<T>(
   return response.json() as Promise<T>;
 }
 
-async function refreshAccessToken(): Promise<{ access_token: string; refresh_token?: string | null }> {
+async function refreshAccessToken(): Promise<{
+  access_token: string;
+  refresh_token?: string | null;
+}> {
   const refreshToken = getStoredRefreshToken();
   if (!refreshToken) throw new Error("No refresh token available");
   const response = await fetch(`${getApiBaseUrl()}/api/v1/auth/refresh`, {
@@ -102,7 +110,10 @@ async function refreshAccessToken(): Promise<{ access_token: string; refresh_tok
     body: JSON.stringify({ refresh_token: refreshToken }),
   });
   if (!response.ok) throw new Error("Refresh session expired");
-  return response.json() as Promise<{ access_token: string; refresh_token?: string | null }>;
+  return response.json() as Promise<{
+    access_token: string;
+    refresh_token?: string | null;
+  }>;
 }
 
 export async function apiDownload(path: string): Promise<Blob> {
@@ -116,10 +127,13 @@ export async function apiDownloadWithFilename(
   const response = await fetch(`${getApiBaseUrl()}/api/v1${path}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
-  if (!response.ok) throw new Error(await apiErrorMessage(response, "download"));
+  if (!response.ok)
+    throw new Error(await apiErrorMessage(response, "download"));
   return {
     blob: await response.blob(),
-    filename: filenameFromContentDisposition(response.headers.get("content-disposition")),
+    filename: filenameFromContentDisposition(
+      response.headers.get("content-disposition"),
+    ),
   };
 }
 
@@ -141,8 +155,11 @@ async function apiErrorMessage(
         .map((item) => {
           if (!item || typeof item !== "object") return null;
           const error = item as { loc?: unknown[]; msg?: unknown };
-          const location = Array.isArray(error.loc) ? error.loc.slice(1).join(" → ") : "";
-          const message = typeof error.msg === "string" ? error.msg : "Invalid value";
+          const location = Array.isArray(error.loc)
+            ? error.loc.slice(1).join(" → ")
+            : "";
+          const message =
+            typeof error.msg === "string" ? error.msg : "Invalid value";
           return location ? `${location}: ${message}` : message;
         })
         .filter(Boolean);
