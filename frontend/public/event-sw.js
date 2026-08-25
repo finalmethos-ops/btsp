@@ -1,4 +1,3 @@
-/* eslint-env serviceworker */
 // Bump this when shell/UI assets change so returning event users do not stay
 // on a stale cached login or calendar bundle.
 const cacheName = "btsp-event-shell-v3";
