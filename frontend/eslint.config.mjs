@@ -5,16 +5,17 @@ import { defineConfig } from "eslint/config";
 // lint runnable in the CI environment. Reintroduce plugin-based extends once
 // peer deps and config shapes are stabilized.
 export default defineConfig({
-  parser: "@typescript-eslint/parser",
-  parserOptions: {
-    ecmaVersion: 2022,
-    sourceType: "module",
-    ecmaFeatures: { jsx: true },
-  },
-  env: {
-    browser: true,
-    node: true,
-    es2022: true,
+  languageOptions: {
+    parser: "@typescript-eslint/parser",
+    parserOptions: {
+      ecmaVersion: 2022,
+      sourceType: "module",
+      ecmaFeatures: { jsx: true },
+    },
+    globals: {
+      window: "readonly",
+      process: "readonly",
+    },
   },
   rules: {
     // Keep only a small set of safe rules; expand later when plugins are stable
