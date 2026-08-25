@@ -1,5 +1,11 @@
 import { apiFetch, apiDownload } from "./http-client";
-export { getStoredToken, storeToken, storeRefreshToken, clearToken, sanitizeDownloadFilename } from "./http-client";
+export {
+  getStoredToken,
+  storeToken,
+  storeRefreshToken,
+  clearToken,
+  sanitizeDownloadFilename,
+} from "./http-client";
 
 export type LoginResponse = {
   access_token: string;
@@ -241,7 +247,6 @@ export type AuditFilters = {
   date_from?: string;
   date_to?: string;
 };
-
 
 export async function login(
   email: string,
