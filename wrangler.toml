@@ -1,0 +1,8 @@
+name = "pem-buddys"
+# Minimal config to satisfy Wrangler static site detection for Cloudflare Builds
+# This points Wrangler to the public/ folder containing static assets.
+site = { bucket = "public" }
+
+# If Cloudflare project requires an account_id or other settings, add them in the dashboard or here.
+# account_id = "your-account-id"
+# workers_dev = true
