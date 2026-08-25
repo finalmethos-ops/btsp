@@ -22,7 +22,7 @@ export default defineConfig({
     "no-unused-vars": "warn",
     "no-undef": "error",
   },
-  ignorePatterns: [
+  ignores: [
     ".next/**",
     "out/**",
     "dist/**",
