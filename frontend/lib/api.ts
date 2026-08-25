@@ -1,7 +1,5 @@
-import { getApiBaseUrl } from "./api-origin";
-
-const TOKEN_STORAGE_KEY = "btsp.access_token";
-const REFRESH_TOKEN_STORAGE_KEY = "btsp.refresh_token";
+import { apiFetch, apiDownload } from "./http-client";
+export { getStoredToken, storeToken, storeRefreshToken, clearToken, sanitizeDownloadFilename } from "./http-client";
 
 export type LoginResponse = {
   access_token: string;
@@ -244,66 +242,6 @@ export type AuditFilters = {
   date_to?: string;
 };
 
-export async function apiFetch<T>(
-  path: string,
-  options: RequestInit = {},
-  allowRefresh = true,
-): Promise<T> {
-  const token = getStoredToken();
-  const usesFormData =
-    typeof FormData !== "undefined" && options.body instanceof FormData;
-  const response = await fetch(`${getApiBaseUrl()}/api/v1${path}`, {
-    ...options,
-    headers: {
-      ...(!usesFormData ? { "Content-Type": "application/json" } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
-  });
-
-  if (response.status === 401 && allowRefresh && getStoredRefreshToken()) {
-    try {
-      const refreshed = await refreshAccessToken();
-      storeToken(refreshed.access_token);
-      storeRefreshToken(refreshed.refresh_token);
-      return apiFetch<T>(path, options, false);
-    } catch {
-      clearToken();
-    }
-  }
-  if (!response.ok) throw new Error(await apiErrorMessage(response));
-  if (response.status === 204) return undefined as T;
-  return response.json() as Promise<T>;
-}
-
-async function refreshAccessToken(): Promise<LoginResponse> {
-  const refreshToken = getStoredRefreshToken();
-  if (!refreshToken) throw new Error("No refresh token available");
-  const response = await fetch(`${getApiBaseUrl()}/api/v1/auth/refresh`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refresh_token: refreshToken }),
-  });
-  if (!response.ok) throw new Error("Refresh session expired");
-  return response.json() as Promise<LoginResponse>;
-}
-
-export async function apiDownloadWithFilename(
-  path: string,
-): Promise<{ blob: Blob; filename: string | null }> {
-  const token = getStoredToken();
-  const response = await fetch(`${getApiBaseUrl()}/api/v1${path}`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
-  if (!response.ok)
-    throw new Error(await apiErrorMessage(response, "download"));
-  return {
-    blob: await response.blob(),
-    filename: filenameFromContentDisposition(
-      response.headers.get("content-disposition"),
-    ),
-  };
-}
 
 export async function login(
   email: string,

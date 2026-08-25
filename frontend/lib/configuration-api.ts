@@ -43,22 +43,6 @@ async function configFetch<T>(
   options: RequestInit = {},
 ): Promise<T> {
   return apiFetch<T>(path, options);
-  const response = await fetch(`${getApiBaseUrl()}/api/v1${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      `BTSP configuration request failed with status ${response.status}`,
-    );
-  }
-
-  return response.json() as Promise<T>;
 }
 
 export async function listConfigEntries(
