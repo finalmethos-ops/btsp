@@ -10,6 +10,11 @@ module.exports = [
       globals: {
         window: "readonly",
         process: "readonly",
+        self: "readonly",
+        caches: "readonly",
+        fetch: "readonly",
+        Response: "readonly",
+        URL: "readonly",
       },
     },
     rules: {
