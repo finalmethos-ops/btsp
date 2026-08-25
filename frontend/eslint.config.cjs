@@ -1,11 +1,11 @@
 module.exports = [
   {
     languageOptions: {
-      parser: require.resolve("@typescript-eslint/parser"),
+        parser: require("@typescript-eslint/parser"),
       parserOptions: {
-        ecmaVersion: 2022,
-        sourceType: "module",
-        ecmaFeatures: { jsx: true },
+          ecmaVersion: 2022,
+          sourceType: "module",
+          ecmaFeatures: { jsx: true },
       },
       globals: {
         window: "readonly",
