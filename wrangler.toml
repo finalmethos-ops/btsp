@@ -4,6 +4,8 @@ name = "pem-buddys"
 site = { bucket = "public" }
 # top-level main entry for Wrangler (required when using a site with modern Wrangler)
 main = "workers-site/index.js"
+# Compatibility date required by Cloudflare Workers platform; set to a recent date to pin runtime behavior
+compatibility_date = "2026-08-20"
 
 # If Cloudflare project requires an account_id or other settings, add them in the dashboard or here.
 account_id = "09af4e2d332aa82ae7ad5f6fbdb1e1c0"
