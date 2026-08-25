@@ -1,20 +1,23 @@
-import { defineConfig, globalIgnores } from "eslint/config";
-import nextVitals from "eslint-config-next/core-web-vitals";
-import nextTypescript from "eslint-config-next/typescript";
+import { defineConfig } from "eslint/config";
 
-export default defineConfig([
-  ...nextVitals,
-  ...nextTypescript,
-  {
-    rules: {
-      "react-hooks/set-state-in-effect": "off",
-    },
+export default defineConfig({
+  parser: "@typescript-eslint/parser",
+  extends: [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:react/recommended",
+  ],
+  settings: {
+    react: { version: "detect" },
   },
-  globalIgnores([
+  rules: {
+    "react-hooks/set-state-in-effect": "off",
+  },
+  ignorePatterns: [
     ".next/**",
     "out/**",
     "dist/**",
     "coverage/**",
     "next-env.d.ts",
-  ]),
-]);
+  ],
+});

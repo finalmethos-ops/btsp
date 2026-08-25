@@ -1,4 +1,4 @@
-import { apiFetch } from "./api";
+import { apiFetch } from "./http-client";
 import { EventMembership } from "./event-admin-api";
 
 export type CalendarAudience = EventMembership["membership_type"];

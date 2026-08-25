@@ -1,4 +1,4 @@
-import { apiDownload, apiDownloadWithFilename, apiFetch } from "./api";
+import { apiDownload, apiDownloadWithFilename, apiFetch } from "./http-client";
 
 export type VendorHallBoothStatus =
   | "draft"

@@ -1,4 +1,4 @@
-import { apiDownload, apiFetch } from "./api";
+import { apiDownload, apiFetch } from "./http-client";
 
 export type CatalogVendor = {
   vendor_code: string;

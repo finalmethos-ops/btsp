@@ -1,4 +1,4 @@
-import { apiFetch } from "./api";
+import { apiFetch } from "./http-client";
 
 export type VendorReport = {
   vendor_code: string;

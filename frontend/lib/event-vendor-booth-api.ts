@@ -1,4 +1,4 @@
-import { apiFetch } from "./api";
+import { apiFetch } from "./http-client";
 import { CatalogVendor } from "./purchasing-api";
 
 export type EventVendorBoothStatus = "draft" | "published";

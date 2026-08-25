@@ -2,7 +2,7 @@ import {
   apiDownloadWithFilename,
   apiFetch,
   sanitizeDownloadFilename,
-} from "./api";
+} from "./http-client";
 
 export type EventOrderReviewItem = {
   order_id: string;

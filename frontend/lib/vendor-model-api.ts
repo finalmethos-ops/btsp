@@ -1,4 +1,4 @@
-import { apiDownload, apiFetch } from "./api";
+import { apiDownload, apiFetch } from "./http-client";
 
 export type VendorModel = {
   product_code: string;

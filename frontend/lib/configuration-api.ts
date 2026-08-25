@@ -1,6 +1,4 @@
-import { getStoredToken } from "./api";
-
-import { getApiBaseUrl } from "./api-origin";
+import { apiFetch } from "./http-client";
 
 export type ConfigEntry = {
   id: number;
@@ -44,23 +42,7 @@ async function configFetch<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const token = getStoredToken();
-  const response = await fetch(`${getApiBaseUrl()}/api/v1${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options.headers,
-    },
-  });
-
-  if (!response.ok) {
-    throw new Error(
-      `BTSP configuration request failed with status ${response.status}`,
-    );
-  }
-
-  return response.json() as Promise<T>;
+  return apiFetch<T>(path, options);
 }
 
 export async function listConfigEntries(

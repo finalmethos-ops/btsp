@@ -12,8 +12,9 @@ RUN groupadd --gid 10001 btsp \
     && mkdir -p /data/attachments /data/purchase-order-exports /data/analytics-reports /data/invoice-intake \
     && chown -R btsp:btsp /data
 
-COPY requirements.txt .
-COPY requirements-dev.txt .
+# Support building from repo root by referencing the files' path explicitly
+COPY backend/requirements.txt ./requirements.txt
+COPY backend/requirements-dev.txt ./requirements-dev.txt
 RUN python -m pip install --no-cache-dir --upgrade pip==26.1.2 \
     && pip install --no-cache-dir -r requirements.txt \
     && if [ "$INSTALL_DEV_DEPS" = "true" ]; then pip install --no-cache-dir -r requirements-dev.txt; fi

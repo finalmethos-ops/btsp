@@ -1,4 +1,4 @@
-import { apiDownload, apiFetch } from "./api";
+import { apiDownload, apiFetch } from "./http-client";
 import { PurchaseOrder } from "./purchase-order-api";
 import { PurchaseRequest } from "./purchasing-api";
 import { VendorModel } from "./vendor-model-api";

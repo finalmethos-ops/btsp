@@ -1,4 +1,4 @@
-import { apiFetch } from "./api";
+import { apiFetch } from "./http-client";
 import { VendorModel, VendorModelCost } from "./vendor-model-api";
 import { VendorModelClassification } from "./vendor-model-api";
 

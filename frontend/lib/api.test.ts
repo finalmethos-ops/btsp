@@ -6,7 +6,7 @@ import {
   clearToken,
   getStoredToken,
   storeToken,
-} from "./api";
+} from "./http-client";
 
 class MemoryStorage {
   private values = new Map<string, string>();
